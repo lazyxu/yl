@@ -1,0 +1,130 @@
+.calendar-container {
+  margin: 0 auto;
+  padding: 10px;
+  font-family: 'Arial', sans-serif;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  margin-bottom: 10px;
+}
+
+.header button {
+  padding: 8px 15px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+h2 {
+  margin: 0;
+  color: #333;
+}
+
+.calendar {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.weekdays {
+  background: #f5f5f5;
+  font-weight: bold;
+  padding: 10px 0;
+}
+
+.weekday {
+  text-align: center;
+  color: #666;
+  background: #f5f5f5;
+  font-weight: bold;
+  padding: 10px 0;
+}
+
+.week {
+  min-height: 80px;
+}
+
+.day {
+  padding: 8px;
+  border-right: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.date {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.date.grayed {
+  color: #999;
+}
+
+.shift {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-align: center;
+}
+
+.shift.白班 { background: #ad576d; }
+.shift.夜班 { background: #37b2eb; }
+.shift.休息 { background: #1edb5d; }
+
+.day.白班 { border: 2px solid #ad576d; border-radius: 10px; }
+.day.夜班 { border: 2px solid #37b2eb; border-radius: 10px; }
+.day.休息 { border: 2px solid #1edb5d; border-radius: 10px; }
+
+.slide-container {
+  display: flex;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.slide-content {
+  display: flex;
+  transition: transform 0.3s ease;
+}
+
+.slide-content[transition="false"] .month-card {
+  /* 原地显示 */
+}
+
+.month-card {
+  width: 300px; /* 可根据需要调整 */
+  flex: 0 0 auto;
+}
+
+@media (max-width: 768px) {
+  .day {
+    padding: 4px;
+    font-size: 12px;
+  }
+
+  .date {
+    font-size: 12px;
+  }
+
+  .shift {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+
+  .header button {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
