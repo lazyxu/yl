@@ -33,14 +33,14 @@ const Calendar = () => {
     setTransitionBuffer(true);
     setTimeout(() => {
       setCurrentMonth(currentMonth.clone().subtract(1, 'month'));
-    }, 300); // 等待动画结束
+    }, 0); // 等待动画结束
   };
 
   const handleSlideNext = () => {
     setTransitionBuffer(true);
     setTimeout(() => {
       setCurrentMonth(currentMonth.clone().add(1, 'month'));
-    }, 300); // 等待动画结束
+    }, 0); // 等待动画结束
   };
 
   useEffect(() => {
