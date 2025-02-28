@@ -1,7 +1,7 @@
 import moment from 'moment';
 import React, { useEffect, useRef, useState } from 'react';
 import './Calendar.css';
-import { getShift } from './utils';
+import { getMenstrualState, getShift } from './utils';
 
 // window.moment = moment;
 // window.moment('2025-02-01').isSame(window.moment(), 'day');
@@ -60,13 +60,18 @@ const Calendar = () => {
         const day = currentDay.clone();
         const isCurrentMonth = day.month() === currentMonth.month();
         const isToday = day.isSame(today, 'day');
-        // console.log(isToday, day, today)
         const shift = getShift(day);
+        const isMenstrual = getMenstrualState(day); // 获取经期状态
 
         weeks.push(
-          <div key={day.format('YYYY-MM-DD')} className={`day ${isToday ? shift : ''}`}>
+          <div
+            key={day.format('YYYY-MM-DD')}
+            className={`day ${isToday ? shift : ''} ${isMenstrual ? 'menstrual-day' : '' // 添加经期样式
+              }`}
+          >
             <div
-              className={`date ${isCurrentMonth ? '' : 'grayed'}`}
+              className={`date ${isCurrentMonth ? '' : 'grayed'} ${isMenstrual ? 'menstrual-date' : '' // 经期日期样式
+                }`}
             >
               {day.format('D')}
             </div>
@@ -80,11 +85,7 @@ const Calendar = () => {
         );
         currentDay.add(1, 'day');
       }
-      // weeks.push(
-      //   <div key={currentDay.format()} className="week">
-      //     {days}
-      //   </div>
-      // );
+      // weeks.push(<div key={currentDay.format()} className="week">{days}</div>);
     }
     return weeks;
   };
@@ -122,11 +123,11 @@ const Calendar = () => {
       </div>
       <div className="calendar" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {/* <div className="weekdays"> */}
-          {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-            <div key={day} className="weekday">
-              {day}
-            </div>
-          ))}
+        {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+          <div key={day} className="weekday">
+            {day}
+          </div>
+        ))}
         {/* </div> */}
         {generateCalendar()}
       </div>

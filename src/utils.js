@@ -9,3 +9,23 @@ export const getShift = (date) => {
   const diffDays = date.diff(startDate, 'days');
   return shifts[(diffDays % 8 + 8) % 8];
 };
+
+// moment('2025-01-14')
+// moment('2025-01-15')
+// moment('2025-01-16')
+// moment('2025-01-17')
+
+// moment('2025-02-09')
+// moment('2025-02-10')
+// moment('2025-02-11')
+// moment('2025-02-12')
+const BASE_DATE = moment('2025-02-09'); // 基准起始日期
+const CYCLE_LENGTH = 28; // 周期长度（天） 21-35
+const MENSTRUATION_DAYS = 4; // 经期持续天数  2-7
+
+// 检查当前日期是否处于经期
+export const getMenstrualState = (date) => {
+  const daysPassed = date.diff(BASE_DATE, 'days');
+  const cycleDay = (daysPassed % CYCLE_LENGTH + CYCLE_LENGTH) % CYCLE_LENGTH;
+  return cycleDay < MENSTRUATION_DAYS ? '经期日' : '';
+};
