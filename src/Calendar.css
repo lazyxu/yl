@@ -111,9 +111,23 @@ h2 {
   flex: 0 0 auto;
 }
 
-/* 经期日的样式 */
-.menstrual-day .date {
+.经期日 .date {
   border-radius: 50%;
-  background-color: pink; /* 可以根据需要调整背景颜色 */
-  color: #fff; /* 白色文字 */
+  background-color: pink;
+  color: #fff;
+}
+
+.卵泡期 .date {
+  border: 2px solid orange;
+  border-radius: 50%;
+}
+
+.排卵期 .date {
+  border: 2px solid purple;
+  border-radius: 50%;
+}
+
+.黄体期 .date {
+  border: 2px solid rgb(90, 90, 214);
+  border-radius: 50%;
 }
