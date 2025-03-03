@@ -1,7 +1,6 @@
 .calendar-container {
   margin: auto;
   max-width: 500px;
-  padding: 10px;
   font-family: 'Arial', sans-serif;
 }
 
@@ -15,7 +14,7 @@
 
 .header button {
   padding: 8px 15px;
-  font-size: 14px;
+  font-size: 12px;
   border: 1px solid #ddd;
   background: #f8f8f8;
   border-radius: 4px;
@@ -38,7 +37,6 @@ h2 {
 .weekdays {
   background: #f5f5f5;
   font-weight: bold;
-  padding: 10px 0;
 }
 
 .weekday {
@@ -46,7 +44,6 @@ h2 {
   color: #666;
   background: #f5f5f5;
   font-weight: bold;
-  padding: 10px 0;
 }
 
 .week {
@@ -54,7 +51,7 @@ h2 {
 }
 
 .day {
-  padding: 8px;
+  /* padding: 8px; */
   aspect-ratio: 1;
   display: flex;
   flex-direction: column;
@@ -63,9 +60,14 @@ h2 {
 }
 
 .date {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: bold;
   margin-bottom: 4px;
+  display: inline-block;
+  width: 24px; /* 可以根据需要调整 */
+  height: 24px; /* 可以根据需要调整 */
+  text-align: center;
+  line-height: 24px; /* 与高度相同以垂直居中 */
 }
 
 .date.grayed {
@@ -73,19 +75,21 @@ h2 {
 }
 
 .shift {
-  font-size: 12px;
-  padding: 2px 6px;
+  font-size: 10px;
+  padding: 1px 8px;
+  margin: 1px;
   border-radius: 3px;
   text-align: center;
+  color: #fff;
 }
 
 .shift.白班 { background: #ad576d; }
 .shift.夜班 { background: #37b2eb; }
 .shift.休息 { background: #1edb5d; }
 
-.day.白班 { border: 2px solid #ad576d; border-radius: 10px; }
-.day.夜班 { border: 2px solid #37b2eb; border-radius: 10px; }
-.day.休息 { border: 2px solid #1edb5d; border-radius: 10px; }
+.day.白班 { border: 2px solid #ad576d; border-radius: 3px; }
+.day.夜班 { border: 2px solid #37b2eb; border-radius: 3px; }
+.day.休息 { border: 2px solid #1edb5d; border-radius: 3px; }
 
 .slide-container {
   display: flex;
@@ -107,38 +111,9 @@ h2 {
   flex: 0 0 auto;
 }
 
-@media (max-width: 768px) {
-  .day {
-    padding: 4px;
-    font-size: 12px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-  }
-
-  .date {
-    font-size: 12px;
-    width: 24px;
-    height: 24px;
-    line-height: 24px;
-  }
-
-  .shift {
-    font-size: 10px;
-    padding: 1px 4px;
-  }
-
-  .header button {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-}
-
 /* 经期日的样式 */
 .menstrual-day .date {
-  background: #EA8787; /* 浅红色 */
-  border-radius: 24px;
+  border-radius: 50%;
+  background-color: pink; /* 可以根据需要调整背景颜色 */
   color: #fff; /* 白色文字 */
 }
