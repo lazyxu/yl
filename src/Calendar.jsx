@@ -3,12 +3,20 @@ import React, { useEffect, useState } from 'react';
 import './Calendar.css';
 import { getMenstrualState, getShift } from './utils';
 
+const 经期状态映射 = {
+  经期: '腰酸、烦躁、疲惫、压力大',
+  卵泡期: '心情愉悦、头脑清醒、充满干劲',
+  排卵期: '粘人精，要贴贴',
+  黄体期: '精力下降、情绪波动、emo',
+}
+
 const Calendar = () => {
   const today = moment();
   const [currentMonth, setCurrentMonth] = useState(moment().startOf('month'));
   const [transitionBuffer, setTransitionBuffer] = useState(false); // 过渡动画控制
   const [startX, setStartX] = useState(0);
   const [translateX, setTranslateX] = useState(0); // 用于水平拖拽偏移
+  const [selectedDate, setSelectedDate] = useState(today);
 
   // 开始触摸时记录起始 X 坐标
   const onTouchStart = (e) => {
@@ -54,6 +62,10 @@ const Calendar = () => {
     setTransitionBuffer(false);
   }, [currentMonth]);
 
+  const handleDateClick = (day) => {
+    setSelectedDate(day);
+  };
+
   // 生成月份日历
   const generateCalendar = () => {
     const startOfMonth = currentMonth.clone().startOf('month');
@@ -65,6 +77,7 @@ const Calendar = () => {
       const day = currentDay.clone();
       const isCurrentMonth = day.month() === currentMonth.month();
       const isToday = day.isSame(today, 'day');
+      const isSelected = day.isSame(selectedDate, 'day');
       const shift = getShift(day);
       const menstrualState = getMenstrualState(day); // 获取经期状态
 
@@ -72,7 +85,8 @@ const Calendar = () => {
         <div
           key={day.format('YYYY-MM-DD')}
           style={isCurrentMonth ? {} : { opacity: 0.5 }}
-          className={`day ${isToday ? shift : ''} ${menstrualState}`}
+          className={`day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${menstrualState}`}
+          onClick={() => handleDateClick(day)}
         >
           <div
             className={`date ${menstrualState}`}
@@ -90,7 +104,7 @@ const Calendar = () => {
     }
     return days;
   };
-
+  const state = getMenstrualState(selectedDate).split(' ')[0];
   return (
     <div
       className="calendar-container">
@@ -119,6 +133,10 @@ const Calendar = () => {
         </div>
       ))}
       {generateCalendar()}
+    </div>
+    <div className="selected-date-info">
+      <p>{selectedDate.format('YYYY年MM月DD日')} {getShift(selectedDate)}</p>
+      <p>{state}: {经期状态映射[state]}</p>
     </div>
     </div>
   );

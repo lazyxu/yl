@@ -137,3 +137,22 @@ h2 {
 .黄体期 .date {
   border-color: rgb(141, 141, 219);
 }
+
+.today .date {
+  background-color: #f05757;
+  color: #fff;
+}
+
+.selected .date {
+  background-color: #96c231;
+  color: #fff;
+}
+
+.selected-date-info {
+  margin-top: 20px;
+  padding: 10px;
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: center;
+}
