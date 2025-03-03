@@ -19,25 +19,25 @@ export const getShift = (date) => {
 // moment('2025-02-10')
 // moment('2025-02-11')
 // moment('2025-02-12')
-const BASE_DATE = moment('2025-02-09'); // 基准起始日期
-const CYCLE_LENGTH = 28; // 周期长度（天） 21-35
-const 经期日长度 = 4; // 经期持续天数  2-7
-const FOLLICULAR_PHASE_DAYS = 9; // 卵泡期持续天数
-const OVULATION_PHASE_DAYS = 5; // 排卵期持续天数
-const LUTEAL_PHASE_DAYS = 10; // 黄体期持续天数
+const 经期起始日期 = moment('2025-02-09'); // 基准起始日期
+const 经期周期 = 28; // 21-35 天
+const 经期持续天数 = 4; // 2-7 天
+const 卵泡期持续天数 = 9;
+const 排卵期持续天数 = 5;
+const 黄体期持续天数 = 10;
 
 // 检查当前日期是否处于经期
 export const getMenstrualState = (date) => {
-  const daysPassed = date.diff(BASE_DATE, 'days');
-  const cycleDay = (daysPassed % CYCLE_LENGTH + CYCLE_LENGTH) % CYCLE_LENGTH;
+  const daysPassed = date.diff(经期起始日期, 'days');
+  const cycleDay = (daysPassed % 经期周期 + 经期周期) % 经期周期;
 
-  if (cycleDay < 经期日长度) {
-    return '经期日';
-  } else if (cycleDay < 经期日长度 + FOLLICULAR_PHASE_DAYS) {
-    return '卵泡期';
-  } else if (cycleDay < 经期日长度 + FOLLICULAR_PHASE_DAYS + OVULATION_PHASE_DAYS) {
-    return '排卵期'; // 排卵期
+  if (cycleDay < 经期持续天数) {
+    return '经期 ' + (cycleDay === 0 ? 'first' : cycleDay === (经期持续天数 - 1) ? 'last' : '');
+  } else if (cycleDay < 经期持续天数 + 卵泡期持续天数) {
+    return '卵泡期 ' + (cycleDay === 经期持续天数 ? 'first' : cycleDay === (经期持续天数 + 卵泡期持续天数 - 1) ? 'last' : '');
+  } else if (cycleDay < 经期持续天数 + 卵泡期持续天数 + 排卵期持续天数) {
+    return '排卵期 ' + (cycleDay === (经期持续天数 + 卵泡期持续天数) ? 'first' : cycleDay === (经期持续天数 + 卵泡期持续天数 + 排卵期持续天数 - 1) ? 'last' : '');
   } else {
-    return '黄体期'; // 黄体期
+    return '黄体期 ' + (cycleDay === (经期持续天数 + 卵泡期持续天数 + 排卵期持续天数) ? 'first' : cycleDay === (经期持续天数 + 卵泡期持续天数 + 排卵期持续天数 + 黄体期持续天数 - 1) ? 'last' : '');
   }
 };

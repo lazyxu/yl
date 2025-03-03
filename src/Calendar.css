@@ -57,6 +57,7 @@ h2 {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  border-bottom: 2px solid transparent;
 }
 
 .date {
@@ -68,10 +69,8 @@ h2 {
   height: 24px; /* 可以根据需要调整 */
   text-align: center;
   line-height: 24px; /* 与高度相同以垂直居中 */
-}
-
-.date.grayed {
-  color: #999;
+  width: 100%;
+  color: #fff;
 }
 
 .shift {
@@ -87,9 +86,9 @@ h2 {
 .shift.夜班 { background: #37b2eb; }
 .shift.休息 { background: #1edb5d; }
 
-.day.白班 { border: 2px solid #ad576d; border-radius: 3px; }
-.day.夜班 { border: 2px solid #37b2eb; border-radius: 3px; }
-.day.休息 { border: 2px solid #1edb5d; border-radius: 3px; }
+.day.白班 { border-bottom: 2px solid #ad576d; }
+.day.夜班 { border-bottom: 2px solid #37b2eb; }
+.day.休息 { border-bottom: 2px solid #1edb5d; }
 
 .slide-container {
   display: flex;
@@ -111,23 +110,26 @@ h2 {
   flex: 0 0 auto;
 }
 
-.经期日 .date {
-  border-radius: 50%;
-  background-color: pink;
-  color: #fff;
+.first .date {
+  border-radius: 10px 0 0 10px;
+}
+
+.last .date {
+  border-radius: 0 10px 10px 0;
+}
+
+.经期 .date {
+  background-color: rgb(252, 126, 147);
 }
 
 .卵泡期 .date {
-  border: 2px solid orange;
-  border-radius: 50%;
+  background-color: rgb(252, 190, 77);
 }
 
 .排卵期 .date {
-  border: 2px solid purple;
-  border-radius: 50%;
+  background-color: rgb(241, 120, 205);
 }
 
 .黄体期 .date {
-  border: 2px solid rgb(90, 90, 214);
-  border-radius: 50%;
+  background-color: rgb(141, 141, 219);
 }
