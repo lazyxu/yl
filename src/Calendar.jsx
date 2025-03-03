@@ -3,18 +3,26 @@ import React, { useEffect, useState } from 'react';
 import './Calendar.css';
 import { getMenstrualState, getShift } from './utils';
 
-// window.moment = moment;
-// window.moment('2025-02-01').isSame(window.moment(), 'day');
 const Calendar = () => {
   const today = moment();
   const [currentMonth, setCurrentMonth] = useState(moment().startOf('month'));
-  const [transitionBuffer, setTransitionBuffer] = useState(false); // 用于过渡动画
+  const [transitionBuffer, setTransitionBuffer] = useState(false); // 过渡动画控制
   const [startX, setStartX] = useState(0);
+  const [translateX, setTranslateX] = useState(0); // 用于水平拖拽偏移
 
+  // 开始触摸时记录起始 X 坐标
   const onTouchStart = (e) => {
     setStartX(e.touches[0].clientX);
   };
 
+  // 拖拽过程中更新 X 轴偏移
+  const onTouchMove = (e) => {
+    const currentX = e.touches[0].clientX;
+    const deltaX = currentX - startX;
+    setTranslateX(deltaX);
+  };
+
+  // 释放触摸时根据水平滑动判断是否切换月份并复位偏移
   const onTouchEnd = (e) => {
     const endX = e.changedTouches[0].clientX;
     const threshold = 50; // 滑动距离阈值
@@ -25,18 +33,25 @@ const Calendar = () => {
         handleSlidePrevious();
       }
     }
+    // 重置水平偏移，Y轴保持不变
+    setTranslateX(0);
   };
 
+  // 切换到上一个月
   const handleSlidePrevious = () => {
     setCurrentMonth(currentMonth.clone().subtract(1, 'month'));
+    setTransitionBuffer(true);
   };
 
+  // 切换到下一个月
   const handleSlideNext = () => {
     setCurrentMonth(currentMonth.clone().add(1, 'month'));
+    setTransitionBuffer(true);
   };
 
   useEffect(() => {
-    setTransitionBuffer(false); // 动画结束后恢复状态
+    // 动画结束后恢复状态
+    setTransitionBuffer(false);
   }, [currentMonth]);
 
   // 生成月份日历
@@ -79,24 +94,34 @@ const Calendar = () => {
   };
 
   return (
-    <div className="calendar-container">
-      <div className="header">
-        <button onClick={handleSlidePrevious}>
-          ←
-        </button>
-        <h2>{currentMonth.format('YYYY年MM月')}</h2>
-        <button onClick={handleSlideNext}>
-          →
-        </button>
-      </div>
-      <div className="calendar" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-          <div key={day} className="weekday">
-            {day}
-          </div>
-        ))}
-        {generateCalendar()}
-      </div>
+    <div
+      className="calendar-container">
+    <div className="header">
+      <button onClick={handleSlidePrevious}>
+        ←
+      </button>
+      <h2>{currentMonth.format('YYYY年MM月')}</h2>
+      <button onClick={handleSlideNext}>
+        →
+      </button>
+    </div>
+    <div className="calendar"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      // 仅对 X 轴进行平移，Y轴没有变化
+      style={{
+        transform: `translate(${translateX}px)`,
+        transition: transitionBuffer ? 'transform 0.3s ease' : 'none'
+      }}
+    >
+      {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+        <div key={day} className="weekday">
+          {day}
+        </div>
+      ))}
+      {generateCalendar()}
+    </div>
     </div>
   );
 };
