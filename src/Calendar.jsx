@@ -57,11 +57,11 @@ const Calendar = () => {
   // 生成月份日历
   const generateCalendar = () => {
     const startOfMonth = currentMonth.clone().startOf('month');
-    const endOfMonth = currentMonth.clone().endOf('month');
+    const endOfMonth = currentMonth.clone().endOf('month').endOf('week');
     const days = [];
     let currentDay = startOfMonth.clone().startOf('week');
 
-    while (currentDay.isBefore(endOfMonth, 'day')) {
+    while (currentDay.isSameOrBefore(endOfMonth, 'day')) {
       const day = currentDay.clone();
       const isCurrentMonth = day.month() === currentMonth.month();
       const isToday = day.isSame(today, 'day');
@@ -71,16 +71,16 @@ const Calendar = () => {
       days.push(
         <div
           key={day.format('YYYY-MM-DD')}
+          style={isCurrentMonth ? {} : { opacity: 0.5 }}
           className={`day ${isToday ? shift : ''} ${menstrualState}`}
         >
           <div
-            className={`date ${isCurrentMonth ? '' : 'grayed'} ${menstrualState}`}
+            className={`date ${menstrualState}`}
           >
             {day.format('D')}
           </div>
           <div
             className={`shift ${shift}`}
-            style={isCurrentMonth ? {} : { opacity: 0.5 }}
           >
             {shift}
           </div>
