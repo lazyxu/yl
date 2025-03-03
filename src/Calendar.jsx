@@ -66,17 +66,15 @@ const Calendar = () => {
       const isCurrentMonth = day.month() === currentMonth.month();
       const isToday = day.isSame(today, 'day');
       const shift = getShift(day);
-      const isMenstrual = getMenstrualState(day); // 获取经期状态
+      const menstrualState = getMenstrualState(day); // 获取经期状态
 
       days.push(
         <div
           key={day.format('YYYY-MM-DD')}
-          className={`day ${isToday ? shift : ''} ${isMenstrual ? 'menstrual-day' : '' // 添加经期样式
-            }`}
+          className={`day ${isToday ? shift : ''} ${menstrualState}`}
         >
           <div
-            className={`date ${isCurrentMonth ? '' : 'grayed'} ${isMenstrual ? 'menstrual-date' : '' // 经期日期样式
-              }`}
+            className={`date ${isCurrentMonth ? '' : 'grayed'} ${menstrualState}`}
           >
             {day.format('D')}
           </div>
