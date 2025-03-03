@@ -70,7 +70,8 @@ h2 {
   text-align: center;
   line-height: 24px; /* 与高度相同以垂直居中 */
   width: 100%;
-  color: #fff;
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
 }
 
 .shift {
@@ -111,25 +112,28 @@ h2 {
 }
 
 .first .date {
+  border-left: 2px solid transparent;
   border-radius: 10px 0 0 10px;
 }
 
 .last .date {
+  border-right: 2px solid transparent;
   border-radius: 0 10px 10px 0;
 }
 
 .经期 .date {
   background-color: rgb(252, 126, 147);
+  color: white;
 }
 
 .卵泡期 .date {
-  background-color: rgb(252, 190, 77);
+  border-color: rgb(252, 190, 77);
 }
 
 .排卵期 .date {
-  background-color: rgb(241, 120, 205);
+  border-color: rgb(241, 120, 205);
 }
 
 .黄体期 .date {
-  background-color: rgb(141, 141, 219);
+  border-color: rgb(141, 141, 219);
 }
