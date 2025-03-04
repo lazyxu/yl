@@ -26,6 +26,12 @@ const 卵泡期持续天数 = 9;
 const 排卵期持续天数 = 5;
 const 黄体期持续天数 = 10;
 
+const togetherStartDate = moment('2025-01-26'); // 在一起的起始日期
+
+export const getDaysTogether = (date) => {
+  return date.diff(togetherStartDate, 'days');
+};
+
 // 检查当前日期是否处于经期
 export const getMenstrualState = (date) => {
   const daysPassed = date.diff(经期起始日期, 'days');
