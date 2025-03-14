@@ -83,13 +83,13 @@ h2 {
   color: #fff;
 }
 
-.shift.白班 { background: #ad576d; }
-.shift.夜班 { background: #37b2eb; }
-.shift.休息 { background: #1edb5d; }
+.shift.白班 { background: #DF7C7F; }
+.shift.夜班 { background: #5DB9E2; }
+.shift.休息 { background: #7AC252; }
 
-.day.白班 { border-bottom: 2px solid #ad576d; }
-.day.夜班 { border-bottom: 2px solid #37b2eb; }
-.day.休息 { border-bottom: 2px solid #1edb5d; }
+.day.白班 { border-bottom: 2px solid #DF7C7F; }
+.day.夜班 { border-bottom: 2px solid #5DB9E2; }
+.day.休息 { border-bottom: 2px solid #7AC252; }
 
 .slide-container {
   display: flex;
