@@ -79,17 +79,17 @@ const Calendar = () => {
       const isToday = day.isSame(today, 'day');
       const isSelected = day.isSame(selectedDate, 'day');
       const shift = getShift(day);
-      const menstrualState = getMenstrualState(day); // 获取经期状态
+      // const menstrualState = getMenstrualState(day); // 获取经期状态
 
       days.push(
         <div
           key={day.format('YYYY-MM-DD')}
           style={isCurrentMonth ? {} : { opacity: 0.5 }}
-          className={`day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${menstrualState}`}
+          className={`day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
           onClick={() => handleDateClick(day)}
         >
           <div
-            className={`date ${menstrualState}`}
+            className={`date`}
           >
             {day.format('D')}
           </div>
@@ -104,7 +104,7 @@ const Calendar = () => {
     }
     return days;
   };
-  const state = getMenstrualState(selectedDate).split(' ')[0];
+  // const state = getMenstrualState(selectedDate).split(' ')[0];
   return (
     <div
       className="calendar-container">
@@ -137,7 +137,7 @@ const Calendar = () => {
     <div className="selected-date-info">
       <p>{selectedDate.format('YYYY年MM月DD日')} {getShift(selectedDate)}</p>
       <p>在一起第 {getDaysTogether(selectedDate)} 天</p>
-      <p>{经期状态映射[state]}</p>
+      {/* <p>{经期状态映射[state]}</p> */}
     </div>
     </div>
   );

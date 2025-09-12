@@ -1,6 +1,7 @@
 .calendar-container {
   margin: auto;
-  max-width: 500px;
+  width: 500px;
+  max-width: 100%;
   font-family: 'Arial', sans-serif;
 }
 
@@ -150,7 +151,8 @@ h2 {
 
 .selected-date-info {
   margin-top: 20px;
-  padding: 10px;
+  width: 500px;
+  max-width: 100%;
   background: #f9f9f9;
   border: 1px solid #ddd;
   border-radius: 4px;
