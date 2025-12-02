@@ -1,13 +1,22 @@
 import moment from 'moment';
 
-const shifts = ['白班', '白班', '夜班', '休息', '休息', '夜班', '休息', '休息'];
-
-// 计算班次（起始日期为2024-12-27）
-const startDate = moment('2024-12-27');
+const startDateList = [
+  { startDate: moment('2024-12-27'), shifts: ['白班', '白班', '夜班', '休息', '休息', '夜班', '休息', '休息'] },
+  { startDate: moment('2025-11-20'), shifts: ['白班', '白班', '休息', '夜班', '夜班', '休息', '休息', '休息'] },
+];
 
 export const getShift = (date) => {
-  const diffDays = date.diff(startDate, 'days');
-  return shifts[(diffDays % 8 + 8) % 8];
+  for (let i = startDateList.length - 1; i >= 0; i--) {
+    if (date.isSameOrAfter(startDateList[i].startDate, 'day')) {
+      const { startDate, shifts } = startDateList[i];
+      const diffDays = date.diff(startDate, 'days');
+      return shifts[(diffDays % 8 + 8) % 8];
+    }
+  }
+  // 如果日期早于所有已知起始日期，使用第一个起始日期计算
+  const { startDate, shifts } = startDateList[0];
+    const diffDays = date.diff(startDate, 'days');
+    return shifts[(diffDays % 8 + 8) % 8];
 };
 
 // moment('2025-01-14')
