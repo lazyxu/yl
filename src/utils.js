@@ -3,6 +3,7 @@ import moment from 'moment';
 const startDateList = [
   { startDate: moment('2024-12-27'), shifts: ['白班', '白班', '夜班', '休息', '休息', '夜班', '休息', '休息'] },
   { startDate: moment('2025-11-20'), shifts: ['白班', '白班', '休息', '夜班', '夜班', '休息', '休息', '休息'] },
+  { startDate: moment('2026-01-24'), shifts: ['白班', '白班', '休息', '夜班', '夜班', '休息', '休息', '休息'] },
 ];
 
 export const getShift = (date) => {
