@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import PhotoCard from '../components/PhotoCard'
+import MediaViewer from '../components/MediaViewer'
+import PhotoGrid from '../components/PhotoGrid'
 
 function AlbumPage() {
   const [photos, setPhotos] = useState([])
@@ -177,20 +180,12 @@ function AlbumPage() {
   }
 
   const renderCard = (photo) => (
-    <article key={photo.id} className="photo-card">
-      {photo.mediaType === 'video' ? (
-        <video className="photo-video" src={photo.url} controls preload="metadata" onClick={(e) => openViewer(photo, e)} />
-      ) : (
-        <img className="photo-image" src={photo.url} alt={photo.name} onClick={(e) => openViewer(photo, e)} />
-      )}
-      <div className="photo-footer">
-        <span className="photo-name" title={photo.name}>{photo.name}</span>
-        <Link className="detail-link" to={`/album/${photo.id}`}>详情</Link>
-        <button type="button" className="remove-btn" onClick={() => removePhoto(photo.id)}>
-          移除
-        </button>
-      </div>
-    </article>
+    <PhotoCard
+      key={photo.id}
+      photo={photo}
+      onRemove={removePhoto}
+      onOpenViewer={openViewer}
+    />
   )
 
   return (
@@ -237,9 +232,7 @@ function AlbumPage() {
       {!loading && photos.length === 0 && <p className="upload-meta">还没有媒体，先上传一张照片或一个视频吧。</p>}
 
       {!loading && photos.length > 0 && viewMode === 'time' && (
-        <div className="photo-grid">
-          {photosByTime.map((photo) => renderCard(photo))}
-        </div>
+        <PhotoGrid photos={photosByTime} onRenderCard={renderCard} />
       )}
 
       {!loading && photos.length > 0 && viewMode === 'album' && (
@@ -250,25 +243,17 @@ function AlbumPage() {
                 <h3 className="album-section-title">{name}</h3>
                 <span className="upload-meta">{list.length} 个</span>
               </div>
-              <div className="photo-grid">
-                {list.map((photo) => renderCard(photo))}
-              </div>
+              <PhotoGrid photos={list} onRenderCard={renderCard} />
             </section>
           ))}
         </div>
       )}
 
       {viewer && (
-        <div className="viewer-overlay" onClick={closeViewer} role="dialog" aria-modal="true">
-          <div className="viewer-content" onClick={(e) => e.stopPropagation()}>
-            {viewer.mediaType === 'video' ? (
-              <video src={viewer.url} controls autoPlay />
-            ) : (
-              <img src={viewer.url} alt={viewer.name} />
-            )}
-          </div>
-          <button className="viewer-close" onClick={closeViewer}>关闭</button>
-        </div>
+        <MediaViewer
+          media={viewer}
+          onClose={closeViewer}
+        />
       )}
     </section>
   )
