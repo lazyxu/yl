@@ -1,7 +1,7 @@
 import moment from 'moment';
 import React, { useEffect, useState } from 'react';
 import './Calendar.css';
-import { getDaysTogether, getMenstrualState, getShift } from './utils';
+import { getDaysTogether, getMenstrualState, getShift, togetherStartDateText } from './utils';
 
 const 经期状态映射 = {
   经期: '腰酸、烦躁、疲惫、压力大',
@@ -136,7 +136,7 @@ const Calendar = () => {
     </div>
     <div className="selected-date-info">
       <p>{selectedDate.format('YYYY年MM月DD日')} {getShift(selectedDate)}</p>
-      <p>在一起第 {getDaysTogether(selectedDate)} 天</p>
+      <p>在一起第 {getDaysTogether(selectedDate)} 天（纪念日：{togetherStartDateText}）</p>
       {/* <p>{经期状态映射[state]}</p> */}
     </div>
     </div>
