@@ -1,33 +1,53 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import MediaViewer from './MediaViewer';
 
-const PhotoCard = ({ photo, onRemove, onOpenViewer }) => {
+const PhotoCard = ({ photo, onRemove }) => {
+  const [isViewerOpen, setViewerOpen] = useState(false);
+  const [currentMedia, setCurrentMedia] = useState(null);
+
+  const handleOpenViewer = (media, event) => {
+    event.stopPropagation();
+    setCurrentMedia(media);
+    setViewerOpen(true);
+  };
+
+  const handleCloseViewer = () => {
+    setViewerOpen(false);
+    setCurrentMedia(null);
+  };
+
   return (
-    <article className="photo-card">
-      {photo.mediaType === 'video' ? (
-        <video
-          className="photo-video"
-          src={photo.url}
-          controls
-          preload="metadata"
-          onClick={(e) => onOpenViewer(photo, e)}
-        />
-      ) : (
-        <img
-          className="photo-image"
-          src={photo.url}
-          alt={photo.name}
-          onClick={(e) => onOpenViewer(photo, e)}
-        />
+    <>
+      <article className="photo-card">
+        {photo.mediaType === 'video' ? (
+          <video
+            className="photo-video"
+            src={photo.url}
+            controls
+            preload="metadata"
+            onClick={(e) => handleOpenViewer(photo, e)}
+          />
+        ) : (
+          <img
+            className="photo-image"
+            src={photo.url}
+            alt={photo.name}
+            onClick={(e) => handleOpenViewer(photo, e)}
+          />
+        )}
+        <div className="photo-footer">
+          <span className="photo-name" title={photo.name}>{photo.name}</span>
+          <Link className="detail-link" to={`/album/${photo.id}`}>详情</Link>
+          <button type="button" className="remove-btn" onClick={() => onRemove(photo.id)}>
+            移除
+          </button>
+        </div>
+      </article>
+      {isViewerOpen && currentMedia && (
+        <MediaViewer media={currentMedia} onClose={handleCloseViewer} />
       )}
-      <div className="photo-footer">
-        <span className="photo-name" title={photo.name}>{photo.name}</span>
-        <Link className="detail-link" to={`/album/${photo.id}`}>详情</Link>
-        <button type="button" className="remove-btn" onClick={() => onRemove(photo.id)}>
-          移除
-        </button>
-      </div>
-    </article>
+    </>
   );
 };
 

@@ -57,7 +57,7 @@ function AlbumPage() {
         throw new Error('加载相册失败')
       }
       const data = await response.json()
-      setPhotos(data.photos || [])
+      setPhotos(data || [])
     } catch (fetchError) {
       const message = fetchError instanceof Error ? fetchError.message : '加载相册失败'
       setError(message)
