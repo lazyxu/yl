@@ -118,15 +118,15 @@ function AlbumPage() {
     event.target.value = ''
   }
 
-  const removePhoto = async (id) => {
+  const removePhoto = async (sha256) => {
     setError('')
     try {
-      const response = await fetch(`/api/photos/${id}`, { method: 'DELETE' })
+      const response = await fetch(`/api/photos/sha256/${sha256}`, { method: 'DELETE' })
       if (!response.ok) {
         const failed = await response.json().catch(() => ({}))
         throw new Error(failed.message || '删除失败')
       }
-      setPhotos((prev) => prev.filter((photo) => photo.id !== id))
+      setPhotos((prev) => prev.filter((photo) => photo.sha256 !== sha256))
     } catch (removeError) {
       const message = removeError instanceof Error ? removeError.message : '删除失败'
       setError(message)
@@ -181,9 +181,9 @@ function AlbumPage() {
 
   const renderCard = (photo) => (
     <PhotoCard
-      key={photo.id}
+      key={photo.sha256}
       photo={photo}
-      onRemove={removePhoto}
+      onRemove={() => removePhoto(photo.sha256)}
       onOpenViewer={openViewer}
     />
   )

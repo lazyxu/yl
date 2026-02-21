@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 function AlbumDetailPage() {
-  const { id } = useParams()
+  const { sha256 } = useParams()
   const [media, setMedia] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -12,13 +12,13 @@ function AlbumDetailPage() {
       setLoading(true)
       setError('')
       try {
-        const response = await fetch(`/api/photos/${id}`)
+        const response = await fetch(`/api/photos/sha256/${sha256}`)
         if (!response.ok) {
           const failed = await response.json().catch(() => ({}))
           throw new Error(failed.message || '加载详情失败')
         }
         const data = await response.json()
-        setMedia(data.photo)
+        setMedia(data)
       } catch (fetchError) {
         const message = fetchError instanceof Error ? fetchError.message : '加载详情失败'
         setError(message)
@@ -28,7 +28,7 @@ function AlbumDetailPage() {
     }
 
     fetchDetail()
-  }, [id])
+  }, [sha256])
 
   return (
     <section className="page-card">
@@ -47,9 +47,9 @@ function AlbumDetailPage() {
             if (el && el.requestFullscreen) el.requestFullscreen().catch(() => {})
           }}>
             {media.mediaType === 'video' ? (
-              <video className="detail-video" src={media.url} controls preload="metadata" />
+              <video className="detail-video" src={`/api/photos/sha256/${media.sha256}/file`} controls preload="metadata" />
             ) : (
-              <img className="detail-image" src={media.url} alt={media.name} />
+              <img className="detail-image" src={`/api/photos/sha256/${media.sha256}/file`} alt={media.name} />
             )}
           </div>
 

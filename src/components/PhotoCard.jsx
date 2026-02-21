@@ -17,13 +17,15 @@ const PhotoCard = ({ photo, onRemove }) => {
     setCurrentMedia(null);
   };
 
+  const photoUrl = `/api/photos/sha256/${photo.sha256}/file`;
+
   return (
     <>
       <article className="photo-card">
         {photo.mediaType === 'video' ? (
           <video
             className="photo-video"
-            src={photo.url}
+            src={`${photo.url}`}
             controls
             preload="metadata"
             onClick={(e) => handleOpenViewer(photo, e)}
@@ -31,15 +33,15 @@ const PhotoCard = ({ photo, onRemove }) => {
         ) : (
           <img
             className="photo-image"
-            src={photo.url}
+            src={photoUrl}
             alt={photo.name}
             onClick={(e) => handleOpenViewer(photo, e)}
           />
         )}
         <div className="photo-footer">
           <span className="photo-name" title={photo.name}>{photo.name}</span>
-          <Link className="detail-link" to={`/album/${photo.id}`}>详情</Link>
-          <button type="button" className="remove-btn" onClick={() => onRemove(photo.id)}>
+          <Link className="detail-link" to={`/album/${photo.sha256}`}>详情</Link>
+          <button type="button" className="remove-btn" onClick={() => onRemove(photo.sha256)}>
             移除
           </button>
         </div>

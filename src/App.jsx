@@ -25,7 +25,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/calendar" replace />} />
             <Route path="/album" element={<AlbumPage />} />
-            <Route path="/album/:id" element={<AlbumDetailPage />} />
+            <Route path="/album/:sha256" element={<AlbumDetailPage />} />
             {/* <Route path="/suki" element={<SukiPage />} /> */}
             <Route path="/calendar" element={<Calendar />} />
             <Route path="*" element={<Navigate to="/calendar" replace />} />
