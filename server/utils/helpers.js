@@ -19,13 +19,13 @@ const initDb = async () => {
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS photos (
-      id TEXT PRIMARY KEY,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       album TEXT NOT NULL,
       mediaType TEXT NOT NULL,
       type TEXT NOT NULL,
       size INTEGER NOT NULL,
-      sha256 TEXT NOT NULL,
+      sha256 TEXT UNIQUE NOT NULL,
       createdAt TEXT NOT NULL
     );
   `);
@@ -174,8 +174,7 @@ export const readPhotos = async () => {
 export const writePhoto = async (photo) => {
   const db = await initDb();
   await db.run(
-    `INSERT INTO photos (id, name, album, mediaType, type, size, sha256, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    photo.id,
+    `INSERT INTO photos (name, album, mediaType, type, size, sha256, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     photo.name,
     photo.album,
     photo.mediaType,
@@ -186,7 +185,7 @@ export const writePhoto = async (photo) => {
   );
 };
 
-export const deletePhoto = async (id) => {
+export const deletePhoto = async (sha256) => {
   const db = await initDb();
-  await db.run('DELETE FROM photos WHERE id = ?', id);
+  await db.run('DELETE FROM photos WHERE sha256 = ?', sha256);
 };

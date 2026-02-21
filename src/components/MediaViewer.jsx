@@ -65,7 +65,7 @@ const MediaViewer = ({ media, onClose }) => {
         {media.mediaType === 'video' ? (
           <video ref={videoRef} controls autoPlay className="video-js" />
         ) : (
-          <img src={media.url} alt={media.name} />
+          <img src={`/api/photos/sha256/${media.sha256}/file`} alt={media.name} />
         )}
       </div>
       <button className="viewer-close" onClick={onClose}>关闭</button>

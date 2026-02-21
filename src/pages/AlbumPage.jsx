@@ -119,6 +119,7 @@ function AlbumPage() {
   }
 
   const removePhoto = async (sha256) => {
+    console.log('Removing photo with sha256:', sha256)
     setError('')
     try {
       const response = await fetch(`/api/photos/sha256/${sha256}`, { method: 'DELETE' })
@@ -232,7 +233,12 @@ function AlbumPage() {
       {!loading && photos.length === 0 && <p className="upload-meta">还没有媒体，先上传一张照片或一个视频吧。</p>}
 
       {!loading && photos.length > 0 && viewMode === 'time' && (
-        <PhotoGrid photos={photosByTime} onRenderCard={renderCard} />
+        <PhotoGrid
+          photos={photosByTime}
+          onRenderCard={renderCard}
+          onRemove={removePhoto}
+          onOpenViewer={openViewer}
+        />
       )}
 
       {!loading && photos.length > 0 && viewMode === 'album' && (
@@ -243,7 +249,12 @@ function AlbumPage() {
                 <h3 className="album-section-title">{name}</h3>
                 <span className="upload-meta">{list.length} 个</span>
               </div>
-              <PhotoGrid photos={list} onRenderCard={renderCard} />
+              <PhotoGrid
+                photos={list}
+                onRenderCard={renderCard}
+                onRemove={removePhoto}
+                onOpenViewer={openViewer}
+              />
             </section>
           ))}
         </div>
