@@ -17,17 +17,16 @@ const PhotoCard = ({ photo, onRemove }) => {
     setCurrentMedia(null);
   };
 
-  const photoUrl = `/api/photos/sha256/${photo.sha256}/file`;
+  const photoUrl = `/api/photos/sha256/${photo.sha256}/thumbnail`;
 
   return (
     <>
       <article className="photo-card">
         {photo.mediaType === 'video' ? (
-          <video
-            className="photo-video"
-            src={`${photo.url}`}
-            controls
-            preload="metadata"
+          <img
+            className="photo-image"
+            src={photoUrl}
+            alt={photo.name}
             onClick={(e) => handleOpenViewer(photo, e)}
           />
         ) : (
