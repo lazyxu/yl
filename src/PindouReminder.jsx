@@ -1,553 +1,243 @@
-import { useEffect, useState } from 'react'
-import './PindouReminder.css'
-import MARD from './colorPalettes/mard.json'
-import Dialog from '@mui/material/Dialog'
-import DialogTitle from '@mui/material/DialogTitle'
-import DialogContent from '@mui/material/DialogContent'
-import DialogActions from '@mui/material/DialogActions'
-import { useTheme } from '@mui/material/styles'
-import useMediaQuery from '@mui/material/useMediaQuery'
-import Button from '@mui/material/Button'
-import TextField from '@mui/material/TextField'
-import Stack from '@mui/material/Stack'
-import MenuItem from '@mui/material/MenuItem'
-import Select from '@mui/material/Select'
-import InputLabel from '@mui/material/InputLabel'
-import FormControl from '@mui/material/FormControl'
-import Checkbox from '@mui/material/Checkbox'
-import ListItemText from '@mui/material/ListItemText'
+import React, { useMemo, useState, useEffect } from 'react'
 import Box from '@mui/material/Box'
+import TextField from '@mui/material/TextField'
+import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import Autocomplete from '@mui/material/Autocomplete'
 import Chip from '@mui/material/Chip'
 import IconButton from '@mui/material/IconButton'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
-import DeleteIcon from '@mui/icons-material/Delete'
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
+import CloseIcon from '@mui/icons-material/Close'
+import LinearProgress from '@mui/material/LinearProgress'
+import Input from '@mui/material/Input'
+import Tesseract from 'tesseract.js'
+import ColorSwatch from './ColorSwatch'
+import MARD from './colorPalettes/mard.json'
 
-// API base inlined as '/api'
+function findPalette(code){
+  return MARD.find(p => p.code === code)
+}
 
-function PindouReminder({ initialOperation, initialRows, onClose, onAdded }) {
-  const [operation, setOperation] = useState('补豆')
-  const [rows, setRows] = useState([{ color: '', count: '' }])
-  const [rowErrors, setRowErrors] = useState([{ color: '', count: '' }])
-  const [bulkSelected, setBulkSelected] = useState([]) // will hold array of palette objects when using Autocomplete
-  const [bulkCount, setBulkCount] = useState('')
+export default function PindouReminder({ initialOperation = '补豆', initialRows = null, onClose = ()=>{}, onAdded = ()=>{} }){
+  // itemsMap: { code: number }
+  const [itemsMap, setItemsMap] = useState(() => {
+    const map = {}
+    MARD.forEach(p => { map[p.code] = 0 })
+    return map
+  })
+  const [selectedCodes, setSelectedCodes] = useState([])
+  const [applyCount, setApplyCount] = useState('')
   const [note, setNote] = useState('')
-  const [date, setDate] = useState('')
-  const [timeOption, setTimeOption] = useState('now') // 'now' | 'custom'
-  const [reminders, setReminders] = useState([])
   const [loading, setLoading] = useState(false)
-  const [dragIndex, setDragIndex] = useState(null)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [confirmSummary, setConfirmSummary] = useState(null)
-  const [notify, setNotify] = useState(null) // {type: 'success'|'error', msg}
-  const [lastSync, setLastSync] = useState(null)
-  const [filterColor, setFilterColor] = useState('')
-  const [filterOp, setFilterOp] = useState('all')
-  const [filterFrom, setFilterFrom] = useState('')
-  const [filterTo, setFilterTo] = useState('')
+  const [imgFile, setImgFile] = useState(null)
+  const [imgPreview, setImgPreview] = useState(null)
+  const [ocrLoading, setOcrLoading] = useState(false)
+  const [ocrProgress, setOcrProgress] = useState(0)
 
-  useEffect(() => {
-    fetchReminders()
-  }, [])
-
-  const theme = useTheme()
-  const isSmall = useMediaQuery(theme.breakpoints.down('sm'))
-
-  function readableTextColor(hex){
-    if(!hex) return '#000'
-    const c = hex.replace('#','')
-    const r = parseInt(c.substring(0,2),16)
-    const g = parseInt(c.substring(2,4),16)
-    const b = parseInt(c.substring(4,6),16)
-    const yiq = (r*299 + g*587 + b*114) / 1000
-    return yiq >= 128 ? '#000' : '#fff'
-  }
-
-  useEffect(() => {
-    if (initialOperation) setOperation(initialOperation)
-  }, [initialOperation])
-
-  useEffect(() => {
-    if (initialRows && Array.isArray(initialRows) && initialRows.length > 0) {
-      // normalize counts to strings
-      const normalized = initialRows.map(r => ({ color: r.color, count: String(r.count) }))
-      setRows(normalized)
-      setRowErrors(normalized.map(r => ({ color: r.color ? '' : '请选择色号', count: (Number.isInteger(Number(r.count)) && Number(r.count) > 0) ? '' : '数量需为大于 0 的整数' })))
+  useEffect(()=>{
+    if (Array.isArray(initialRows) && initialRows.length>0){
+      setItemsMap(prev => {
+        const next = { ...prev }
+        initialRows.forEach(r => { next[r.color] = Number(r.count) || 0 })
+        return next
+      })
+      setSelectedCodes(initialRows.map(r => r.color))
     }
   }, [initialRows])
 
-  async function fetchReminders() {
-    try {
-      setLoading(true)
-      const res = await fetch('/api/reminders')
+  const allCodes = useMemo(()=>{
+    const set = new Set(MARD.map(p=>p.code))
+    Object.keys(itemsMap).forEach(k=>set.add(k))
+    return Array.from(set)
+  }, [itemsMap])
+
+  function updateCount(code, v){
+    const n = Number(v) || 0
+    if (!Number.isInteger(n) || n < 0) return
+    setItemsMap(prev => ({ ...prev, [code]: n }))
+  }
+
+  function applyToSelected(){
+    const n = Number(applyCount)
+    if (!Number.isInteger(n) || n <= 0) return alert('请输入正整数数量')
+    setItemsMap(prev => {
+      const next = { ...prev }
+      selectedCodes.forEach(code => { next[code] = n })
+      return next
+    })
+  }
+
+  async function handleSubmit(){
+    // collect items with count>0
+    const items = Object.entries(itemsMap).filter(([,cnt]) => Number(cnt) > 0).map(([color,cnt]) => ({ color, count: Number(cnt) }))
+    if (items.length === 0) return alert('请先输入要补的数量')
+    const body = { operation: '补豆', items, occurred_at: new Date().toISOString(), note }
+    setLoading(true)
+    try{
+      const res = await fetch('/api/reminders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) throw new Error((await res.json()).error || res.statusText)
       const data = await res.json()
-      setReminders(data)
-      setLastSync(new Date())
-      showNotify('同步成功', 'success')
-    } catch (err) {
+      alert('补豆记录已保存')
+      onAdded(data)
+    }catch(err){
       console.error(err)
-      showNotify('获取提醒失败：' + err.message, 'error')
-    } finally {
-      setLoading(false)
-    }
+      alert('保存失败：' + err.message)
+    }finally{ setLoading(false) }
   }
 
-  function showNotify(msg, type = 'success', timeout = 4000) {
-    setNotify({ msg, type })
-    if (timeout) setTimeout(() => setNotify(null), timeout)
+  function handleFileChange(file){
+    if (!file) return
+    setImgFile(file)
+    const url = URL.createObjectURL(file)
+    setImgPreview(url)
   }
 
-  function validateRowObject(row) {
-    const err = { color: '', count: '' }
-    if (!row.color) err.color = '请选择色号'
-    const cnt = Number(row.count)
-    if (!Number.isInteger(cnt) || cnt <= 0) err.count = '数量需为大于 0 的整数'
-    return err
+  function hexToRgb(hex){
+    const c = (hex||'#000000').replace('#','')
+    return { r: parseInt(c.substr(0,2),16), g: parseInt(c.substr(2,2),16), b: parseInt(c.substr(4,2),16) }
   }
 
-  function updateRow(index, key, value) {
-    setRows(prev => {
-      const next = prev.map((r, i) => i === index ? { ...r, [key]: value } : r)
-      // validate updated row and sync rowErrors
-      setRowErrors(prevErr => {
-        const nextErr = prevErr.slice(0)
-        const updated = next[index] || { color: '', count: '' }
-        nextErr[index] = validateRowObject(updated)
-        return nextErr
+  function colorDistance(a,b){
+    return Math.sqrt((a.r-b.r)**2 + (a.g-b.g)**2 + (a.b-b.b)**2)
+  }
+
+  function findNearestCodeByRgb(rgb){
+    let best = null, bestDist = Infinity
+    MARD.forEach(p => {
+      const r = hexToRgb(p.hex)
+      const d = colorDistance(rgb, r)
+      if (d < bestDist){ bestDist = d; best = p.code }
+    })
+    return best
+  }
+
+  async function processImage(){
+    if (!imgFile) return alert('请先选择图片')
+    setOcrLoading(true)
+    setOcrProgress(0)
+    try{
+      // load image into canvas
+      const img = await createImageBitmap(imgFile)
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.min(img.width, 800)
+      canvas.height = Math.min(img.height, 800 * (img.height/img.width))
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+      // sample center area for average color
+      const w = canvas.width, h = canvas.height
+      const sx = Math.max(0, Math.floor(w*0.25)), sy = Math.max(0, Math.floor(h*0.25))
+      const sw = Math.floor(w*0.5), sh = Math.floor(h*0.5)
+      const data = ctx.getImageData(sx, sy, sw, sh).data
+      let r=0,g=0,b=0,count=0
+      for(let i=0;i<data.length;i+=4){ r += data[i]; g += data[i+1]; b += data[i+2]; count++ }
+      const avg = { r: Math.round(r/count), g: Math.round(g/count), b: Math.round(b/count) }
+      const nearest = findNearestCodeByRgb(avg)
+
+      // run OCR to find numbers and codes
+      const worker = Tesseract.createWorker({
+        logger: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) }
       })
-      return next
-    })
-  }
+      await worker.load()
+      await worker.loadLanguage('eng+chi_sim')
+      await worker.initialize('eng+chi_sim')
+      const { data: { text } } = await worker.recognize(canvas)
+      await worker.terminate()
 
-  function addRow() {
-    setRows(prev => {
-      const next = [...prev, { color: '', count: '' }]
-      setRowErrors(prevErr => [...prevErr, { color: '', count: '' }])
-      return next
-    })
-  }
+      // find numeric quantity
+      const nums = text.match(/\d+/g)
+      const foundNum = nums ? Number(nums[0]) : null
 
-  function applyBulkAdd() {
-    const cnt = Number(bulkCount)
-    if (!bulkSelected || bulkSelected.length === 0) return showNotify('请选择至少一个色号', 'error')
-    if (!Number.isInteger(cnt) || cnt <= 0) return showNotify('数量需为大于 0 的整数', 'error')
-    setRows(prev => {
-      const existing = [...prev]
-      for (const p of bulkSelected) {
-        const color = p.code
-        const idx = existing.findIndex(r => r.color === color)
-        if (idx >= 0) {
-          const prevCnt = Number(existing[idx].count) || 0
-          existing[idx] = { ...existing[idx], count: String(prevCnt + cnt) }
-        } else {
-          existing.push({ color, count: String(cnt) })
-        }
-      }
-      return existing
-    })
-    showNotify('已批量累加色号数量', 'success')
-  }
+      // try to find any known code in OCR text (A1, B12 etc.)
+      const textUpper = text.toUpperCase()
+      let foundCode = null
+      for(const p of MARD){ if (textUpper.indexOf(p.code.toUpperCase()) > -1){ foundCode = p.code; break } }
 
-  function duplicateRow(index) {
-    setRows(prev => {
-      const copy = { ...prev[index] }
-      const arr = [...prev]
-      arr.splice(index + 1, 0, copy)
-      return arr
-    })
-  }
+      // prefer code from OCR, fallback to nearest color
+      const targetCode = foundCode || nearest
 
-  function onDragStart(e, index) {
-    setDragIndex(index)
-    try { e.dataTransfer.effectAllowed = 'move' } catch (_) {}
-  }
-
-  function onDragOver(e) {
-    e.preventDefault()
-    try { e.dataTransfer.dropEffect = 'move' } catch (_) {}
-  }
-
-  function onDrop(e, index) {
-    e.preventDefault()
-    if (dragIndex === null) return
-    setRows(prev => {
-      const arr = [...prev]
-      const [m] = arr.splice(dragIndex, 1)
-      arr.splice(index, 0, m)
-      return arr
-    })
-    setDragIndex(null)
-  }
-
-  function removeRow(index) {
-    setRows(prev => {
-      const next = prev.filter((_, i) => i !== index)
-      setRowErrors(prevErr => {
-        const e = prevErr.slice(0)
-        e.splice(index, 1)
-        return e
-      })
-      return next
-    })
-  }
-
-  // Prepare: validate and show confirmation modal
-  function prepareSubmit(e) {
-    e.preventDefault()
-    if (timeOption === 'custom' && !date) return showNotify('请选择时间', 'error')
-    // validate all rows and set inline errors
-    const errors = rows.map(r => validateRowObject(r))
-    const hasError = errors.some(er => er.color || er.count)
-    if (hasError) {
-      setRowErrors(errors)
-      return showNotify('请修正表单错误后重试', 'error')
-    }
-
-    const items = rows.map(r => ({ color: r.color.trim(), count: Number(r.count) }))
-
-    // aggregate totals per color
-    const totals = {}
-    for (const it of items) {
-      if (!totals[it.color]) totals[it.color] = 0
-      totals[it.color] += it.count
-    }
-
-    let occurred_at
-    if (timeOption === 'now') occurred_at = new Date()
-    else occurred_at = new Date(date)
-
-    const summary = {
-      operation,
-      occurred_at: occurred_at.toISOString(),
-      occurred_at_label: occurred_at.toLocaleString(),
-      note,
-      totals,
-      items,
-    }
-
-    setConfirmSummary(summary)
-    setShowConfirm(true)
-  }
-
-  // Confirmed: actually send payload
-  async function confirmSubmit() {
-    if (!confirmSummary) return
-    const payload = {
-      operation: confirmSummary.operation,
-      items: confirmSummary.items,
-      occurred_at: confirmSummary.occurred_at,
-      note: confirmSummary.note,
-    }
-    try {
-      setLoading(true)
-      const res = await fetch('/api/reminders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        showNotify('添加失败：' + (err.error || res.statusText), 'error')
-        return
-      }
-      const created = await res.json()
-      // refresh list and update sync time
-      await fetchReminders()
-      setRows([{ color: '', count: '' }])
-      setNote('')
-      setDate('')
-      setShowConfirm(false)
-      setConfirmSummary(null)
-      showNotify('添加成功', 'success')
-      // 如果在 modal 中打开，调用 onClose
-      if (typeof onClose === 'function') {
-        try { onClose() } catch(_) {}
-      }
-      // 通知父组件已添加，用于刷新库存
-      if (typeof onAdded === 'function') {
-        try { onAdded() } catch(_) {}
-      }
-    } catch (err) {
+      // apply results
+      setItemsMap(prev => ({ ...prev, [targetCode]: foundNum || prev[targetCode] || 0 }))
+      setSelectedCodes(s => s.includes(targetCode) ? s : [...s, targetCode])
+      setOcrProgress(100)
+      alert(`识别结果：色号 ${targetCode}，数量 ${foundNum || 0}`)
+    }catch(err){
       console.error(err)
-      showNotify('添加失败：' + err.message, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function removeReminder(id) {
-    if (!confirm('确认删除？')) return
-    try {
-      const res = await fetch(`/api/reminders/${id}`, { method: 'DELETE' })
-      if (!res.ok) return alert('删除失败')
-      setReminders(prev => prev.filter(r => String(r.id) !== String(id)))
-    } catch (err) {
-      console.error(err)
-    }
+      alert('识别失败：' + err.message)
+    }finally{ setOcrLoading(false); setOcrProgress(0) }
   }
 
   return (
-    <div className="pindou-root">
-      <Box sx={{display:'flex',alignItems:'center',justifyContent:'space-between',mb:1}}>
-        <Typography component="h1" sx={{fontSize:{xs:'1.1rem',sm:'1.25rem',md:'1.5rem'},lineHeight:1.2,fontWeight:700}}>拼豆补豆提醒</Typography>
+    <Box sx={{ p:1 }}>
+      <Box sx={{ display:'flex', alignItems:'center', justifyContent:'space-between', mb:1 }}>
+        <Typography variant="h6">补豆</Typography>
+        <IconButton onClick={onClose}><CloseIcon /></IconButton>
       </Box>
 
-      <Box component="form" className="pindou-form" onSubmit={prepareSubmit} sx={{
-        '& .MuiInputBase-root': { fontSize: { xs: '16px', sm: '14px' }, lineHeight: 1.6 },
-        '& .MuiTypography-root': { fontSize: { xs: '15px', sm: '14px' } },
-        px: { xs: 0, sm: 1 }
-      }}>
-        {notify && (
-          <div className={`notify ${notify.type}`} role="status">{notify.msg}</div>
-        )}
-        <Box sx={{display:'flex',flexDirection:{xs:'column',sm:'row'},alignItems:'center',gap:1,mb:2}}>
-          <Box component="span" sx={{minWidth:60}}>操作：</Box>
-          <Box sx={{display:'flex',gap:2,alignItems:'center'}}>
-            <label style={{display:'flex',alignItems:'center',gap:6}}><input type="radio" name="op" value="补豆" checked={operation==='补豆'} onChange={()=>setOperation('补豆')} /> 补豆</label>
-            <label style={{display:'flex',alignItems:'center',gap:6}}><input type="radio" name="op" value="消耗" checked={operation==='消耗'} onChange={()=>setOperation('消耗')} /> 消耗</label>
-          </Box>
-        </Box>
+      
 
-        {/* 批量操作区 */}
-        <Box sx={{display:'flex',gap:2,alignItems:'center',mb:2,flexWrap:'wrap'}}>
-          <Autocomplete
-            multiple
-            disableCloseOnSelect
-            options={MARD}
-            getOptionLabel={(option) => `${option.code} — ${option.name}`}
-            isOptionEqualToValue={(option, value) => option.code === value.code}
-            value={bulkSelected}
-            onChange={(e, newValue) => setBulkSelected(newValue)}
-            renderOption={(props, option, { selected }) => (
-              <li {...props}>
-                <Checkbox style={{ marginRight: 8 }} checked={selected} />
-                <Box sx={{width:28,height:18,background:option.hex||'#fff',border: '1px solid #ddd',mr:1,display:'inline-block',verticalAlign:'middle'}} />
-                <Box component="span" sx={{mr:1}}>{option.code}</Box>
-                <Box component="span" sx={{color:'#666',fontSize:13}}>{option.name || ''} {option.hex ? ` ${option.hex}` : ''}</Box>
-              </li>
-            )}
-            renderTags={(value, getTagProps) =>
-              value.map((option, index) => (
-                <Chip
-                  label={`${option.code} ${option.hex || ''}`}
-                  size="small"
-                  key={option.code}
-                  sx={{ mr: 0.5, height:28 }}
-                  icon={<Box sx={{width:18,height:12,background:option.hex||'#fff',border: '1px solid #ddd',borderRadius:1}} />}
-                  {...getTagProps({ index })}
-                />
-              ))
-            }
-            renderInput={(params) => (
-              <TextField {...params} size="small" label="批量选择色号" placeholder="搜索色号或名称" sx={{minWidth:240}} />
-            )}
-            sx={{minWidth:260}}
-          />
-          <TextField label="数量" size="small" value={bulkCount} onChange={e=>setBulkCount(e.target.value)} sx={{width:120,'& .MuiInputBase-root':{minHeight:44}}} />
-          <Button variant="outlined" onClick={applyBulkAdd} sx={{minHeight:44}}>批量添加</Button>
-        </Box>
+      <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1, flexWrap:'wrap' }}>
+        <Autocomplete
+          multiple
+          freeSolo
+          options={MARD.map(p=>p.code)}
+          value={selectedCodes}
+          onChange={(e, v) => {
+            setSelectedCodes(v)
+            // ensure map contains entries
+            setItemsMap(prev => {
+              const next = { ...prev }
+              v.forEach(code => { if (!(code in next)) next[code] = 0 })
+              return next
+            })
+          }}
+          renderTags={(value, getTagProps) => value.map((option, index) => (
+            <Chip size="small" label={option} {...getTagProps({ index })} key={option} />
+          ))}
+          renderInput={(params) => <TextField {...params} size="small" label="选择色号（可多选/输入）" />}
+          sx={{ minWidth: 240 }}
+        />
 
-            <div className="items-editor">
-              {rows.map((r, i) => {
-                const countVal = r.count
-                const countNum = Number(countVal)
-                const rowErr = rowErrors[i] || { color: '', count: '' }
-                return (
-                  <div key={i} className="item-row" draggable onDragStart={e=>onDragStart(e,i)} onDragOver={onDragOver} onDrop={e=>onDrop(e,i)}>
-                        <Box sx={{display:'flex',flexDirection:{xs:'column',sm:'row'},alignItems:'center',gap:1,width:'100%'}}>
-                          <IconButton title="拖拽排序" draggable onDragStart={e=>onDragStart(e,i)} onDragOver={onDragOver} onDrop={e=>onDrop(e,i)}>
-                            <DragIndicatorIcon />
-                          </IconButton>
-
-                          <Autocomplete
-                            options={MARD}
-                            getOptionLabel={(opt) => `${opt.code} — ${opt.name}`}
-                            isOptionEqualToValue={(opt, val) => opt.code === val.code}
-                            value={MARD.find(x => x.code === r.color) || null}
-                            onChange={(e, val) => updateRow(i, 'color', val ? val.code : '')}
-                            renderOption={(props, option) => (
-                              <li {...props}>
-                                <Box sx={{width:36,height:24,background:option.hex||'#fff',border: '1px solid #ddd',mr:1,display:'inline-block'}} />
-                                  <Box component="span" sx={{fontWeight:600,mr:0.5}}>{option.code}</Box>
-                                  <Box component="span" sx={{color:'#666',fontSize:13}}>{option.name || ''} {option.hex ? ` ${option.hex}` : ''}</Box>
-                              </li>
-                            )}
-                            renderInput={(params) => (
-                              <TextField
-                                {...params}
-                                label="色号"
-                                placeholder="搜索或选择色号"
-                                size="medium"
-                                fullWidth
-                                error={Boolean(rowErr.color)}
-                                helperText={rowErr.color || ''}
-                                sx={{'& .MuiInputBase-root':{minHeight:44}}}
-                              />
-                            )}
-                            fullWidth
-                            sx={{width:{xs:'100%', sm:180}}}
-                          />
-                          <Box sx={{display:'flex',flexDirection:'column',alignItems:'center',mt:{xs:1, sm:0}}}>
-                            <Box sx={{width:44,height:30,background:(MARD.find(x => x.code === r.color)||{}).hex||'transparent',border: (r.color?'1px solid #ddd':'1px dashed #ccc'),borderRadius:2}} title={r.color||'未选择'} />
-                            <Box component="span" sx={{fontSize:11,color:'#444',mt:0.5}}>{r.color || ''} {(MARD.find(x => x.code === r.color)||{}).hex || ''}</Box>
-                          </Box>
-
-                          <TextField size="small" sx={{width:{xs:'100%', sm:100}}} label="数量" type="number" value={r.count} onChange={e => updateRow(i, 'count', e.target.value)} error={Boolean(rowErr.count)} helperText={rowErr.count || ''} />
-
-                          <Box sx={{display:'flex',gap:1,mt:{xs:1, sm:0}}}>
-                            <IconButton title="复制此行" onClick={() => duplicateRow(i)}><ContentCopyIcon /></IconButton>
-                            <IconButton title="删除" onClick={() => removeRow(i)} disabled={rows.length === 1}><DeleteIcon /></IconButton>
-                          </Box>
-                        </Box>
-                  </div>
-                )
-              })}
-              <Button type="button" variant="outlined" onClick={addRow} sx={{mt:1,width:'100%',minHeight:44}}>＋ 添加色号</Button>
-            </div>
-
-        <div className="time-row">
-          <label>时间：</label>
-          <div className="time-options">
-            <button type="button" className={timeOption==='now' ? 'active' : ''} onClick={()=>{setTimeOption('now'); setDate('')}}>现在</button>
-            <button type="button" className={timeOption==='custom' ? 'active' : ''} onClick={()=>setTimeOption('custom')}>自定义</button>
-          </div>
-          {timeOption === 'custom' && (
-            <TextField
-              type="datetime-local"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              required
-              InputLabelProps={{ shrink: true }}
-              size="small"
-            />
-          )}
-        </div>
-        <TextField placeholder="备注（可选）" value={note} onChange={e => setNote(e.target.value)} fullWidth size="medium" sx={{mt:1,'& .MuiInputBase-root':{minHeight:44}}} />
-        <Button type="submit" variant="contained" sx={{mt:1,width:'100%',minHeight:44}}>添加提醒</Button>
+        <TextField size="small" label="数量" type="number" value={applyCount} onChange={e=>setApplyCount(e.target.value)} sx={{ width:120 }} />
+        <Button variant="contained" size="small" onClick={applyToSelected}>应用到所选</Button>
       </Box>
-      {/* 确认弹窗：小屏使用 fullScreen（避免键盘/滚动问题），大屏保持小窗 */}
-      <Dialog open={showConfirm} onClose={() => { setShowConfirm(false); setConfirmSummary(null) }} maxWidth="sm" fullWidth fullScreen={isSmall}>
-          <DialogTitle>确认提交</DialogTitle>
-        <DialogContent>
-          <div>操作：{confirmSummary?.operation}</div>
-          <div>时间：{confirmSummary?.occurred_at_label}</div>
-          {confirmSummary?.note && <div>备注：{confirmSummary.note}</div>}
-          <div style={{marginTop:8}}>
-            <strong>汇总：</strong>
-            <ul>
-              {confirmSummary && Object.keys(confirmSummary.totals).map(code => {
-                const p = MARD.find(x => x.code === code)
-                const name = p ? ` ${p.name}` : ''
-                const hex = p ? ` ${p.hex || ''}` : ''
-                return <li key={code}>{code}{name}{hex} — {confirmSummary.totals[code]} 颗</li>
-              })}
-            </ul>
-          </div>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => { setShowConfirm(false); setConfirmSummary(null) }}>编辑</Button>
-          <Button onClick={confirmSubmit} variant="contained">确定提交</Button>
-        </DialogActions>
-      </Dialog>
 
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12}}>
-        <div style={{fontSize:12,color:'#666'}}>最近一次同步：{lastSync ? lastSync.toLocaleString() : '—'}</div>
-        <div>
-          <button onClick={fetchReminders} style={{padding:'6px 10px',borderRadius:4}}>手动同步</button>
-        </div>
-      </div>
-      {/* filters */}
-      <div className="filters" style={{display:'flex',gap:8,alignItems:'center',marginTop:12,flexWrap:'wrap'}}>
-        <input placeholder="按色号搜索（例如 A7）" value={filterColor} onChange={e=>setFilterColor(e.target.value)} style={{padding:6,borderRadius:4,border:'1px solid #ddd'}} />
-        <FormControl size="small" sx={{minWidth:120}}>
-          <Select value={filterOp} onChange={e=>setFilterOp(e.target.value)}>
-            <MenuItem value="all">全部操作</MenuItem>
-            <MenuItem value="补豆">补豆</MenuItem>
-            <MenuItem value="消耗">消耗</MenuItem>
-          </Select>
-        </FormControl>
-        <label style={{fontSize:12,color:'#666'}}>从</label>
-        <input type="date" value={filterFrom} onChange={e=>setFilterFrom(e.target.value)} />
-        <label style={{fontSize:12,color:'#666'}}>到</label>
-        <input type="date" value={filterTo} onChange={e=>setFilterTo(e.target.value)} />
-        <button onClick={()=>{setFilterColor('');setFilterOp('all');setFilterFrom('');setFilterTo('')}} style={{padding:6}}>清除</button>
-      </div>
+      <Box sx={{ mb:1 }}>
+        <TextField fullWidth label="备注（可选）" size="small" value={note} onChange={e=>setNote(e.target.value)} />
+      </Box>
 
-      <div style={{marginTop:12}}>
-        {loading && <div className="empty">加载中...</div>}
-        {!loading && reminders.length === 0 && <div className="empty">暂无提醒</div>}
+      <Box sx={{ display:'flex', gap:1, mt:0, mb:1 }}>
+        <Button variant="contained" onClick={handleSubmit} disabled={loading}>补豆</Button>
+        <Button onClick={onClose}>取消</Button>
+      </Box>
 
-        {/* grouping by date */}
-        {(() => {
-          // apply filters client-side
-          const filtered = reminders.filter(r => {
-            if (filterOp !== 'all' && r.operation !== filterOp) return false
-            if (filterColor) {
-              const q = filterColor.trim().toLowerCase()
-              const found = (r.items || []).some(it => (it.color || '').toLowerCase().includes(q))
-              if (!found) return false
-            }
-            if (filterFrom) {
-              const from = new Date(filterFrom)
-              if (new Date(r.occurred_at) < from) return false
-            }
-            if (filterTo) {
-              const to = new Date(filterTo)
-              // include whole day
-              to.setHours(23,59,59,999)
-              if (new Date(r.occurred_at) > to) return false
-            }
-            return true
-          })
+      {/* 图片上传与识别 */}
+      <Box sx={{ mb:1, display:'flex', gap:1, alignItems:'center', flexWrap:'wrap' }}>
+        <Input
+          inputProps={{ accept: 'image/*' }}
+          type="file"
+          onChange={e => handleFileChange(e.target.files && e.target.files[0])}
+          sx={{ display: 'inline-flex' }}
+        />
+        <Button size="small" onClick={() => { if (imgPreview) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${imgPreview}" style="max-width:100%">` } }}>预览</Button>
+        <Button size="small" variant="outlined" onClick={processImage} disabled={ocrLoading || !imgFile}>识别图片</Button>
+        {ocrLoading && <Box sx={{ width: 160 }}><LinearProgress variant="determinate" value={ocrProgress} /></Box>}
+      </Box>
 
-          // group by date string
-          const groups = {}
-          for (const it of filtered) {
-            const d = new Date(it.occurred_at)
-            const key = d.toLocaleDateString()
-            if (!groups[key]) groups[key] = []
-            groups[key].push(it)
-          }
+      <Box sx={{ display: 'grid', gap: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))' }}>
+        {allCodes.map(code => {
+          const p = findPalette(code)
+          const hex = p ? p.hex : '#fff'
+          return (
+            <Box key={code} sx={{ display:'flex', alignItems:'center', gap:1, p:1, border:'1px solid #eee', borderRadius:1 }}>
+                <ColorSwatch code={code} hex={hex} sx={{ borderRadius:0, fontSize:'0.85rem', fontWeight:700 }} />
+                <TextField size="small" type="number" inputProps={{ min:0 }} value={itemsMap[code] || 0} onChange={e=>updateCount(code, e.target.value)} sx={{ width:120 }} />
+              </Box>
+          )
+        })}
+      </Box>
 
-          const keys = Object.keys(groups).sort((a,b)=> new Date(b) - new Date(a))
-          return keys.map(k => (
-            <div key={k} className="group">
-              <div className="group-title">{k}</div>
-              <ul className="pindou-list">
-                {groups[k].map(item => (
-                  <li key={item.id} className="pindou-item">
-                    <div className="pindou-item-main">
-                      <div style={{display:'flex',flexDirection:'column'}}>
-                        <div className="pindou-note">{item.operation} · {new Date(item.occurred_at).toLocaleTimeString()}</div>
-                        <div className="pindou-date">{item.note}</div>
-                      </div>
-                      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                        {(item.items || []).map((it, idx) => {
-                          const p = MARD.find(x => x.code === it.color)
-                          const hex = p ? p.hex : '#fff'
-                          return (
-                            <div key={idx} className="chip">
-                              <div className="chip-color" style={{background:hex}} />
-                              <div className="chip-label">{it.color} {it.count}颗</div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                    <div className="pindou-item-actions">
-                      <button onClick={() => removeReminder(item.id)}>删除</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))
-        })()}
-      </div>
-    </div>
+      
+    </Box>
   )
 }
 
-export default PindouReminder

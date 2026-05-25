@@ -26,8 +26,8 @@ function App() {
   function openPindouWith(op, initialRows = null) {
     setOperationForForm(op)
     setInitialRowsForForm(initialRows)
-    // open as modal when called from inventory
-    setPindouModalOpen(true)
+    // navigate to 补豆 page when requested
+    setView('补豆')
   }
 
   function onPindouAdded() {
@@ -40,7 +40,7 @@ function App() {
       <CssBaseline />
       <Box sx={{ flexGrow: 1, height: '100vh', overflowY: 'auto' }}>
         <AppBar position="fixed" sx={{py:0}}>
-          <Toolbar variant="dense" sx={{gap:0,py:0,minHeight:40}}>
+          <Toolbar variant="dense" sx={{gap:0,py:0,height:40}}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontSize: { xs: '0.95rem', sm: '1rem' }, lineHeight: 1.1, py:0 }}>
               {view}
             </Typography>
@@ -50,7 +50,7 @@ function App() {
         </AppBar>
 
         {/* spacer to offset fixed AppBar */}
-        <Toolbar variant="dense" sx={{minHeight:40}} />
+        <Toolbar variant="dense" sx={{height:40}} />
 
         <Box component="main" sx={{ p: 0, maxWidth: '100%', mx: 0, width: '100%' }}>
           {view === '日历' && <Calendar />}
@@ -58,16 +58,10 @@ function App() {
             <Inventory onAction={(op, rows)=>openPindouWith(op, rows)} refreshKey={inventoryRefreshKey} />
           )}
 
-          {pindouModalOpen && (
-            <div style={{position:'fixed',left:0,top:0,right:0,bottom:0,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999}}>
-              <div style={{width:'96%',maxWidth:900,background:'#fff',borderRadius:6,padding:16,boxShadow:'0 6px 24px rgba(0,0,0,0.2)'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-                  <Typography variant="h6" sx={{fontSize:{xs:'1.05rem', sm:'1.25rem'}}}>添加提醒</Typography>
-                  <IconButton onClick={()=>setPindouModalOpen(false)}><span style={{fontSize:18}}>✖</span></IconButton>
-                </div>
-                <PindouReminder initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => setPindouModalOpen(false)} onAdded={onPindouAdded} />
-              </div>
-            </div>
+          {view === '补豆' && (
+            <Box sx={{ p: 1 }}>
+              <PindouReminder initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => setView('拼豆')} onAdded={() => { onPindouAdded(); setView('拼豆') }} />
+            </Box>
           )}
         </Box>
       </Box>
