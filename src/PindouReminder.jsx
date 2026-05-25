@@ -30,6 +30,7 @@ import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
 function PindouReminder({ initialOperation, initialRows, onClose, onAdded }) {
   const [operation, setOperation] = useState('补豆')
   const [rows, setRows] = useState([{ color: '', count: '' }])
+  const [rowErrors, setRowErrors] = useState([{ color: '', count: '' }])
   const [bulkSelected, setBulkSelected] = useState([]) // will hold array of palette objects when using Autocomplete
   const [bulkCount, setBulkCount] = useState('')
   const [note, setNote] = useState('')
@@ -71,7 +72,9 @@ function PindouReminder({ initialOperation, initialRows, onClose, onAdded }) {
   useEffect(() => {
     if (initialRows && Array.isArray(initialRows) && initialRows.length > 0) {
       // normalize counts to strings
-      setRows(initialRows.map(r => ({ color: r.color, count: String(r.count) })))
+      const normalized = initialRows.map(r => ({ color: r.color, count: String(r.count) }))
+      setRows(normalized)
+      setRowErrors(normalized.map(r => ({ color: r.color ? '' : '请选择色号', count: (Number.isInteger(Number(r.count)) && Number(r.count) > 0) ? '' : '数量需为大于 0 的整数' })))
     }
   }, [initialRows])
 
@@ -96,12 +99,34 @@ function PindouReminder({ initialOperation, initialRows, onClose, onAdded }) {
     if (timeout) setTimeout(() => setNotify(null), timeout)
   }
 
+  function validateRowObject(row) {
+    const err = { color: '', count: '' }
+    if (!row.color) err.color = '请选择色号'
+    const cnt = Number(row.count)
+    if (!Number.isInteger(cnt) || cnt <= 0) err.count = '数量需为大于 0 的整数'
+    return err
+  }
+
   function updateRow(index, key, value) {
-    setRows(prev => prev.map((r, i) => i === index ? { ...r, [key]: value } : r))
+    setRows(prev => {
+      const next = prev.map((r, i) => i === index ? { ...r, [key]: value } : r)
+      // validate updated row and sync rowErrors
+      setRowErrors(prevErr => {
+        const nextErr = prevErr.slice(0)
+        const updated = next[index] || { color: '', count: '' }
+        nextErr[index] = validateRowObject(updated)
+        return nextErr
+      })
+      return next
+    })
   }
 
   function addRow() {
-    setRows(prev => [...prev, { color: '', count: '' }])
+    setRows(prev => {
+      const next = [...prev, { color: '', count: '' }]
+      setRowErrors(prevErr => [...prevErr, { color: '', count: '' }])
+      return next
+    })
   }
 
   function applyBulkAdd() {
@@ -157,16 +182,30 @@ function PindouReminder({ initialOperation, initialRows, onClose, onAdded }) {
   }
 
   function removeRow(index) {
-    setRows(prev => prev.filter((_, i) => i !== index))
+    setRows(prev => {
+      const next = prev.filter((_, i) => i !== index)
+      setRowErrors(prevErr => {
+        const e = prevErr.slice(0)
+        e.splice(index, 1)
+        return e
+      })
+      return next
+    })
   }
 
   // Prepare: validate and show confirmation modal
   function prepareSubmit(e) {
     e.preventDefault()
-    if (timeOption === 'custom' && !date) return alert('请选择时间')
+    if (timeOption === 'custom' && !date) return showNotify('请选择时间', 'error')
+    // validate all rows and set inline errors
+    const errors = rows.map(r => validateRowObject(r))
+    const hasError = errors.some(er => er.color || er.count)
+    if (hasError) {
+      setRowErrors(errors)
+      return showNotify('请修正表单错误后重试', 'error')
+    }
+
     const items = rows.map(r => ({ color: r.color.trim(), count: Number(r.count) }))
-    const invalid = items.some(it => !Number.isInteger(it.count) || it.count <= 0)
-    if (invalid) return alert('请修正错误：每行数量必须为正整数')
 
     // aggregate totals per color
     const totals = {}
@@ -314,7 +353,7 @@ function PindouReminder({ initialOperation, initialRows, onClose, onAdded }) {
               {rows.map((r, i) => {
                 const countVal = r.count
                 const countNum = Number(countVal)
-                const countInvalid = !(Number.isInteger(countNum) && countNum > 0)
+                const rowErr = rowErrors[i] || { color: '', count: '' }
                 return (
                   <div key={i} className="item-row" draggable onDragStart={e=>onDragStart(e,i)} onDragOver={onDragOver} onDrop={e=>onDrop(e,i)}>
                         <Box sx={{display:'flex',flexDirection:{xs:'column',sm:'row'},alignItems:'center',gap:1,width:'100%'}}>
@@ -342,6 +381,8 @@ function PindouReminder({ initialOperation, initialRows, onClose, onAdded }) {
                                 placeholder="搜索或选择色号"
                                 size="medium"
                                 fullWidth
+                                error={Boolean(rowErr.color)}
+                                helperText={rowErr.color || ''}
                                 sx={{'& .MuiInputBase-root':{minHeight:44}}}
                               />
                             )}
@@ -353,7 +394,7 @@ function PindouReminder({ initialOperation, initialRows, onClose, onAdded }) {
                             <Box component="span" sx={{fontSize:11,color:'#444',mt:0.5}}>{r.color || ''} {(MARD.find(x => x.code === r.color)||{}).hex || ''}</Box>
                           </Box>
 
-                          <TextField size="small" sx={{width:{xs:'100%', sm:100}}} label="数量" type="number" value={r.count} onChange={e => updateRow(i, 'count', e.target.value)} error={countInvalid} helperText={countInvalid? '数量需为大于 0 的整数' : ''} />
+                          <TextField size="small" sx={{width:{xs:'100%', sm:100}}} label="数量" type="number" value={r.count} onChange={e => updateRow(i, 'count', e.target.value)} error={Boolean(rowErr.count)} helperText={rowErr.count || ''} />
 
                           <Box sx={{display:'flex',gap:1,mt:{xs:1, sm:0}}}>
                             <IconButton title="复制此行" onClick={() => duplicateRow(i)}><ContentCopyIcon /></IconButton>

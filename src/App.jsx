@@ -38,8 +38,8 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ flexGrow: 1 }}>
-        <AppBar position="static" sx={{py:0}}>
+      <Box sx={{ flexGrow: 1, height: '100vh', overflowY: 'auto' }}>
+        <AppBar position="fixed" sx={{py:0}}>
           <Toolbar variant="dense" sx={{gap:0,py:0,minHeight:40}}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontSize: { xs: '0.95rem', sm: '1rem' }, lineHeight: 1.1, py:0 }}>
               {view}
@@ -49,7 +49,10 @@ function App() {
           </Toolbar>
         </AppBar>
 
-        <Box component="main" sx={{ p: 2, maxWidth: 960, mx: 'auto', width: '100%' }}>
+        {/* spacer to offset fixed AppBar */}
+        <Toolbar variant="dense" sx={{minHeight:40}} />
+
+        <Box component="main" sx={{ p: 0, maxWidth: '100%', mx: 0, width: '100%' }}>
           {view === '日历' && <Calendar />}
           {view === '拼豆' && (
             <Inventory onAction={(op, rows)=>openPindouWith(op, rows)} refreshKey={inventoryRefreshKey} />
