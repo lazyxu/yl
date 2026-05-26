@@ -15,6 +15,7 @@ import Input from '@mui/material/Input'
 // use dynamic import for tesseract to handle different bundler export shapes
 import ColorSwatch from './ColorSwatch'
 import MARD from './colorPalettes/mard.json'
+import { recognizeImage, parseOcrText, recognizeAndParse } from './ocr/recognize'
 
 function findPalette(code){
   return MARD.find(p => p.code === code)
@@ -35,7 +36,6 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
   const [imgPreview, setImgPreview] = useState(null)
   const [ocrLoading, setOcrLoading] = useState(false)
   const [ocrProgress, setOcrProgress] = useState(0)
-  const workerRef = useRef(null)
   const [ocrResult, setOcrResult] = useState(null)
   const [ocrDialogOpen, setOcrDialogOpen] = useState(false)
 
@@ -95,25 +95,7 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
     }
   }
 
-  useEffect(() => {
-    let mounted = true
-    async function initWorker(){
-      try{
-        const mod = await import('tesseract.js')
-        const creator = mod.createWorker || (mod.default && mod.default.createWorker) || mod.default
-        if (typeof creator !== 'function') throw new Error('createWorker not found')
-        const w = creator({ logger: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) } })
-        await w.load()
-        await w.loadLanguage('eng')
-        await w.initialize('eng')
-        try{ await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' }) }catch(e){}
-        if (mounted) workerRef.current = w
-        else await w.terminate()
-      }catch(err){ console.error('预热 OCR worker 失败', err) }
-    }
-    initWorker()
-    return () => { mounted = false; if (workerRef.current){ workerRef.current.terminate().catch(()=>{}); workerRef.current = null } }
-  }, [])
+  // 移除本地 worker 预热，使用共享识别函数 `recognizeImage`。
 
   function hexToRgb(hex){
     const c = (hex||'#000000').replace('#','')
@@ -154,28 +136,11 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
       for(let i=0;i<data.length;i+=4){ r += data[i]; g += data[i+1]; b += data[i+2]; count++ }
       const avg = { r: Math.round(r/count), g: Math.round(g/count), b: Math.round(b/count) }
       const nearest = findNearestCodeByRgb(avg)
-      let worker = workerRef.current
-      let createdLocal = false
-      if (!worker){
-        const mod = await import('tesseract.js')
-        const creator = mod.createWorker || (mod.default && mod.default.createWorker) || mod.default
-        if (typeof creator !== 'function') throw new Error('createWorker not found')
-        worker = creator({ logger: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) } })
-        await worker.load()
-        await worker.loadLanguage('eng')
-        await worker.initialize('eng')
-        try{ await worker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' }) }catch(e){}
-        createdLocal = true
-      }
-      const { data: { text } } = await worker.recognize(canvas)
-      if (createdLocal){ try{ await worker.terminate() }catch(e){} }
-      const nums = text.match(/\d+/g)
-      const foundNum = nums ? Number(nums[0]) : null
-      const textUpper = text.toUpperCase()
-      let foundCode = null
-      for(const p of MARD){ if (textUpper.indexOf(p.code.toUpperCase()) > -1){ foundCode = p.code; break } }
-      const targetCode = foundCode || nearest
-      setOcrResult({ code: targetCode, count: foundNum || 0, hex: (findPalette(targetCode)||{}).hex || '#ffffff' })
+      // 使用共享识别函数并解析结果（将 nearest 作为后备）
+      const result = await recognizeImage(canvas, { lang: 'eng', psm: 6, whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', onProgress: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) } })
+      const text = result && (result.text || (result.data && result.data.text)) ? (result.text || result.data.text) : ''
+      const parsed = parseOcrText(text, { palette: MARD, fallbackCode: nearest })
+      setOcrResult({ code: parsed.code, count: parsed.count || 0, hex: (findPalette(parsed.code)||{}).hex || '#ffffff' })
       setOcrDialogOpen(true)
       setOcrProgress(100)
     }catch(err){
