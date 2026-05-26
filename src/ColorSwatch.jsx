@@ -12,7 +12,7 @@ function getTextColor(hex){
   }catch(e){ return '#000' }
 }
 
-export default function ColorSwatch({ code, hex = '#ffffff', width = 36, height = 20, fontSize = '0.85rem', fontWeight = 700, sx = {}, onClick, title }){
+export default function ColorSwatch({ code, hex = '#ffffff', size = 'sm', sx = {} }){
   const textColor = getTextColor(hex)
   const defaultSx = {
     p: 0.5,
@@ -22,21 +22,25 @@ export default function ColorSwatch({ code, hex = '#ffffff', width = 36, height 
     justifyContent: 'center',
     fontSize: { xs: '10px', sm: '11px' }
   }
+
+  // size can be 'sm'|'md'|'lg' or a numeric pixel width
+  let width = 36, height = 20, fontWeight = 700
+  if (size === 'md') { width = 44; height = 24 }
+  else if (size === 'lg') { width = 56; height = 32 }
+  else if (typeof size === 'number') { width = size; height = Math.round(size * 0.56) }
   return (
     <Box
-      onClick={onClick}
       sx={{
+        ...defaultSx,
         width,
         height,
         background: hex,
         border: '1px solid rgba(0,0,0,0.06)',
         color: textColor,
         fontWeight,
-        cursor: onClick ? 'pointer' : 'default',
-        ...defaultSx,
         ...sx
       }}
-      title={title || `${code} ${hex}`}
+      title={`${code} ${hex}`}
     >
       <span aria-hidden>{code}</span>
     </Box>

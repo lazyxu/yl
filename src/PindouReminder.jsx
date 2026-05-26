@@ -1,10 +1,14 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import Box from '@mui/material/Box'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import Autocomplete from '@mui/material/Autocomplete'
 import Chip from '@mui/material/Chip'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogActions from '@mui/material/DialogActions'
 import IconButton from '@mui/material/IconButton'
 import CloseIcon from '@mui/icons-material/Close'
 import LinearProgress from '@mui/material/LinearProgress'
@@ -32,6 +36,12 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
   const [imgPreview, setImgPreview] = useState(null)
   const [ocrLoading, setOcrLoading] = useState(false)
   const [ocrProgress, setOcrProgress] = useState(0)
+  const [showCamera, setShowCamera] = useState(false)
+  const [cameraStream, setCameraStream] = useState(null)
+  const videoRef = useRef(null)
+  const workerRef = useRef(null)
+  const [ocrResult, setOcrResult] = useState(null)
+  const [ocrDialogOpen, setOcrDialogOpen] = useState(false)
 
   useEffect(()=>{
     if (Array.isArray(initialRows) && initialRows.length>0){
@@ -69,14 +79,14 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
   async function handleSubmit(){
     // collect items with count>0
     const items = Object.entries(itemsMap).filter(([,cnt]) => Number(cnt) > 0).map(([color,cnt]) => ({ color, count: Number(cnt) }))
-    if (items.length === 0) return alert('请先输入要补的数量')
-    const body = { operation: '补豆', items, occurred_at: new Date().toISOString(), note }
+    if (items.length === 0) return alert('请先输入要' + initialOperation + '的数量')
+    const body = { operation: initialOperation, items, occurred_at: new Date().toISOString(), note }
     setLoading(true)
     try{
       const res = await fetch('/api/reminders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error((await res.json()).error || res.statusText)
       const data = await res.json()
-      alert('补豆记录已保存')
+      alert(initialOperation + '记录已保存')
       onAdded(data)
     }catch(err){
       console.error(err)
@@ -90,6 +100,80 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
     const url = URL.createObjectURL(file)
     setImgPreview(url)
   }
+
+  async function startCamera(){
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+      try{
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+        setCameraStream(stream)
+        setShowCamera(true)
+        if (videoRef.current) videoRef.current.srcObject = stream
+      }catch(err){
+        console.error('无法打开摄像头', err)
+        alert('无法打开摄像头：' + err.message)
+      }
+    }else{
+      alert('此浏览器不支持摄像头访问')
+    }
+  }
+
+  function stopCamera(){
+    try{
+      if (cameraStream){
+        cameraStream.getTracks().forEach(t => t.stop())
+        setCameraStream(null)
+      }
+    }finally{
+      setShowCamera(false)
+      if (videoRef.current) videoRef.current.srcObject = null
+    }
+  }
+
+  async function captureFromCamera(){
+    if (!videoRef.current) return alert('摄像头未就绪')
+    try{
+      const video = videoRef.current
+      const canvas = document.createElement('canvas')
+      const MAX_SIDE = 400
+      const ratio = video.videoWidth ? (video.videoHeight / video.videoWidth) : 1
+      canvas.width = Math.min(video.videoWidth || MAX_SIDE, MAX_SIDE)
+      canvas.height = Math.round(canvas.width * ratio)
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      // convert canvas to blob and reuse processImage flow by setting imgFile
+      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9))
+      if (blob){
+        setImgFile(new File([blob], 'capture.jpg', { type: 'image/jpeg' }))
+        const url = URL.createObjectURL(blob)
+        setImgPreview(url)
+        // run OCR directly on captured image
+        await processImage()
+      }
+    }catch(err){
+      console.error(err)
+      alert('拍照识别失败：' + err.message)
+    }finally{
+      stopCamera()
+    }
+  }
+
+  // Prewarm Tesseract worker to reduce first-time OCR latency
+  useEffect(() => {
+    let mounted = true
+    async function initWorker(){
+      try{
+        const w = Tesseract.createWorker({ logger: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) } })
+        await w.load()
+        await w.loadLanguage('eng')
+        await w.initialize('eng')
+        try{ await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' }) }catch(e){}
+        if (mounted) workerRef.current = w
+        else await w.terminate()
+      }catch(err){ console.error('预热 OCR worker 失败', err) }
+    }
+    initWorker()
+    return () => { mounted = false; if (workerRef.current){ workerRef.current.terminate().catch(()=>{}); workerRef.current = null } }
+  }, [])
 
   function hexToRgb(hex){
     const c = (hex||'#000000').replace('#','')
@@ -118,8 +202,10 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
       // load image into canvas
       const img = await createImageBitmap(imgFile)
       const canvas = document.createElement('canvas')
-      canvas.width = Math.min(img.width, 800)
-      canvas.height = Math.min(img.height, 800 * (img.height/img.width))
+      // reduce canvas max size to speed up OCR while keeping acceptable accuracy
+      const MAX_SIDE = 400
+      canvas.width = Math.min(img.width, MAX_SIDE)
+      canvas.height = Math.min(img.height, Math.round(MAX_SIDE * (img.height/img.width)))
       const ctx = canvas.getContext('2d')
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
@@ -134,14 +220,19 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
       const nearest = findNearestCodeByRgb(avg)
 
       // run OCR to find numbers and codes
-      const worker = Tesseract.createWorker({
-        logger: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) }
-      })
-      await worker.load()
-      await worker.loadLanguage('eng+chi_sim')
-      await worker.initialize('eng+chi_sim')
+      // use prewarmed worker if available, otherwise create a temporary one
+      let worker = workerRef.current
+      let createdLocal = false
+      if (!worker){
+        worker = Tesseract.createWorker({ logger: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) } })
+        await worker.load()
+        await worker.loadLanguage('eng')
+        await worker.initialize('eng')
+        try{ await worker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' }) }catch(e){}
+        createdLocal = true
+      }
       const { data: { text } } = await worker.recognize(canvas)
-      await worker.terminate()
+      if (createdLocal){ try{ await worker.terminate() }catch(e){} }
 
       // find numeric quantity
       const nums = text.match(/\d+/g)
@@ -155,50 +246,48 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
       // prefer code from OCR, fallback to nearest color
       const targetCode = foundCode || nearest
 
-      // apply results
-      setItemsMap(prev => ({ ...prev, [targetCode]: foundNum || prev[targetCode] || 0 }))
-      setSelectedCodes(s => s.includes(targetCode) ? s : [...s, targetCode])
+      // show OCR confirmation dialog with suggested values
+      setOcrResult({ code: targetCode, count: foundNum || 0, hex: (findPalette(targetCode)||{}).hex || '#ffffff' })
+      setOcrDialogOpen(true)
       setOcrProgress(100)
-      alert(`识别结果：色号 ${targetCode}，数量 ${foundNum || 0}`)
     }catch(err){
       console.error(err)
       alert('识别失败：' + err.message)
     }finally{ setOcrLoading(false); setOcrProgress(0) }
   }
 
+  function confirmOcrApply(){
+    if (!ocrResult) return setOcrDialogOpen(false)
+    const { code, count } = ocrResult
+    setItemsMap(prev => ({ ...prev, [code]: Number(count) || 0 }))
+    setSelectedCodes(s => s.includes(code) ? s : [...s, code])
+    setOcrDialogOpen(false)
+    alert(`已应用：色号 ${code}，数量 ${count}`)
+    setOcrResult(null)
+  }
+
+  function cancelOcr(){ setOcrDialogOpen(false); setOcrResult(null) }
+
   return (
+    <>
     <Box sx={{ p:1 }}>
       <Box sx={{ display:'flex', alignItems:'center', justifyContent:'space-between', mb:1 }}>
-        <Typography variant="h6">补豆</Typography>
+        <Typography variant="h6">{initialOperation}</Typography>
         <IconButton onClick={onClose}><CloseIcon /></IconButton>
       </Box>
 
       
 
       <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1, flexWrap:'wrap' }}>
-        <Autocomplete
-          multiple
-          freeSolo
-          options={MARD.map(p=>p.code)}
-          value={selectedCodes}
-          onChange={(e, v) => {
-            setSelectedCodes(v)
-            // ensure map contains entries
-            setItemsMap(prev => {
-              const next = { ...prev }
-              v.forEach(code => { if (!(code in next)) next[code] = 0 })
-              return next
-            })
-          }}
-          renderTags={(value, getTagProps) => value.map((option, index) => (
-            <Chip size="small" label={option} {...getTagProps({ index })} key={option} />
+        <Box sx={{ minWidth:240, display:'flex', gap:0.5, flexWrap:'wrap', alignItems:'center' }}>
+          {selectedCodes.length === 0 ? <Typography variant="body2" sx={{ color: '#666' }}>未选择色号</Typography> : selectedCodes.map(code => (
+            <Chip key={code} size="small" label={code} onDelete={() => setSelectedCodes(s => s.filter(c => c !== code))} />
           ))}
-          renderInput={(params) => <TextField {...params} size="small" label="选择色号（可多选/输入）" />}
-          sx={{ minWidth: 240 }}
-        />
+        </Box>
 
         <TextField size="small" label="数量" type="number" value={applyCount} onChange={e=>setApplyCount(e.target.value)} sx={{ width:120 }} />
         <Button variant="contained" size="small" onClick={applyToSelected}>应用到所选</Button>
+        <Button size="small" variant="outlined" onClick={() => { setSelectedCodes(allCodes); setItemsMap(prev => { const next = { ...prev }; allCodes.forEach(c => { if (!(c in next)) next[c] = 0 }); return next }) }} disabled={selectedCodes.length === allCodes.length}>全选</Button>
       </Box>
 
       <Box sx={{ mb:1 }}>
@@ -206,7 +295,7 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
       </Box>
 
       <Box sx={{ display:'flex', gap:1, mt:0, mb:1 }}>
-        <Button variant="contained" onClick={handleSubmit} disabled={loading}>补豆</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={loading}>{initialOperation}</Button>
         <Button onClick={onClose}>取消</Button>
       </Box>
 
@@ -220,6 +309,16 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
         />
         <Button size="small" onClick={() => { if (imgPreview) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${imgPreview}" style="max-width:100%">` } }}>预览</Button>
         <Button size="small" variant="outlined" onClick={processImage} disabled={ocrLoading || !imgFile}>识别图片</Button>
+        {!showCamera && <Button size="small" onClick={startCamera}>打开相机</Button>}
+        {showCamera && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap:1 }}>
+            <video ref={videoRef} autoPlay playsInline muted style={{ width: 200, height: 'auto', borderRadius: 4, border: '1px solid #ddd' }} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap:0.5 }}>
+              <Button size="small" variant="contained" onClick={captureFromCamera}>拍照识别</Button>
+              <Button size="small" onClick={stopCamera}>关闭相机</Button>
+            </Box>
+          </Box>
+        )}
         {ocrLoading && <Box sx={{ width: 160 }}><LinearProgress variant="determinate" value={ocrProgress} /></Box>}
       </Box>
 
@@ -227,10 +326,17 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
         {allCodes.map(code => {
           const p = findPalette(code)
           const hex = p ? p.hex : '#fff'
+          const selected = selectedCodes.includes(code)
           return (
-            <Box key={code} sx={{ display:'flex', alignItems:'center', gap:1, p:1, border:'1px solid #eee', borderRadius:1 }}>
-                <ColorSwatch code={code} hex={hex} sx={{ borderRadius:0, fontSize:'0.85rem', fontWeight:700 }} />
-                <TextField size="small" type="number" inputProps={{ min:0 }} value={itemsMap[code] || 0} onChange={e=>updateCount(code, e.target.value)} sx={{ width:120 }} />
+            <Box
+              key={code}
+              onClick={() => { setSelectedCodes(s => s.includes(code) ? s.filter(c => c !== code) : [...s, code]); setItemsMap(prev => ({ ...prev, [code]: prev[code] || 0 })) }}
+              sx={{ display:'flex', alignItems:'center', gap:1, p:1, border: selected ? '2px solid rgba(25,118,210,0.8)' : '1px solid #eee', borderRadius:1, cursor: 'pointer' }}
+            >
+                <Box sx={{ display: 'inline-block' }}>
+                  <ColorSwatch code={code} hex={hex} />
+                </Box>
+                <TextField size="small" type="number" inputProps={{ min:0 }} value={itemsMap[code] || 0} onClick={e=>e.stopPropagation()} onChange={e=>updateCount(code, e.target.value)} sx={{ width:120 }} />
               </Box>
           )
         })}
@@ -238,6 +344,26 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
 
       
     </Box>
+
+    <Dialog open={ocrDialogOpen} onClose={cancelOcr}>
+      <DialogTitle>识别结果确认</DialogTitle>
+      <DialogContent>
+        {ocrResult && (
+          <Box sx={{ display:'flex', gap:1, alignItems:'center', mt:1 }}>
+            <TextField label="色号" size="small" value={ocrResult.code} onChange={e=>setOcrResult(r => ({ ...r, code: e.target.value }))} sx={{ minWidth:120 }} />
+            <TextField label="数量" size="small" type="number" value={ocrResult.count} onChange={e=>setOcrResult(r => ({ ...r, count: e.target.value }))} sx={{ width:120 }} />
+            <Box sx={{ display:'inline-block', ml:1 }}>
+              <ColorSwatch code={ocrResult ? ocrResult.code : ''} hex={ocrResult ? ocrResult.hex : '#fff'} />
+            </Box>
+          </Box>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={cancelOcr}>取消</Button>
+        <Button variant="contained" onClick={confirmOcrApply}>应用</Button>
+      </DialogActions>
+    </Dialog>
+    </>
   )
 }
 

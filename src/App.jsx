@@ -8,6 +8,7 @@ import CssBaseline from '@mui/material/CssBaseline'
 import AppBar from '@mui/material/AppBar'
 import Toolbar from '@mui/material/Toolbar'
 import IconButton from '@mui/material/IconButton'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
@@ -42,8 +43,13 @@ function App() {
         <AppBar position="fixed" sx={{py:0}}>
           <Toolbar variant="dense" sx={{gap:0,py:0,height:40}}>
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontSize: { xs: '0.95rem', sm: '1rem' }, lineHeight: 1.1, py:0 }}>
-              {view}
+              {view === '补豆' ? operationForForm : view}
             </Typography>
+            {view === '补豆' && (
+              <IconButton color="inherit" size="small" onClick={() => setView('拼豆')} sx={{ mr: 1 }}>
+                <ArrowBackIcon fontSize="small" />
+              </IconButton>
+            )}
             <Button color="inherit" size="small" onClick={() => setView('日历')} sx={{minWidth:40,px:1,py:0,ml:0}}>日历</Button>
             <Button color="inherit" size="small" onClick={() => setView('拼豆')} sx={{minWidth:40,px:1,py:0,ml:0}}>拼豆</Button>
           </Toolbar>

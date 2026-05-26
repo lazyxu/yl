@@ -28,11 +28,7 @@ const ColorCard = React.memo(function ColorCard({ it, findPalette, threshold }){
       <Box role="listitem" aria-label={`${it.color}，${cnt} 颗`} sx={{ p:0, touchAction:'manipulation', border: 'none', borderRadius: 0, boxShadow: 'none' }}>
         <Box sx={{ p:0 }}>
           <Box sx={{ p:0, display:'flex', alignItems:'center', gap:0.4 }}>
-            <ColorSwatch
-              code={it.color}
-              hex={hex}
-              title={`${it.color} ${hex}`}
-            />
+            <ColorSwatch code={it.color} hex={hex} />
             <Box sx={{ ml:0.5, p:0, display:'flex', alignItems:'center', fontWeight:700, fontSize:{xs:'10px', sm:'11px'}, opacity: cnt === 0 ? 0.5 : 1 }} aria-hidden>x {cnt}</Box>
             <Box sx={{ flex:1, minWidth:0 }} />
           </Box>
