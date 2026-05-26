@@ -5,15 +5,9 @@ import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import Autocomplete from '@mui/material/Autocomplete'
 import Chip from '@mui/material/Chip'
-import Dialog from '@mui/material/Dialog'
-import DialogTitle from '@mui/material/DialogTitle'
-import DialogContent from '@mui/material/DialogContent'
-import DialogActions from '@mui/material/DialogActions'
 import IconButton from '@mui/material/IconButton'
 import CloseIcon from '@mui/icons-material/Close'
-import LinearProgress from '@mui/material/LinearProgress'
-import Input from '@mui/material/Input'
-import Tesseract from 'tesseract.js'
+// Image upload and OCR removed
 import ColorSwatch from './ColorSwatch'
 import MARD from './colorPalettes/mard.json'
 
@@ -32,16 +26,7 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
   const [applyCount, setApplyCount] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
-  const [imgFile, setImgFile] = useState(null)
-  const [imgPreview, setImgPreview] = useState(null)
-  const [ocrLoading, setOcrLoading] = useState(false)
-  const [ocrProgress, setOcrProgress] = useState(0)
-  const [showCamera, setShowCamera] = useState(false)
-  const [cameraStream, setCameraStream] = useState(null)
-  const videoRef = useRef(null)
-  const workerRef = useRef(null)
-  const [ocrResult, setOcrResult] = useState(null)
-  const [ocrDialogOpen, setOcrDialogOpen] = useState(false)
+  // Image upload and OCR state removed
 
   useEffect(()=>{
     if (Array.isArray(initialRows) && initialRows.length>0){
@@ -94,86 +79,11 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
     }finally{ setLoading(false) }
   }
 
-  function handleFileChange(file){
-    if (!file) return
-    setImgFile(file)
-    const url = URL.createObjectURL(file)
-    setImgPreview(url)
-  }
+  // handleFileChange removed
 
-  async function startCamera(){
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
-      try{
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
-        setCameraStream(stream)
-        setShowCamera(true)
-        if (videoRef.current) videoRef.current.srcObject = stream
-      }catch(err){
-        console.error('无法打开摄像头', err)
-        alert('无法打开摄像头：' + err.message)
-      }
-    }else{
-      alert('此浏览器不支持摄像头访问')
-    }
-  }
 
-  function stopCamera(){
-    try{
-      if (cameraStream){
-        cameraStream.getTracks().forEach(t => t.stop())
-        setCameraStream(null)
-      }
-    }finally{
-      setShowCamera(false)
-      if (videoRef.current) videoRef.current.srcObject = null
-    }
-  }
 
-  async function captureFromCamera(){
-    if (!videoRef.current) return alert('摄像头未就绪')
-    try{
-      const video = videoRef.current
-      const canvas = document.createElement('canvas')
-      const MAX_SIDE = 400
-      const ratio = video.videoWidth ? (video.videoHeight / video.videoWidth) : 1
-      canvas.width = Math.min(video.videoWidth || MAX_SIDE, MAX_SIDE)
-      canvas.height = Math.round(canvas.width * ratio)
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      // convert canvas to blob and reuse processImage flow by setting imgFile
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9))
-      if (blob){
-        setImgFile(new File([blob], 'capture.jpg', { type: 'image/jpeg' }))
-        const url = URL.createObjectURL(blob)
-        setImgPreview(url)
-        // run OCR directly on captured image
-        await processImage()
-      }
-    }catch(err){
-      console.error(err)
-      alert('拍照识别失败：' + err.message)
-    }finally{
-      stopCamera()
-    }
-  }
-
-  // Prewarm Tesseract worker to reduce first-time OCR latency
-  useEffect(() => {
-    let mounted = true
-    async function initWorker(){
-      try{
-        const w = Tesseract.createWorker({ logger: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) } })
-        await w.load()
-        await w.loadLanguage('eng')
-        await w.initialize('eng')
-        try{ await w.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' }) }catch(e){}
-        if (mounted) workerRef.current = w
-        else await w.terminate()
-      }catch(err){ console.error('预热 OCR worker 失败', err) }
-    }
-    initWorker()
-    return () => { mounted = false; if (workerRef.current){ workerRef.current.terminate().catch(()=>{}); workerRef.current = null } }
-  }, [])
+  // OCR worker prewarm removed
 
   function hexToRgb(hex){
     const c = (hex||'#000000').replace('#','')
@@ -194,79 +104,9 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
     return best
   }
 
-  async function processImage(){
-    if (!imgFile) return alert('请先选择图片')
-    setOcrLoading(true)
-    setOcrProgress(0)
-    try{
-      // load image into canvas
-      const img = await createImageBitmap(imgFile)
-      const canvas = document.createElement('canvas')
-      // reduce canvas max size to speed up OCR while keeping acceptable accuracy
-      const MAX_SIDE = 400
-      canvas.width = Math.min(img.width, MAX_SIDE)
-      canvas.height = Math.min(img.height, Math.round(MAX_SIDE * (img.height/img.width)))
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  // processImage and OCR logic removed
 
-      // sample center area for average color
-      const w = canvas.width, h = canvas.height
-      const sx = Math.max(0, Math.floor(w*0.25)), sy = Math.max(0, Math.floor(h*0.25))
-      const sw = Math.floor(w*0.5), sh = Math.floor(h*0.5)
-      const data = ctx.getImageData(sx, sy, sw, sh).data
-      let r=0,g=0,b=0,count=0
-      for(let i=0;i<data.length;i+=4){ r += data[i]; g += data[i+1]; b += data[i+2]; count++ }
-      const avg = { r: Math.round(r/count), g: Math.round(g/count), b: Math.round(b/count) }
-      const nearest = findNearestCodeByRgb(avg)
-
-      // run OCR to find numbers and codes
-      // use prewarmed worker if available, otherwise create a temporary one
-      let worker = workerRef.current
-      let createdLocal = false
-      if (!worker){
-        worker = Tesseract.createWorker({ logger: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) } })
-        await worker.load()
-        await worker.loadLanguage('eng')
-        await worker.initialize('eng')
-        try{ await worker.setParameters({ tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789' }) }catch(e){}
-        createdLocal = true
-      }
-      const { data: { text } } = await worker.recognize(canvas)
-      if (createdLocal){ try{ await worker.terminate() }catch(e){} }
-
-      // find numeric quantity
-      const nums = text.match(/\d+/g)
-      const foundNum = nums ? Number(nums[0]) : null
-
-      // try to find any known code in OCR text (A1, B12 etc.)
-      const textUpper = text.toUpperCase()
-      let foundCode = null
-      for(const p of MARD){ if (textUpper.indexOf(p.code.toUpperCase()) > -1){ foundCode = p.code; break } }
-
-      // prefer code from OCR, fallback to nearest color
-      const targetCode = foundCode || nearest
-
-      // show OCR confirmation dialog with suggested values
-      setOcrResult({ code: targetCode, count: foundNum || 0, hex: (findPalette(targetCode)||{}).hex || '#ffffff' })
-      setOcrDialogOpen(true)
-      setOcrProgress(100)
-    }catch(err){
-      console.error(err)
-      alert('识别失败：' + err.message)
-    }finally{ setOcrLoading(false); setOcrProgress(0) }
-  }
-
-  function confirmOcrApply(){
-    if (!ocrResult) return setOcrDialogOpen(false)
-    const { code, count } = ocrResult
-    setItemsMap(prev => ({ ...prev, [code]: Number(count) || 0 }))
-    setSelectedCodes(s => s.includes(code) ? s : [...s, code])
-    setOcrDialogOpen(false)
-    alert(`已应用：色号 ${code}，数量 ${count}`)
-    setOcrResult(null)
-  }
-
-  function cancelOcr(){ setOcrDialogOpen(false); setOcrResult(null) }
+  // OCR confirm/cancel removed
 
   return (
     <>
@@ -299,28 +139,7 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
         <Button onClick={onClose}>取消</Button>
       </Box>
 
-      {/* 图片上传与识别 */}
-      <Box sx={{ mb:1, display:'flex', gap:1, alignItems:'center', flexWrap:'wrap' }}>
-        <Input
-          inputProps={{ accept: 'image/*' }}
-          type="file"
-          onChange={e => handleFileChange(e.target.files && e.target.files[0])}
-          sx={{ display: 'inline-flex' }}
-        />
-        <Button size="small" onClick={() => { if (imgPreview) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${imgPreview}" style="max-width:100%">` } }}>预览</Button>
-        <Button size="small" variant="outlined" onClick={processImage} disabled={ocrLoading || !imgFile}>识别图片</Button>
-        {!showCamera && <Button size="small" onClick={startCamera}>打开相机</Button>}
-        {showCamera && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap:1 }}>
-            <video ref={videoRef} autoPlay playsInline muted style={{ width: 200, height: 'auto', borderRadius: 4, border: '1px solid #ddd' }} />
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap:0.5 }}>
-              <Button size="small" variant="contained" onClick={captureFromCamera}>拍照识别</Button>
-              <Button size="small" onClick={stopCamera}>关闭相机</Button>
-            </Box>
-          </Box>
-        )}
-        {ocrLoading && <Box sx={{ width: 160 }}><LinearProgress variant="determinate" value={ocrProgress} /></Box>}
-      </Box>
+      {/* 图片上传与识别 已移除 */}
 
       <Box sx={{ display: 'grid', gap: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))' }}>
         {allCodes.map(code => {
@@ -330,8 +149,7 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
           return (
             <Box
               key={code}
-              onClick={() => { setSelectedCodes(s => s.includes(code) ? s.filter(c => c !== code) : [...s, code]); setItemsMap(prev => ({ ...prev, [code]: prev[code] || 0 })) }}
-              sx={{ display:'flex', alignItems:'center', gap:1, p:1, border: selected ? '2px solid rgba(25,118,210,0.8)' : '1px solid #eee', borderRadius:1, cursor: 'pointer' }}
+              sx={{ display:'flex', alignItems:'center', gap:1, p:1, border: selected ? '2px solid rgba(25,118,210,0.8)' : '1px solid #eee', borderRadius:1 }}
             >
                 <Box sx={{ display: 'inline-block' }}>
                   <ColorSwatch code={code} hex={hex} />
@@ -345,24 +163,7 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
       
     </Box>
 
-    <Dialog open={ocrDialogOpen} onClose={cancelOcr}>
-      <DialogTitle>识别结果确认</DialogTitle>
-      <DialogContent>
-        {ocrResult && (
-          <Box sx={{ display:'flex', gap:1, alignItems:'center', mt:1 }}>
-            <TextField label="色号" size="small" value={ocrResult.code} onChange={e=>setOcrResult(r => ({ ...r, code: e.target.value }))} sx={{ minWidth:120 }} />
-            <TextField label="数量" size="small" type="number" value={ocrResult.count} onChange={e=>setOcrResult(r => ({ ...r, count: e.target.value }))} sx={{ width:120 }} />
-            <Box sx={{ display:'inline-block', ml:1 }}>
-              <ColorSwatch code={ocrResult ? ocrResult.code : ''} hex={ocrResult ? ocrResult.hex : '#fff'} />
-            </Box>
-          </Box>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={cancelOcr}>取消</Button>
-        <Button variant="contained" onClick={confirmOcrApply}>应用</Button>
-      </DialogActions>
-    </Dialog>
+    {/* OCR dialog removed */}
     </>
   )
 }

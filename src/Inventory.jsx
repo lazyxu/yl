@@ -29,7 +29,7 @@ const ColorCard = React.memo(function ColorCard({ it, findPalette, threshold }){
         <Box sx={{ p:0 }}>
           <Box sx={{ p:0, display:'flex', alignItems:'center', gap:0.4 }}>
             <ColorSwatch code={it.color} hex={hex} />
-            <Box sx={{ ml:0.5, p:0, display:'flex', alignItems:'center', fontWeight:700, fontSize:{xs:'10px', sm:'11px'}, opacity: cnt === 0 ? 0.5 : 1 }} aria-hidden>x {cnt}</Box>
+            <Box sx={{ ml:0.5, p:0, display:'flex', alignItems:'center', fontWeight:700, fontSize:{xs:'10px', sm:'11px'}, opacity: cnt === 0 ? 0.5 : 1 }} aria-hidden>{cnt}</Box>
             <Box sx={{ flex:1, minWidth:0 }} />
           </Box>
         </Box>

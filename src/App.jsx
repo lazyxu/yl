@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import React, { useState, lazy, Suspense } from 'react'
 import './App.css'
 import Calendar from './Calendar'
-import PindouReminder from './PindouReminder'
+const PindouReminder = lazy(() => import('./PindouReminder'))
+const PindouConsume = lazy(() => import('./PindouConsume'))
 import Inventory from './Inventory'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
@@ -27,8 +28,9 @@ function App() {
   function openPindouWith(op, initialRows = null) {
     setOperationForForm(op)
     setInitialRowsForForm(initialRows)
-    // navigate to 补豆 page when requested
-    setView('补豆')
+    // navigate to corresponding page
+    if (op === '补豆') setView('补豆')
+    else if (op === '消耗') setView('消耗')
   }
 
   function onPindouAdded() {
@@ -45,7 +47,7 @@ function App() {
             <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontSize: { xs: '0.95rem', sm: '1rem' }, lineHeight: 1.1, py:0 }}>
               {view === '补豆' ? operationForForm : view}
             </Typography>
-            {view === '补豆' && (
+            {(view === '补豆' || view === '消耗') && (
               <IconButton color="inherit" size="small" onClick={() => setView('拼豆')} sx={{ mr: 1 }}>
                 <ArrowBackIcon fontSize="small" />
               </IconButton>
@@ -66,7 +68,17 @@ function App() {
 
           {view === '补豆' && (
             <Box sx={{ p: 1 }}>
-              <PindouReminder initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => setView('拼豆')} onAdded={() => { onPindouAdded(); setView('拼豆') }} />
+              <Suspense fallback={<div>加载中...</div>}>
+                <PindouReminder initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => setView('拼豆')} onAdded={() => { onPindouAdded(); setView('拼豆') }} />
+              </Suspense>
+            </Box>
+          )}
+
+          {view === '消耗' && (
+            <Box sx={{ p: 1 }}>
+              <Suspense fallback={<div>加载中...</div>}>
+                <PindouConsume initialRows={initialRowsForForm} onClose={() => setView('拼豆')} onAdded={() => { onPindouAdded(); setView('拼豆') }} />
+              </Suspense>
             </Box>
           )}
         </Box>
