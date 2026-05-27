@@ -1,8 +1,8 @@
 import React, { useState, lazy, Suspense } from 'react'
 import './App.css'
 import Calendar from './Calendar'
-const PindouReminder = lazy(() => import('./PindouReminder'))
 const PindouConsume = lazy(() => import('./PindouConsume'))
+const History = lazy(() => import('./History'))
 import Inventory from './Inventory'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
@@ -63,13 +63,21 @@ function App() {
         <Box component="main" sx={{ p: 0, maxWidth: '100%', mx: 0, width: '100%' }}>
           {view === '日历' && <Calendar />}
           {view === '拼豆' && (
-            <Inventory onAction={(op, rows)=>openPindouWith(op, rows)} refreshKey={inventoryRefreshKey} />
+            <Inventory onAction={(op, rows)=>openPindouWith(op, rows)} refreshKey={inventoryRefreshKey} onNavigate={(v) => setView(v)} />
+          )}
+
+          {view === '历史' && (
+            <Box sx={{ p: 1 }}>
+              <Suspense fallback={<div>加载中...</div>}>
+                <History onNavigate={(v)=>setView(v)} refreshKey={inventoryRefreshKey} />
+              </Suspense>
+            </Box>
           )}
 
           {view === '补豆' && (
             <Box sx={{ p: 1 }}>
               <Suspense fallback={<div>加载中...</div>}>
-                <PindouReminder initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => setView('拼豆')} onAdded={() => { onPindouAdded(); setView('拼豆') }} />
+                <PindouConsume initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => setView('拼豆')} onAdded={() => { onPindouAdded(); setView('拼豆') }} />
               </Suspense>
             </Box>
           )}

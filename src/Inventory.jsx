@@ -14,6 +14,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 import IconButton from '@mui/material/IconButton'
 import DeleteIcon from '@mui/icons-material/Delete'
 import ColorSwatch from './ColorSwatch'
+import InventoryGrid from './InventoryGrid'
 // use CSS Grid for auto-fill compact layout instead of MUI 12-col Grid
 // Card replaced by Box for more compact layout
 
@@ -40,24 +41,24 @@ const ColorCard = React.memo(function ColorCard({ it, findPalette, threshold }){
 
 // API base inlined as '/api'
 
-function Inventory({ onAction, refreshKey }) {
+function Inventory({ onAction, refreshKey, onNavigate = ()=>{} }) {
   const [inventory, setInventory] = useState([])
   const [threshold, setThreshold] = useState(() => {
     const v = localStorage.getItem('pindou-threshold')
-    return v ? Number(v) : 20
+    return v ? Number(v) : 200
   })
   const [bulkCountInput, setBulkCountInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [records, setRecords] = useState([])
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [displayMode, setDisplayMode] = useState('all') // 'all' | 'low'
+  const [sortOrder, setSortOrder] = useState('none') // 'none' | 'asc' | 'desc'
   // color-blind mode removed
 
   useEffect(() => { fetchInventory() }, [])
   useEffect(() => { if (typeof refreshKey !== 'undefined') fetchInventory() }, [refreshKey])
 
-  useEffect(() => { fetchReminders() }, [])
-  useEffect(() => { if (typeof refreshKey !== 'undefined') fetchReminders() }, [refreshKey])
+  // history moved to separate page
 
   // Build displayedInventory: include all color codes from MARD (missing -> count 0),
   // and append any backend inventory entries not present in MARD.
@@ -84,9 +85,25 @@ function Inventory({ onAction, refreshKey }) {
       if (!map.has(key)) map.set(key, [])
       map.get(key).push(it)
     })
+    // sort items in each group by count according to sortOrder
+    const entries = Array.from(map.entries()).map(([k, items]) => {
+      const sorted = items.slice()
+      if (sortOrder === 'asc') sorted.sort((a,b) => (Number(a.count)||0) - (Number(b.count)||0))
+      else if (sortOrder === 'desc') sorted.sort((a,b) => (Number(b.count)||0) - (Number(a.count)||0))
+      return [k, sorted]
+    })
     // sort groups by letter
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-  }, [filteredInventory])
+    return entries.sort((a, b) => a[0].localeCompare(b[0]))
+  }, [filteredInventory, sortOrder])
+
+  // If user chooses global ascending sort, present a single-column groupedInventory
+  const groupedForGrid = useMemo(() => {
+    if (sortOrder !== 'asc') return groupedInventory
+    // use filteredInventory (respecting displayMode) and sort ascending by count
+    const all = (filteredInventory || []).slice()
+    all.sort((a,b) => (Number(a.count)||0) - (Number(b.count)||0))
+    return [['全部', all]]
+  }, [sortOrder, filteredInventory, groupedInventory])
 
   const lowCount = useMemo(() => {
     return displayedInventory.filter(it => (it.count || 0) <= threshold).length
@@ -144,14 +161,15 @@ function Inventory({ onAction, refreshKey }) {
   function saveThreshold(v){ localStorage.setItem('pindou-threshold', String(v)); setThreshold(v) }
 
   return (
-    <Box sx={{pb:0, width: '100%'}}>
+    <Box sx={{ p:1 }}>
       <Box sx={{display:'flex',alignItems:'center',justifyContent:'space-between',mb:1}}>
         <Typography variant="h5" sx={{fontSize:{xs:'1.1rem',sm:'1.25rem',md:'1.4rem'},lineHeight:1.25}}>库存总览</Typography>
           <Box sx={{display:'flex',alignItems:'center',gap:1}}>
           {/* 色弱模式已移除 */}
           <Stack direction="row" spacing={1}>
-            <Button variant="contained" onClick={()=>{ if (typeof onAction==='function') onAction('补豆') }}>补豆</Button>
-            <Button variant="contained" color="error" onClick={()=>{ if (typeof onAction==='function') onAction('消耗') }}>消耗</Button>
+            <Button size='small' variant="contained" onClick={() => onNavigate('历史')}>历史</Button>
+            <Button size='small' variant="contained" color="success" onClick={()=>{ if (typeof onAction==='function') onAction('补豆') }}>补豆</Button>
+            <Button size='small' variant="contained" color="warning" onClick={()=>{ if (typeof onAction==='function') onAction('消耗') }}>消耗</Button>
           </Stack>
         </Box>
       </Box>
@@ -162,57 +180,14 @@ function Inventory({ onAction, refreshKey }) {
           <ToggleButton value="all">全部: {displayedInventory.length} 项</ToggleButton>
           <ToggleButton value="low">低于阈值: {lowCount} 项</ToggleButton>
         </ToggleButtonGroup>
+        <ToggleButtonGroup size="small" value={sortOrder} exclusive onChange={(e, v)=>{ if (v) setSortOrder(v) }} sx={{ ml:1 }}>
+          <ToggleButton value="none">默认</ToggleButton>
+          <ToggleButton value="asc">升序</ToggleButton>
+        </ToggleButtonGroup>
         
       </Box>
 
-      {/* 补豆 / 消耗 历史记录 */}
-      <Box sx={{mb:1}}>
-        <Typography variant="subtitle1" sx={{mb:0.5}}>补豆 / 消耗 历史</Typography>
-        {recordsLoading && <Typography>加载中...</Typography>}
-        {!recordsLoading && records.length === 0 && <Typography>暂无历史记录</Typography>}
-        {!recordsLoading && records.length > 0 && (
-          <Box sx={{ display:'flex', flexDirection:'column', gap:1 }}>
-            {records.map(r => (
-              <Box key={r.id} sx={{ p:1, border:'1px solid #f0f0f0', borderRadius:1, display:'flex', flexDirection:'column' }}>
-                <Box sx={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:1 }}>
-                  <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
-                    <Typography variant="body2" sx={{ fontWeight:700 }}>{r.operation}</Typography>
-                    <Typography variant="caption" sx={{ color:'#666' }}>{new Date(r.occurred_at).toLocaleString()}</Typography>
-                  </Box>
-                  <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
-                    {r.image_path && (
-                      <Box sx={{ display:'inline-block', mr:0.5 }}>
-                        <img
-                          src={resolveImageUrl(r.image_path)}
-                          alt="record"
-                          style={{ width:56, height:56, objectFit:'cover', borderRadius:6, border:'1px solid #eee', cursor:'pointer' }}
-                          onClick={() => { const u = resolveImageUrl(r.image_path); if (u) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${u}" style="max-width:100%">` } }}
-                        />
-                      </Box>
-                    )}
-                    {r.note && <Typography variant="caption" sx={{ color:'#333' }}>{r.note}</Typography>}
-                    <IconButton size="small" onClick={() => handleDeleteRecord(r.id)} aria-label="删除记录">
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                </Box>
-                <Box sx={{ mt:0.5, display:'flex', gap:0.5, flexWrap:'wrap', alignItems:'center' }}>
-                  {(r.items || []).map((it, idx) => {
-                    const p = findPalette(it.color)
-                    const hex = p ? p.hex : '#ffffff'
-                    return (
-                      <Box key={idx} sx={{ display:'inline-flex', alignItems:'center', gap:0.5, p:0.5, borderRadius:1, border:'1px solid #f0f0f0', background:'#fff' }}>
-                        <Box sx={{ width:14, height:14, background: hex, border: '1px solid rgba(0,0,0,0.06)', borderRadius:0.5 }} aria-hidden />
-                        <Typography variant="caption">{`${it.color} x ${it.count}`}</Typography>
-                      </Box>
-                    )
-                  })}
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        )}
-      </Box>
+      
 
       
 
@@ -224,23 +199,7 @@ function Inventory({ onAction, refreshKey }) {
 
       {/* 虚拟化卡片列表：每行为卡片风格，移动优先单列 */}
       {filteredInventory.length > 0 && (
-        <Box sx={{ pr:0 }}>
-          {groupedInventory.map(([letter, items]) => (
-            <Box key={letter} sx={{ mb: 1 }}>
-              <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: { xs: 'repeat(auto-fill, minmax(64px, 1fr))', sm: 'repeat(auto-fill, minmax(72px, 1fr))', md: 'repeat(auto-fill, minmax(84px, 1fr))' } }}>
-                {items.map((it) => (
-                    <Box key={it.color} sx={{ p: 0, display: 'flex', alignItems: 'center' }}>
-                      <ColorCard
-                        it={it}
-                        findPalette={findPalette}
-                        threshold={threshold}
-                      />
-                    </Box>
-                ))}
-              </Box>
-            </Box>
-          ))}
-        </Box>
+        <InventoryGrid groupedInventory={groupedForGrid} findPalette={findPalette} />
       )}
 
       

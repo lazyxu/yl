@@ -6,6 +6,7 @@ const fs = require('fs')
 const router = express.Router()
 
 const UPLOAD_DIR = path.resolve(__dirname, '..', '..', 'tmp', 'uploads')
+console.log('UPLOAD_DIR:', UPLOAD_DIR)
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 const storage = multer.diskStorage({
@@ -27,9 +28,18 @@ const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024
 // POST /api/upload
 router.post('/', upload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ ok: false, error: 'no file' })
-  const relPath = path.join('tmp', 'uploads', req.file.filename)
-  // 返回文件信息，后续可由服务器进一步处理（OCR）
-  res.json({ ok: true, filename: req.file.filename, path: relPath, mimetype: req.file.mimetype, size: req.file.size })
+  // 返回仅包含文件名，前端可使用专门的接口获取图片
+  res.json({ ok: true, filename: req.file.filename })
+})
+
+// GET /api/upload/:filename - 返回图片文件（前端可通过该接口加载图片）
+router.get('/:filename', (req, res) => {
+  const filename = req.params.filename
+  if (!filename) return res.status(400).json({ ok: false, error: 'missing filename' })
+  const filePath = path.resolve(UPLOAD_DIR, filename)
+  if (!fs.existsSync(filePath)) return res.status(404).json({ ok: false, error: 'not found' })
+  // 直接发送文件；Express 会自动设置 Content-Type
+  res.sendFile(filePath)
 })
 
 module.exports = router

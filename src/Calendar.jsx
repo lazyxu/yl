@@ -2,6 +2,7 @@ import moment from 'moment';
 import React, { useEffect, useState } from 'react';
 import './Calendar.css';
 import { getDaysTogether, getMenstrualState, getShift } from './utils';
+import { Box } from '@mui/material';
 
 const 经期状态映射 = {
   经期: '腰酸、烦躁、疲惫、压力大',
@@ -106,40 +107,42 @@ const Calendar = () => {
   };
   // const state = getMenstrualState(selectedDate).split(' ')[0];
   return (
-    <div
-      className="calendar-container">
-    <div className="header">
-      <button onClick={handleSlidePrevious}>
-        ←
-      </button>
-      <h2>{currentMonth.format('YYYY年MM月')}</h2>
-      <button onClick={handleSlideNext}>
-        →
-      </button>
-    </div>
-    <div className="calendar"
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      // 仅对 X 轴进行平移，Y轴没有变化
-      style={{
-        transform: `translate(${translateX}px)`,
-        transition: transitionBuffer ? 'transform 0.3s ease' : 'none'
-      }}
-    >
-      {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-        <div key={day} className="weekday">
-          {day}
+    <Box sx={{ p: 1 }}>
+      <div
+        className="calendar-container">
+        <div className="header">
+          <button onClick={handleSlidePrevious}>
+            ←
+          </button>
+          <h2>{currentMonth.format('YYYY年MM月')}</h2>
+          <button onClick={handleSlideNext}>
+            →
+          </button>
         </div>
-      ))}
-      {generateCalendar()}
-    </div>
-    <div className="selected-date-info">
-      <p>{selectedDate.format('YYYY年MM月DD日')} {getShift(selectedDate)}</p>
-      <p>在一起第 {getDaysTogether(selectedDate)} 天</p>
-      {/* <p>{经期状态映射[state]}</p> */}
-    </div>
-    </div>
+        <div className="calendar"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          // 仅对 X 轴进行平移，Y轴没有变化
+          style={{
+            transform: `translate(${translateX}px)`,
+            transition: transitionBuffer ? 'transform 0.3s ease' : 'none'
+          }}
+        >
+          {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+            <div key={day} className="weekday">
+              {day}
+            </div>
+          ))}
+          {generateCalendar()}
+        </div>
+        <div className="selected-date-info">
+          <p>{selectedDate.format('YYYY年MM月DD日')} {getShift(selectedDate)}</p>
+          <p>在一起第 {getDaysTogether(selectedDate)} 天</p>
+          {/* <p>{经期状态映射[state]}</p> */}
+        </div>
+      </div>
+    </Box>
   );
 };
 

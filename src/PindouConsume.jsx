@@ -1,9 +1,10 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import Box from '@mui/material/Box'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
+import ColorCodeSelect from './ColorCodeSelect'
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -15,13 +16,13 @@ import Input from '@mui/material/Input'
 // use dynamic import for tesseract to handle different bundler export shapes
 import ColorSwatch from './ColorSwatch'
 import MARD from './colorPalettes/mard.json'
+import InventoryGrid from './InventoryGrid'
  
 function findPalette(code){
   return MARD.find(p => p.code === code)
 }
 
-export default function PindouConsume({ initialRows = null, onClose = ()=>{}, onAdded = ()=>{} }){
-  const initialOperation = '消耗'
+export default function PindouConsume({ initialOperation = '消耗', initialRows = null, onClose = ()=>{}, onAdded = ()=>{} }){
   const [itemsMap, setItemsMap] = useState(() => {
     const map = {}
     MARD.forEach(p => { map[p.code] = 0 })
@@ -53,6 +54,26 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
     return Array.from(set)
   }, [itemsMap])
 
+  const handleSelectChange = useCallback((e, value) => {
+    setSelectedCodes(value)
+    setItemsMap(prev => {
+      const next = { ...prev }
+      value.forEach(code => { if (!(code in next)) next[code] = 0 })
+      return next
+    })
+  }, [])
+
+  const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes])
+
+  const canApplyToSelected = useMemo(() => {
+    if (!selectedCodes || selectedCodes.length === 0) return false
+    if (applyCount === '' || applyCount == null) return false
+    const n = Number(applyCount)
+    return Number.isInteger(n) && n > 0
+  }, [selectedCodes, applyCount])
+
+  // removed canSubmit: use canApplyToSelected instead as requested
+
   function updateCount(code, v){
     const n = Number(v) || 0
     if (!Number.isInteger(n) || n < 0) return
@@ -70,33 +91,35 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
   }
 
   async function handleSubmit(){
-    const items = Object.entries(itemsMap).filter(([,cnt]) => Number(cnt) > 0).map(([color,cnt]) => ({ color, count: Number(cnt) }))
+    // 如果有填写“应用到所选”的数量，则先在提交数据中应用该数量（但不依赖 setState 异步）
+    let submitMap = { ...itemsMap }
+    if (canApplyToSelected) {
+      const n = Number(applyCount)
+      selectedCodes.forEach(code => { submitMap[code] = n })
+      // 也同步更新组件状态以反映 UI
+      setItemsMap(prev => {
+        const next = { ...prev }
+        selectedCodes.forEach(code => { next[code] = n })
+        return next
+      })
+    }
+
+    const items = Object.entries(submitMap).filter(([,cnt]) => Number(cnt) > 0).map(([color,cnt]) => ({ color, count: Number(cnt) }))
     if (items.length === 0) return alert('请先输入要' + initialOperation + '的数量')
     setLoading(true)
     try{
-      // capture from camera canvas if available
+      // 优先使用用户选择的文件上传为提交图片
       let imagePath = null
-      try{
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9))
-        if (blob){
-          const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' })
-          setImgFile(file)
-          const url = URL.createObjectURL(blob)
-          // show preview
-          if (previewRef.current){ try{ URL.revokeObjectURL(previewRef.current) }catch(e){} }
-          previewRef.current = url
-          setImgPreview(url)
-          // 上传图片到后端，后端返回路径
+      if (imgFile) {
+        try{
           const form = new FormData()
-          form.append('image', file)
+          form.append('image', imgFile)
           const up = await fetch('/api/upload', { method: 'POST', body: form })
           const uj = await up.json()
           if (!up.ok) throw new Error(uj && uj.error ? uj.error : 'upload failed')
           imagePath = uj.path || uj.filename || null
-        }
-      }catch(e){ console.warn('image capture/upload skipped', e) }
+        }catch(e){ console.warn('user-selected image upload skipped', e) }
+      }
 
       const body = { operation: initialOperation, items, occurred_at: new Date().toISOString(), note, image_path: imagePath }
       const res = await fetch('/api/reminders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) })
@@ -174,24 +197,14 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
       </Box>
 
       <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1, flexWrap:'wrap' }}>
-        <Box sx={{ minWidth:240, display:'flex', gap:0.5, flexWrap:'wrap', alignItems:'center' }}>
-          {selectedCodes.length === 0 ? <Typography variant="body2" sx={{ color: '#666' }}>未选择色号</Typography> : selectedCodes.map(code => (
-            <Chip key={code} size="small" label={code} onDelete={() => setSelectedCodes(s => s.filter(c => c !== code))} />
-          ))}
-        </Box>
+          <Box sx={{ minWidth:240 }}>
+            <ColorCodeSelect options={allCodes} value={selectedCodes} onChange={handleSelectChange} sx={{ minWidth: 240 }} />
+          </Box>
+      </Box>
 
+      <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1 }}>
         <TextField size="small" label="数量" type="number" value={applyCount} onChange={e=>setApplyCount(e.target.value)} sx={{ width:120 }} />
-        <Button variant="contained" size="small" onClick={applyToSelected}>应用到所选</Button>
-        <Button size="small" variant="outlined" onClick={() => { setSelectedCodes(allCodes); setItemsMap(prev => { const next = { ...prev }; allCodes.forEach(c => { if (!(c in next)) next[c] = 0 }); return next }) }} disabled={selectedCodes.length === allCodes.length}>全选</Button>
-      </Box>
-
-      <Box sx={{ mb:1 }}>
-        <TextField fullWidth label="备注（可选）" size="small" value={note} onChange={e=>setNote(e.target.value)} />
-      </Box>
-
-      <Box sx={{ display:'flex', gap:1, mt:0, mb:1 }}>
-        <Button variant="contained" onClick={handleSubmit} disabled={loading}>{initialOperation}</Button>
-        <Button onClick={onClose}>取消</Button>
+        <Button variant="contained" size="small" onClick={applyToSelected} disabled={!canApplyToSelected}>应用到所选</Button>
       </Box>
 
       <Box sx={{ mb:1, display:'flex', gap:1, alignItems:'center', flexWrap:'wrap' }}>
@@ -211,25 +224,30 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
         <Button size="small" onClick={() => { if (imgPreview) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${imgPreview}" style="max-width:100%">` } }}>预览</Button>
       </Box>
 
-      <Box sx={{ display: 'grid', gap: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))' }}>
-        {allCodes.map(code => {
-          const p = findPalette(code)
-          const hex = p ? p.hex : '#fff'
-          const selected = selectedCodes.includes(code)
-          return (
-            <Box
-              key={code}
-              onClick={() => { setSelectedCodes(s => s.includes(code) ? s.filter(c => c !== code) : [...s, code]); setItemsMap(prev => ({ ...prev, [code]: prev[code] || 0 })) }}
-              sx={{ display:'flex', alignItems:'center', gap:1, p:1, border: selected ? '2px solid rgba(25,118,210,0.8)' : '1px solid #eee', borderRadius:1, cursor: 'pointer' }}
-            >
-                <Box sx={{ display: 'inline-block' }}>
-                  <ColorSwatch code={code} hex={hex} />
-                </Box>
-                <TextField size="small" type="number" inputProps={{ min:0 }} value={itemsMap[code] || 0} onClick={e=>e.stopPropagation()} onChange={e=>updateCount(code, e.target.value)} sx={{ width:120 }} />
-              </Box>
-          )
-        })}
+      <Box sx={{ mb:1 }}>
+        <TextField fullWidth label="备注（可选）" size="small" value={note} onChange={e=>setNote(e.target.value)} />
       </Box>
+
+      <Box sx={{ display:'flex', gap:1, mt:0, mb:1 }}>
+        <Button variant="contained" onClick={handleSubmit} disabled={!canApplyToSelected || loading}>{initialOperation}</Button>
+        <Button onClick={onClose}>取消</Button>
+      </Box>
+
+      {(() => {
+        const grouped = (() => {
+          const map = new Map()
+          allCodes.forEach(code => {
+            const key = (code || '').charAt(0).toUpperCase() || '#'
+            if (!map.has(key)) map.set(key, [])
+            map.get(key).push({ color: code, count: Number(itemsMap[code] || 0) })
+          })
+          return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0]))
+        })()
+
+        return (
+          <InventoryGrid groupedInventory={grouped} findPalette={findPalette} showZero={false} />
+        )
+      })()}
 
     </Box>
 
