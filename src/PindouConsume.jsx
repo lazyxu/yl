@@ -10,13 +10,12 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import IconButton from '@mui/material/IconButton'
 import CloseIcon from '@mui/icons-material/Close'
-import LinearProgress from '@mui/material/LinearProgress'
+ 
 import Input from '@mui/material/Input'
 // use dynamic import for tesseract to handle different bundler export shapes
 import ColorSwatch from './ColorSwatch'
 import MARD from './colorPalettes/mard.json'
-import { recognizeImage, parseOcrText, recognizeAndParse } from './ocr/recognize'
-
+ 
 function findPalette(code){
   return MARD.find(p => p.code === code)
 }
@@ -34,10 +33,8 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
   const [loading, setLoading] = useState(false)
   const [imgFile, setImgFile] = useState(null)
   const [imgPreview, setImgPreview] = useState(null)
-  const [ocrLoading, setOcrLoading] = useState(false)
-  const [ocrProgress, setOcrProgress] = useState(0)
-  const [ocrResult, setOcrResult] = useState(null)
-  const [ocrDialogOpen, setOcrDialogOpen] = useState(false)
+  const previewRef = useRef(null)
+  
 
   useEffect(()=>{
     if (Array.isArray(initialRows) && initialRows.length>0){
@@ -75,27 +72,48 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
   async function handleSubmit(){
     const items = Object.entries(itemsMap).filter(([,cnt]) => Number(cnt) > 0).map(([color,cnt]) => ({ color, count: Number(cnt) }))
     if (items.length === 0) return alert('请先输入要' + initialOperation + '的数量')
-    const body = { operation: initialOperation, items, occurred_at: new Date().toISOString(), note }
     setLoading(true)
     try{
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9))
-      if (blob){
-        setImgFile(new File([blob], 'capture.jpg', { type: 'image/jpeg' }))
-        const url = URL.createObjectURL(blob)
-        setImgPreview(url)
-        await processImage()
-      }
+      // capture from camera canvas if available
+      let imagePath = null
+      try{
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.9))
+        if (blob){
+          const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' })
+          setImgFile(file)
+          const url = URL.createObjectURL(blob)
+          // show preview
+          if (previewRef.current){ try{ URL.revokeObjectURL(previewRef.current) }catch(e){} }
+          previewRef.current = url
+          setImgPreview(url)
+          // 上传图片到后端，后端返回路径
+          const form = new FormData()
+          form.append('image', file)
+          const up = await fetch('/api/upload', { method: 'POST', body: form })
+          const uj = await up.json()
+          if (!up.ok) throw new Error(uj && uj.error ? uj.error : 'upload failed')
+          imagePath = uj.path || uj.filename || null
+        }
+      }catch(e){ console.warn('image capture/upload skipped', e) }
+
+      const body = { operation: initialOperation, items, occurred_at: new Date().toISOString(), note, image_path: imagePath }
+      const res = await fetch('/api/reminders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) throw new Error((await res.json()).error || res.statusText)
+      const data = await res.json()
+      alert(initialOperation + '记录已保存')
+      onAdded(data)
     }catch(err){
       console.error(err)
-      alert('拍照识别失败：' + err.message)
+      alert('保存失败：' + err.message)
     }finally{
       stopCamera()
+      setLoading(false)
     }
   }
 
-  // 移除本地 worker 预热，使用共享识别函数 `recognizeImage`。
+  
 
   function hexToRgb(hex){
     const c = (hex||'#000000').replace('#','')
@@ -116,50 +134,36 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
     return best
   }
 
-  async function processImage(){
-    if (!imgFile) return alert('请先选择图片')
-    setOcrLoading(true)
-    setOcrProgress(0)
+  
+
+  
+
+  // 选择文件时：本地预览并上传到后端（FormData）
+  async function handleFileChange(file){
+    if (!file) return
+    setImgFile(file)
     try{
-      const img = await createImageBitmap(imgFile)
-      const canvas = document.createElement('canvas')
-      const MAX_SIDE = 400
-      canvas.width = Math.min(img.width, MAX_SIDE)
-      canvas.height = Math.min(img.height, Math.round(MAX_SIDE * (img.height/img.width)))
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      const w = canvas.width, h = canvas.height
-      const sx = Math.max(0, Math.floor(w*0.25)), sy = Math.max(0, Math.floor(h*0.25))
-      const sw = Math.floor(w*0.5), sh = Math.floor(h*0.5)
-      const data = ctx.getImageData(sx, sy, sw, sh).data
-      let r=0,g=0,b=0,count=0
-      for(let i=0;i<data.length;i+=4){ r += data[i]; g += data[i+1]; b += data[i+2]; count++ }
-      const avg = { r: Math.round(r/count), g: Math.round(g/count), b: Math.round(b/count) }
-      const nearest = findNearestCodeByRgb(avg)
-      // 使用共享识别函数并解析结果（将 nearest 作为后备）
-      const result = await recognizeImage(canvas, { lang: 'eng', psm: 6, whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', onProgress: m => { if (m.status==='recognizing text' && m.progress) setOcrProgress(Math.round(m.progress*100)) } })
-      const text = result && (result.text || (result.data && result.data.text)) ? (result.text || result.data.text) : ''
-      const parsed = parseOcrText(text, { palette: MARD, fallbackCode: nearest })
-      setOcrResult({ code: parsed.code, count: parsed.count || 0, hex: (findPalette(parsed.code)||{}).hex || '#ffffff' })
-      setOcrDialogOpen(true)
-      setOcrProgress(100)
-    }catch(err){
-      console.error(err)
-      alert('识别失败：' + err.message)
-    }finally{ setOcrLoading(false); setOcrProgress(0) }
+      // revoke previous preview URL
+      if (previewRef.current){
+        try{ URL.revokeObjectURL(previewRef.current) }catch(e){}
+        previewRef.current = null
+      }
+      const url = URL.createObjectURL(file)
+      previewRef.current = url
+      setImgPreview(url)
+    }catch(e){}
+    // 不在此处上传，图片将在提交时统一上传
   }
 
-  function confirmOcrApply(){
-    if (!ocrResult) return setOcrDialogOpen(false)
-    const { code, count } = ocrResult
-    setItemsMap(prev => ({ ...prev, [code]: Number(count) || 0 }))
-    setSelectedCodes(s => s.includes(code) ? s : [...s, code])
-    setOcrDialogOpen(false)
-    alert(`已应用：色号 ${code}，数量 ${count}`)
-    setOcrResult(null)
-  }
-
-  function cancelOcr(){ setOcrDialogOpen(false); setOcrResult(null) }
+  // cleanup objectURL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewRef.current) {
+        try{ URL.revokeObjectURL(previewRef.current) }catch(e){}
+        previewRef.current = null
+      }
+    }
+  }, [])
 
   return (
     <>
@@ -197,9 +201,14 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
           onChange={e => handleFileChange(e.target.files && e.target.files[0])}
           sx={{ display: 'inline-flex' }}
         />
+        
+        {/* 内联预览 */}
+        {imgPreview && (
+          <Box component="span" sx={{ ml:1, display:'inline-block', verticalAlign:'middle' }}>
+            <img src={imgPreview} alt="preview" style={{ maxWidth:120, maxHeight:90, borderRadius:4, border:'1px solid #eee' }} />
+          </Box>
+        )}
         <Button size="small" onClick={() => { if (imgPreview) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${imgPreview}" style="max-width:100%">` } }}>预览</Button>
-        <Button size="small" variant="outlined" onClick={processImage} disabled={ocrLoading || !imgFile}>识别图片</Button>
-        {ocrLoading && <Box sx={{ width: 160 }}><LinearProgress variant="determinate" value={ocrProgress} /></Box>}
       </Box>
 
       <Box sx={{ display: 'grid', gap: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))' }}>
@@ -224,24 +233,7 @@ export default function PindouConsume({ initialRows = null, onClose = ()=>{}, on
 
     </Box>
 
-    <Dialog open={ocrDialogOpen} onClose={cancelOcr}>
-      <DialogTitle>识别结果确认</DialogTitle>
-      <DialogContent>
-        {ocrResult && (
-          <Box sx={{ display:'flex', gap:1, alignItems:'center', mt:1 }}>
-            <TextField label="色号" size="small" value={ocrResult.code} onChange={e=>setOcrResult(r => ({ ...r, code: e.target.value }))} sx={{ minWidth:120 }} />
-            <TextField label="数量" size="small" type="number" value={ocrResult.count} onChange={e=>setOcrResult(r => ({ ...r, count: e.target.value }))} sx={{ width:120 }} />
-            <Box sx={{ display:'inline-block', ml:1 }}>
-              <ColorSwatch code={ocrResult ? ocrResult.code : ''} hex={ocrResult ? ocrResult.hex : '#fff'} />
-            </Box>
-          </Box>
-        )}
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={cancelOcr}>取消</Button>
-        <Button variant="contained" onClick={confirmOcrApply}>应用</Button>
-      </DialogActions>
-    </Dialog>
+    
     </>
   )
 }

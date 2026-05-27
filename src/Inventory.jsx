@@ -94,6 +94,16 @@ function Inventory({ onAction, refreshKey }) {
 
   const findPalette = useCallback((code) => MARD.find(p => p.code === code), [])
 
+  function resolveImageUrl(imagePath){
+    if (!imagePath) return null
+    // already a URL or absolute path
+    if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('/')) return imagePath
+    // otherwise assume backend returns a relative path like "tmp/uploads/xxx.jpg" or filename
+    const parts = imagePath.split(/[\\\/]/)
+    const filename = parts[parts.length-1]
+    return `/uploads/${filename}`
+  }
+
   // removed onConsume handler — consumption is triggered from explicit UI elsewhere
 
   async function fetchInventory() {
@@ -170,6 +180,16 @@ function Inventory({ onAction, refreshKey }) {
                     <Typography variant="caption" sx={{ color:'#666' }}>{new Date(r.occurred_at).toLocaleString()}</Typography>
                   </Box>
                   <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
+                    {r.image_path && (
+                      <Box sx={{ display:'inline-block', mr:0.5 }}>
+                        <img
+                          src={resolveImageUrl(r.image_path)}
+                          alt="record"
+                          style={{ width:56, height:56, objectFit:'cover', borderRadius:6, border:'1px solid #eee', cursor:'pointer' }}
+                          onClick={() => { const u = resolveImageUrl(r.image_path); if (u) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${u}" style="max-width:100%">` } }}
+                        />
+                      </Box>
+                    )}
                     {r.note && <Typography variant="caption" sx={{ color:'#333' }}>{r.note}</Typography>}
                     <IconButton size="small" onClick={() => handleDeleteRecord(r.id)} aria-label="删除记录">
                       <DeleteIcon fontSize="small" />

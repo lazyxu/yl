@@ -5,6 +5,7 @@ const cors = require('cors');
 const sequelize = require('./sequelize');
 const remindersRouter = require('./routes/reminders');
 const inventoryRouter = require('./routes/inventory');
+const uploadRouter = require('./routes/upload');
 
 const app = express();
 const corsOptions = {
@@ -16,13 +17,24 @@ app.use(express.json());
 
 app.use('/api/reminders', remindersRouter);
 app.use('/api/inventory', inventoryRouter);
+app.use('/api/upload', uploadRouter);
+// serve uploaded files (for debugging); consider securing or removing in production
+app.use('/uploads', express.static(path.resolve(__dirname, '..', 'tmp', 'uploads')));
 
-const PORT = process.env.PORT || 4000;
+// global error handler to ensure JSON responses on unexpected errors
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: err && err.message ? err.message : 'internal server error' });
+});
+
+const PORT = process.env.PORT || 3000;
 
 async function start() {
   try {
     await sequelize.authenticate();
-    await sequelize.sync();
+    // sync with alter to add new nullable columns like image_path
+    await sequelize.sync({ alter: true });
     app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
   } catch (err) {
     console.error('Failed to start server', err);

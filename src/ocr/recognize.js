@@ -4,7 +4,8 @@ export async function recognizeImage(input, { lang = 'eng', psm = 6, whitelist =
   const topRecognize = mod.recognize || (mod.default && mod.default.recognize)
   const creator = mod.createWorker || (mod.default && mod.default.createWorker) || mod.default
 
-  const logger = onProgress ? (m => { try { onProgress(m) } catch(e){} }) : undefined
+  const logger = onProgress ? (m => { try { onProgress(m) } catch(e){} }) : (()=>{})
+  const safeLogger = (typeof logger === 'function') ? logger : (()=>{})
 
   const opts = {}
   if (psm) opts.tessedit_pageseg_mode = psm
@@ -12,13 +13,13 @@ export async function recognizeImage(input, { lang = 'eng', psm = 6, whitelist =
 
   if (typeof topRecognize === 'function'){
     // top-level recognize available
-    const res = await topRecognize(input, lang, { logger, ...opts })
+    const res = await topRecognize(input, lang, { logger: safeLogger, ...opts })
     return res && res.data ? res.data : { text: '' }
   }
 
   if (typeof creator === 'function'){
     // fallback to worker API
-    const worker = creator({ logger })
+    const worker = creator({ logger: safeLogger })
     if (worker && typeof worker.then === 'function'){
       // creator returned a Promise
       const resolved = await worker
@@ -38,7 +39,8 @@ export async function recognizeImage(input, { lang = 'eng', psm = 6, whitelist =
 }
 
 // 解析 OCR 文本，提取色号和数量
-import MARD from '../colorPalettes/mard.json'
+import fs from 'fs'
+const MARD = JSON.parse(fs.readFileSync(new URL('../colorPalettes/mard.json', import.meta.url), 'utf8'))
 
 export function parseOcrText(text, { palette = MARD, fallbackCode = null } = {}){
   const t = (text || '').toUpperCase()

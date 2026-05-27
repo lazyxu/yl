@@ -7,7 +7,6 @@ import Autocomplete from '@mui/material/Autocomplete'
 import Chip from '@mui/material/Chip'
 import IconButton from '@mui/material/IconButton'
 import CloseIcon from '@mui/icons-material/Close'
-// Image upload and OCR removed
 import ColorSwatch from './ColorSwatch'
 import MARD from './colorPalettes/mard.json'
 
@@ -26,7 +25,6 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
   const [applyCount, setApplyCount] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
-  // Image upload and OCR state removed
 
   useEffect(()=>{
     if (Array.isArray(initialRows) && initialRows.length>0){
@@ -69,8 +67,26 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
     setLoading(true)
     try{
       const res = await fetch('/api/reminders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) })
-      if (!res.ok) throw new Error((await res.json()).error || res.statusText)
-      const data = await res.json()
+      // safer JSON parsing: check content-type and handle empty/non-json responses for clearer errors
+      const ct = res.headers.get('content-type') || ''
+      let data = null
+      if (res.status === 204) {
+        data = null
+      } else if (ct.includes('application/json')) {
+        try {
+          data = await res.json()
+        } catch (e) {
+          const txt = await res.text().catch(()=>'')
+          console.warn('Invalid JSON response from /api/reminders:', txt)
+          throw new Error('服务器返回无效 JSON：' + (txt || res.statusText))
+        }
+      } else {
+        // non-json response: capture as text for debugging
+        const txt = await res.text().catch(()=> '')
+        console.warn('Non-JSON response from /api/reminders (status:', res.status, '):', txt)
+        try { data = JSON.parse(txt) } catch { data = txt }
+      }
+      if (!res.ok) throw new Error((data && data.error) || res.statusText)
       alert(initialOperation + '记录已保存')
       onAdded(data)
     }catch(err){
@@ -78,12 +94,6 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
       alert('保存失败：' + err.message)
     }finally{ setLoading(false) }
   }
-
-  // handleFileChange removed
-
-
-
-  // OCR worker prewarm removed
 
   function hexToRgb(hex){
     const c = (hex||'#000000').replace('#','')
@@ -104,10 +114,6 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
     return best
   }
 
-  // processImage and OCR logic removed
-
-  // OCR confirm/cancel removed
-
   return (
     <>
     <Box sx={{ p:1 }}>
@@ -115,8 +121,6 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
         <Typography variant="h6">{initialOperation}</Typography>
         <IconButton onClick={onClose}><CloseIcon /></IconButton>
       </Box>
-
-      
 
       <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1, flexWrap:'wrap' }}>
         <Box sx={{ minWidth:240, display:'flex', gap:0.5, flexWrap:'wrap', alignItems:'center' }}>
@@ -139,8 +143,6 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
         <Button onClick={onClose}>取消</Button>
       </Box>
 
-      {/* 图片上传与识别 已移除 */}
-
       <Box sx={{ display: 'grid', gap: 0, gridTemplateColumns: 'repeat(auto-fill, minmax(128px, 1fr))' }}>
         {allCodes.map(code => {
           const p = findPalette(code)
@@ -160,11 +162,7 @@ export default function PindouReminder({ initialOperation = '补豆', initialRow
         })}
       </Box>
 
-      
     </Box>
-
-    {/* OCR dialog removed */}
     </>
   )
 }
-

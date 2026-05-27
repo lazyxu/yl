@@ -29,10 +29,12 @@ router.post('/', async (req, res) => {
     const errMsg = validateBody(req.body);
     if (errMsg) return res.status(400).json({ error: errMsg });
 
-    const { operation, items, occurred_at, note } = req.body;
-    const rec = await PindouReminder.create({ operation, items, occurred_at, note });
-    res.status(201).json(rec);
+    const { operation, items, occurred_at, note, image_path } = req.body;
+    const rec = await PindouReminder.create({ operation, items, occurred_at, note, image_path });
+    // ensure we send plain JSON (Sequelize instances implement toJSON)
+    res.status(201).json(rec && typeof rec.toJSON === 'function' ? rec.toJSON() : rec);
   } catch (err) {
+    console.error('Error in POST /api/reminders', err);
     res.status(500).json({ error: err.message });
   }
 });
