@@ -1,12 +1,19 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') });
+const fs = require('fs');
+// 读取环境配置：优先使用当前目录下的 .env（便于发布后将 server 展开为顶层），否则回退到父目录的 .env
+const envPaths = [path.resolve(__dirname, '.env'), path.resolve(__dirname, '..', '.env')];
+for (const p of envPaths) {
+  if (fs.existsSync(p)) {
+    require('dotenv').config({ path: p });
+    break;
+  }
+}
 const express = require('express');
 const cors = require('cors');
 const sequelize = require('./sequelize');
 const remindersRouter = require('./routes/reminders');
 const inventoryRouter = require('./routes/inventory');
 const uploadRouter = require('./routes/upload');
-const fs = require('fs');
 
 const app = express();
 const corsOptions = {
@@ -19,8 +26,6 @@ app.use(express.json());
 app.use('/api/reminders', remindersRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/upload', uploadRouter);
-// serve uploaded files (for debugging); consider securing or removing in production
-app.use('/uploads', express.static(path.resolve(__dirname, '..', 'tmp', 'uploads')));
 
 // 如果存在前端构建产物，则让 Express 提供静态文件并回退到 index.html
 // 优先使用 server/dist（便于在发布目录直接从 server 运行），否则回退到 ../dist
@@ -33,7 +38,7 @@ else if (fs.existsSync(parentDist)) distPath = parentDist;
 if (distPath) {
   app.use(express.static(distPath));
   app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    if (req.path.startsWith('/api')) return next();
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }

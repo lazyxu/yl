@@ -111,18 +111,6 @@ function Inventory({ onAction, refreshKey, onNavigate = ()=>{} }) {
 
   const findPalette = useCallback((code) => MARD.find(p => p.code === code), [])
 
-  function resolveImageUrl(imagePath){
-    if (!imagePath) return null
-    // already a URL or absolute path
-    if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('/')) return imagePath
-    // otherwise assume backend returns a relative path like "tmp/uploads/xxx.jpg" or filename
-    const parts = imagePath.split(/[\\\/]/)
-    const filename = parts[parts.length-1]
-    return `/uploads/${filename}`
-  }
-
-  // removed onConsume handler — consumption is triggered from explicit UI elsewhere
-
   async function fetchInventory() {
     setLoading(true)
     try {
