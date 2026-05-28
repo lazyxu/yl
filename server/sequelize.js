@@ -1,22 +1,20 @@
 require('dotenv').config();
-const path = require('path');
 const { Sequelize } = require('sequelize');
 
-// Prefer explicit DB_DIALECT env, otherwise fall back to MySQL when DB_USER/DB_NAME present,
-// else use SQLite for local development to avoid startup failures when MySQL isn't configured.
-const envDialect = process.env.DB_DIALECT;
-const useMysql = envDialect === 'mysql' || (envDialect !== 'sqlite' && process.env.DB_USER && process.env.DB_NAME);
+// 仅支持 MySQL：必须通过环境变量提供 DB_NAME、DB_USER、DB_PASSWORD（可选 DB_HOST，默认 localhost）
+const dbName = process.env.DB_NAME;
+const dbUser = process.env.DB_USER;
+const dbPassword = process.env.DB_PASSWORD;
+const dbHost = process.env.DB_HOST || 'localhost';
 
-let sequelize;
-if (useMysql) {
-    sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
-        host: process.env.DB_HOST || 'localhost',
-        dialect: 'mysql',
-        logging: false,
-    });
-} else {
-    const storagePath = path.resolve(__dirname, '..', 'tmp', 'dev.sqlite');
-    sequelize = new Sequelize({ dialect: 'sqlite', storage: storagePath, logging: false });
+if (!dbName || !dbUser || !dbPassword) {
+    throw new Error('数据库配置不完整：请设置环境变量 DB_NAME、DB_USER、DB_PASSWORD（可选 DB_HOST）。项目仅支持 MySQL。');
 }
+
+const sequelize = new Sequelize(dbName, dbUser, dbPassword, {
+    host: dbHost,
+    dialect: 'mysql',
+    logging: false,
+});
 
 module.exports = sequelize;

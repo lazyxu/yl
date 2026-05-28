@@ -6,6 +6,7 @@ const sequelize = require('./sequelize');
 const remindersRouter = require('./routes/reminders');
 const inventoryRouter = require('./routes/inventory');
 const uploadRouter = require('./routes/upload');
+const fs = require('fs');
 
 const app = express();
 const corsOptions = {
@@ -20,6 +21,22 @@ app.use('/api/inventory', inventoryRouter);
 app.use('/api/upload', uploadRouter);
 // serve uploaded files (for debugging); consider securing or removing in production
 app.use('/uploads', express.static(path.resolve(__dirname, '..', 'tmp', 'uploads')));
+
+// 如果存在前端构建产物，则让 Express 提供静态文件并回退到 index.html
+// 优先使用 server/dist（便于在发布目录直接从 server 运行），否则回退到 ../dist
+const serverDist = path.resolve(__dirname, 'dist');
+const parentDist = path.resolve(__dirname, '..', 'dist');
+let distPath = null;
+if (fs.existsSync(serverDist)) distPath = serverDist;
+else if (fs.existsSync(parentDist)) distPath = parentDist;
+
+if (distPath) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) return next();
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // global error handler to ensure JSON responses on unexpected errors
 app.use((err, req, res, next) => {
