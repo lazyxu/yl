@@ -13,13 +13,19 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import Typography from '@mui/material/Typography'
 import Button from '@mui/material/Button'
 import Box from '@mui/material/Box'
+import { useSearchParams } from 'react-router-dom'
 
 function App() {
-  const [view, setView] = useState('日历')
-  const [operationForForm, setOperationForForm] = useState('补豆')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('view') || '日历'
+  const [operationForForm, setOperationForForm] = React.useState('补豆')
   const [pindouModalOpen, setPindouModalOpen] = useState(false)
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0)
   const [initialRowsForForm, setInitialRowsForForm] = useState(null)
+
+  function navigateToView(v) {
+    setSearchParams({ view: v })
+  }
 
   const theme = createTheme({
     palette: { mode: 'light' }
@@ -29,8 +35,8 @@ function App() {
     setOperationForForm(op)
     setInitialRowsForForm(initialRows)
     // navigate to corresponding page
-    if (op === '补豆') setView('补豆')
-    else if (op === '消耗') setView('消耗')
+    if (op === '补豆') navigateToView('补豆')
+    else if (op === '消耗') navigateToView('消耗')
   }
 
   function onPindouAdded() {
@@ -48,12 +54,12 @@ function App() {
               {view === '补豆' ? operationForForm : view}
             </Typography>
             {(view === '补豆' || view === '消耗') && (
-              <IconButton color="inherit" size="small" onClick={() => setView('拼豆')} sx={{ mr: 1 }}>
+              <IconButton color="inherit" size="small" onClick={() => navigateToView('拼豆')} sx={{ mr: 1 }}>
                 <ArrowBackIcon fontSize="small" />
               </IconButton>
             )}
-            <Button color="inherit" size="small" onClick={() => setView('日历')} sx={{minWidth:40,px:1,py:0,ml:0}}>日历</Button>
-            <Button color="inherit" size="small" onClick={() => setView('拼豆')} sx={{minWidth:40,px:1,py:0,ml:0}}>拼豆</Button>
+            <Button color="inherit" size="small" onClick={() => navigateToView('日历')} sx={{minWidth:40,px:1,py:0,ml:0}}>日历</Button>
+            <Button color="inherit" size="small" onClick={() => navigateToView('拼豆')} sx={{minWidth:40,px:1,py:0,ml:0}}>拼豆</Button>
           </Toolbar>
         </AppBar>
 
@@ -63,13 +69,13 @@ function App() {
         <Box component="main" sx={{ p: 0, maxWidth: '100%', mx: 0, width: '100%' }}>
           {view === '日历' && <Calendar />}
           {view === '拼豆' && (
-            <Inventory onAction={(op, rows)=>openPindouWith(op, rows)} refreshKey={inventoryRefreshKey} onNavigate={(v) => setView(v)} />
+            <Inventory onAction={(op, rows)=>openPindouWith(op, rows)} refreshKey={inventoryRefreshKey} onNavigate={(v) => navigateToView(v)} />
           )}
 
           {view === '历史' && (
             <Box sx={{ p: 1 }}>
               <Suspense fallback={<div>加载中...</div>}>
-                <History onNavigate={(v)=>setView(v)} refreshKey={inventoryRefreshKey} />
+                <History onNavigate={(v)=>navigateToView(v)} refreshKey={inventoryRefreshKey} />
               </Suspense>
             </Box>
           )}
@@ -77,7 +83,7 @@ function App() {
           {view === '补豆' && (
             <Box sx={{ p: 1 }}>
               <Suspense fallback={<div>加载中...</div>}>
-                <PindouConsume initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => setView('拼豆')} onAdded={() => { onPindouAdded(); setView('拼豆') }} />
+                <PindouConsume initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => navigateToView('拼豆')} onAdded={() => { onPindouAdded(); navigateToView('拼豆') }} />
               </Suspense>
             </Box>
           )}
@@ -85,7 +91,7 @@ function App() {
           {view === '消耗' && (
             <Box sx={{ p: 1 }}>
               <Suspense fallback={<div>加载中...</div>}>
-                <PindouConsume initialRows={initialRowsForForm} onClose={() => setView('拼豆')} onAdded={() => { onPindouAdded(); setView('拼豆') }} />
+                <PindouConsume initialRows={initialRowsForForm} onClose={() => navigateToView('拼豆')} onAdded={() => { onPindouAdded(); navigateToView('拼豆') }} />
               </Suspense>
             </Box>
           )}
