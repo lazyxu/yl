@@ -14,6 +14,7 @@ const sequelize = require('./sequelize');
 const remindersRouter = require('./routes/reminders');
 const inventoryRouter = require('./routes/inventory');
 const uploadRouter = require('./routes/upload');
+const mysql = require('mysql2/promise');
 
 const app = express();
 const corsOptions = {
@@ -55,6 +56,25 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 async function start() {
   try {
+    // 在尝试连接 Sequelize 之前，确保数据库存在（若有权限则创建）
+    async function ensureDatabaseExists() {
+      const dbName = process.env.DB_NAME;
+      const dbUser = process.env.DB_USER;
+      const dbPassword = process.env.DB_PASSWORD;
+      const dbHost = process.env.DB_HOST || 'localhost';
+
+      if (!dbName || !dbUser) {
+        throw new Error('缺少环境变量 DB_NAME 或 DB_USER，无法创建数据库');
+      }
+
+      const connection = await mysql.createConnection({ host: dbHost, user: dbUser, password: dbPassword });
+      await connection.query(
+        `CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+      );
+      await connection.end();
+    }
+
+    await ensureDatabaseExists();
     await sequelize.authenticate();
     // sync with alter to add new nullable columns like image_path
     await sequelize.sync({ alter: true });
