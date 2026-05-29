@@ -8,20 +8,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
 
-UPLOAD=0
-UPLOAD_ENV=1
+DRYRUN=0
 REMOTE_USER="root"
 REMOTE_HOST="t-fluid.com"
 REMOTE_BASE="/yl0126"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --upload) UPLOAD=1; shift ;;
-    --with-env) UPLOAD_ENV=1; shift ;;
-    --no-with-env|--without-env) UPLOAD_ENV=0; shift ;;
+    --dryrun) DRYRUN=1; shift ;;
     --host) REMOTE_HOST="$2"; shift 2 ;;
     --user) REMOTE_USER="$2"; shift 2 ;;
-    --help) echo "Usage: $0 [--upload] [--with-env|--no-with-env] [--host host] [--user user]"; exit 0 ;;
+    --help) echo "Usage: $0 [--dryrun|--no-dryrun] [--host host] [--user user]"; exit 0 ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
@@ -47,30 +44,22 @@ echo "==> 准备发布目录: $release_dir"
 scp_cmd="tar -C ${release_dir} -czf - . | ssh ${REMOTE_USER}@${REMOTE_HOST} 'mkdir -p ${REMOTE_BASE} && tar -C ${REMOTE_BASE} -xzf -'"
 ssh_cmd="ssh ${REMOTE_USER}@${REMOTE_HOST} 'cd ${REMOTE_BASE} && ./start.sh pm2'"
 
-if [ "$UPLOAD" -eq 0 ]; then
-  echo "==> 演示模式（未实际上传）。可使用 --upload 执行上传与远端启动。"
+if [ "$DRYRUN" -eq 1 ]; then
+  echo "==> 演示模式（dry-run，未实际上传）。可使用 --no-dryrun 执行上传与远端启动。"
   echo "示例一次性写入命令（tar over ssh）："
   echo "  $scp_cmd"
   echo "示例远端启动命令:"
   echo "  $ssh_cmd"
-  if [ "$UPLOAD_ENV" -eq 1 ]; then
-    echo "注意：发布将上传本地 server/.env 到远端（默认开启）。如需禁用，请使用 --no-with-env。示例命令："
-    echo "  scp server/.env ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE}/${latest}/.env"
-  else
-    echo "注意：已禁用 .env 上传（使用 --with-env 可强制上传）。"
-  fi
+  echo "注意：发布目录若包含 server/.env，会随同上传。如需避免，请在打包前从发布目录移除该文件。"
   exit 0
 fi
 
 echo "==> 开始上传到 ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE}（使用 tar over ssh）" 
 echo "运行: $scp_cmd"
-if [ "$UPLOAD" -eq 1 ]; then
+if [ "$DRYRUN" -eq 0 ]; then
   # 执行流式打包并在远端解压到目标目录
   tar -C "$release_dir" -czf - . | ssh ${REMOTE_USER}@${REMOTE_HOST} "mkdir -p ${REMOTE_BASE} && tar -C ${REMOTE_BASE} -xzf -"
   echo "上传完成。"
-  if [ "$UPLOAD_ENV" -eq 1 ]; then
-    echo "注意：发布目录内若包含 .env，则已随同上传。"
-  fi
   # 上传并启用 nginx 配置（模板位于 deploy/nginx/yl0126.conf）
   if [ -f "deploy/nginx/yl0126.conf" ]; then
     echo "准备并上传 nginx 配置模板到远端 /etc/nginx/sites-available/"
@@ -88,8 +77,6 @@ if [ "$UPLOAD" -eq 1 ]; then
   echo "在远端执行启动："
   echo "运行: $ssh_cmd"
   ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_BASE} && ./start.sh pm2"
-else
-  echo "演示模式，未实际执行上传。"
 fi
 
 echo "部署完成。远端 pm2 状态建议手动检查： ssh ${REMOTE_USER}@${REMOTE_HOST} 'pm2 status'"

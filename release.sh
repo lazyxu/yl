@@ -51,6 +51,12 @@ if [ -d "server" ]; then
   rm -rf "$outdir/node_modules" || true
   echo "==> 将前端构建产物复制到 dist（后端将从 ./dist 提供静态文件）"
   cp -r "$build_dir" "$outdir/dist"
+
+  # 若仓库根目录有 .env，则将其复制到发布目录根
+  if [ -f ".env" ]; then
+    echo "==> 复制根目录 .env 到发布目录根"
+    cp ".env" "$outdir/.env"
+  fi
 fi
 
 echo "==> 处理发布 package.json（仅从 server/package.json 复制）"
