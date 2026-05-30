@@ -146,7 +146,6 @@ export default function History({ onNavigate = ()=>{}, refreshKey }){
                         src={resolveImageUrl(r.image_path)}
                         alt="record"
                         style={{ width:56, height:56, objectFit:'cover', borderRadius:6, border:'1px solid #eee', cursor:'pointer' }}
-                        onClick={() => { const u = resolveImageUrl(r.image_path); if (u) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${u}" style="max-width:100%">` } }}
                       />
                     </Box>
                   )}
