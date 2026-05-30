@@ -31,10 +31,18 @@ export default function InventoryGrid({ groupedInventory = [], findPalette = ()=
   const firstLetter = letters.length ? letters[0] : undefined
   const [visibleGroups, setVisibleGroups] = React.useState(() => (firstLetter ? new Set([firstLetter]) : new Set()))
 
+  const prevLettersRef = React.useRef(null)
   React.useEffect(() => {
-    // sync when groupedInventory changes: default to first column only
-    const first = groupedInventory.length ? groupedInventory[0][0] : undefined
-    setVisibleGroups(first ? new Set([first]) : new Set())
+    // 仅在分组键（letters）发生变化时重置 visibleGroups 为第一个分组。
+    // 这样可以避免 items/count 变更（例如“应用到所选”）导致的重置。
+    const newLetters = groupedInventory.map(([l]) => l)
+    const prev = prevLettersRef.current
+    const same = prev && prev.length === newLetters.length && prev.every((v, i) => v === newLetters[i])
+    if (!same) {
+      const first = groupedInventory.length ? groupedInventory[0][0] : undefined
+      setVisibleGroups(first ? new Set([first]) : new Set())
+    }
+    prevLettersRef.current = newLetters
   }, [groupedInventory])
 
   function toggleGroup(letter){

@@ -234,7 +234,7 @@ export default function PindouConsume({ initialOperation = '消耗', initialRows
       </Box>
 
       {(() => {
-        const grouped = (() => {
+        const grouped = useMemo(() => {
           const map = new Map()
           allCodes.forEach(code => {
             const key = (code || '').charAt(0).toUpperCase() || '#'
@@ -242,7 +242,7 @@ export default function PindouConsume({ initialOperation = '消耗', initialRows
             map.get(key).push({ color: code, count: Number(itemsMap[code] || 0) })
           })
           return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0]))
-        })()
+        }, [allCodes, itemsMap])
 
         return (
           <InventoryGrid groupedInventory={grouped} findPalette={findPalette} showZero={false} />
