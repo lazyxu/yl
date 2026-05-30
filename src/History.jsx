@@ -76,6 +76,19 @@ export default function History({ onNavigate = ()=>{}, refreshKey }){
     })
   }
 
+  function updateItemColor(index, value){
+    setEditData(prev => ({ ...prev, items: prev.items.map((it,i) => i === index ? { ...it, color: value } : it) }))
+  }
+
+  function addItem(){
+    const defaultCode = (MARD && MARD[0] && MARD[0].code) || ''
+    setEditData(prev => ({ ...prev, items: [ ...prev.items, { color: defaultCode, count: 1 } ] }))
+  }
+
+  function removeItem(index){
+    setEditData(prev => ({ ...prev, items: prev.items.filter((_,i) => i !== index) }))
+  }
+
   function updateNote(value){ setEditData(prev => ({ ...prev, note: value })) }
 
   function updateOccurredAt(value){ setEditData(prev => ({ ...prev, occurred_at: value })) }
@@ -84,9 +97,16 @@ export default function History({ onNavigate = ()=>{}, refreshKey }){
     if (!editData || !editingId) return
     setRecordsLoading(true)
     try{
+      // validate items: must be non-empty and counts positive integers
+      const itemsForSave = (editData.items || []).map(it => ({ color: it.color, count: Number(it.count) }))
+      if (!Array.isArray(itemsForSave) || itemsForSave.length === 0) throw new Error('items must be non-empty')
+      for (const it of itemsForSave) {
+        if (!it.color || !Number.isInteger(it.count) || it.count <= 0) throw new Error('each item must have color and positive integer count')
+      }
+
       const body = {
         operation: editData.operation,
-        items: editData.items.map(it => ({ color: it.color, count: Number(it.count) })),
+        items: itemsForSave,
         occurred_at: editData.occurred_at,
         note: editData.note,
         image_path: editData.image_path,
@@ -155,10 +175,18 @@ export default function History({ onNavigate = ()=>{}, refreshKey }){
                       {editData.items.map((it, idx) => (
                         <Box key={idx} sx={{ display:'flex', alignItems:'center', gap:1, mb:0.5 }}>
                           <ColorSwatch code={it.color} hex={findPalette(it.color)?.hex || '#fff'} />
-                          <Typography variant="body2" sx={{ minWidth:80 }}>{it.color}</Typography>
+                          <select value={it.color} onChange={e => updateItemColor(idx, e.target.value)}>
+                            {MARD.map(p => <option key={p.code} value={p.code}>{p.code}</option>)}
+                          </select>
                           <input type="number" value={it.count} min={0} onChange={e => updateItemCount(idx, e.target.value)} />
+                          <IconButton size="small" onClick={() => removeItem(idx)} aria-label="删除项">
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
                         </Box>
                       ))}
+                      <Box sx={{ mt:1 }}>
+                        <Button size="small" onClick={addItem}>添加色号</Button>
+                      </Box>
                     </Box>
                     <Box sx={{ display:'flex', gap:1, mt:1 }}>
                       <Button size="small" variant="contained" onClick={saveEdit}>保存</Button>
