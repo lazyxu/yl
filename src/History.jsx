@@ -3,6 +3,7 @@ import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
 import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
 import Button from '@mui/material/Button'
 import ColorSwatch from './ColorSwatch'
 import InventoryGrid from './InventoryGrid'
@@ -15,6 +16,8 @@ function findPalette(code){
 export default function History({ onNavigate = ()=>{}, refreshKey }){
   const [records, setRecords] = useState([])
   const [recordsLoading, setRecordsLoading] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editData, setEditData] = useState(null)
 
   function resolveImageUrl(imagePath){
     if (!imagePath) return null
@@ -45,6 +48,55 @@ export default function History({ onNavigate = ()=>{}, refreshKey }){
       if (!res.ok) throw new Error('删除失败')
       setRecords(prev => prev.filter(r => r.id !== id))
     }catch(err){ console.error(err); alert('删除失败') }finally{ setRecordsLoading(false) }
+  }
+
+  function startEdit(rec){
+    // clone record for editing
+    const cloned = {
+      id: rec.id,
+      operation: rec.operation,
+      occurred_at: rec.occurred_at,
+      note: rec.note || '',
+      image_path: rec.image_path || null,
+      items: Array.isArray(rec.items) ? rec.items.map(it => ({ color: it.color, count: Number(it.count) || 0 })) : [],
+    }
+    setEditingId(rec.id)
+    setEditData(cloned)
+  }
+
+  function cancelEdit(){
+    setEditingId(null)
+    setEditData(null)
+  }
+
+  function updateItemCount(index, value){
+    setEditData(prev => {
+      const next = { ...prev, items: prev.items.map((it,i) => i === index ? { ...it, count: Number(value) } : it) }
+      return next
+    })
+  }
+
+  function updateNote(value){ setEditData(prev => ({ ...prev, note: value })) }
+
+  function updateOccurredAt(value){ setEditData(prev => ({ ...prev, occurred_at: value })) }
+
+  async function saveEdit(){
+    if (!editData || !editingId) return
+    setRecordsLoading(true)
+    try{
+      const body = {
+        operation: editData.operation,
+        items: editData.items.map(it => ({ color: it.color, count: Number(it.count) })),
+        occurred_at: editData.occurred_at,
+        note: editData.note,
+        image_path: editData.image_path,
+      }
+      const res = await fetch(`/api/reminders/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) throw new Error('保存失败')
+      const updated = await res.json()
+      setRecords(prev => prev.map(r => r.id === updated.id ? updated : r))
+      cancelEdit()
+    }catch(err){ console.error(err); alert('保存失败') }finally{ setRecordsLoading(false) }
   }
 
   return (
@@ -79,12 +131,41 @@ export default function History({ onNavigate = ()=>{}, refreshKey }){
                     </Box>
                   )}
                   {r.note && <Typography variant="caption" sx={{ color:'#333' }}>{r.note}</Typography>}
+                  <IconButton size="small" onClick={() => startEdit(r)} aria-label="编辑记录">
+                    <EditIcon fontSize="small" />
+                  </IconButton>
                   <IconButton size="small" onClick={() => handleDeleteRecord(r.id)} aria-label="删除记录">
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </Box>
               </Box>
               <Box sx={{ mt:0.5 }}>
+                {editingId === r.id && editData ? (
+                  <Box sx={{ p:1, border:'1px dashed #ddd', borderRadius:1, mb:1 }}>
+                    <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1 }}>
+                      <Typography variant="body2">编辑时间：</Typography>
+                      <input type="datetime-local" value={new Date(editData.occurred_at).toISOString().slice(0,16)} onChange={e => updateOccurredAt(new Date(e.target.value).toISOString())} />
+                    </Box>
+                    <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1 }}>
+                      <Typography variant="body2">备注：</Typography>
+                      <input style={{ flex:1 }} value={editData.note} onChange={e => updateNote(e.target.value)} />
+                    </Box>
+                    <Box>
+                      <Typography variant="body2" sx={{ mb:0.5 }}>项数量：</Typography>
+                      {editData.items.map((it, idx) => (
+                        <Box key={idx} sx={{ display:'flex', alignItems:'center', gap:1, mb:0.5 }}>
+                          <ColorSwatch code={it.color} hex={findPalette(it.color)?.hex || '#fff'} />
+                          <Typography variant="body2" sx={{ minWidth:80 }}>{it.color}</Typography>
+                          <input type="number" value={it.count} min={0} onChange={e => updateItemCount(idx, e.target.value)} />
+                        </Box>
+                      ))}
+                    </Box>
+                    <Box sx={{ display:'flex', gap:1, mt:1 }}>
+                      <Button size="small" variant="contained" onClick={saveEdit}>保存</Button>
+                      <Button size="small" variant="outlined" onClick={cancelEdit}>取消</Button>
+                    </Box>
+                  </Box>
+                ) : null}
                 {(() => {
                   const items = Array.isArray(r.items) ? r.items : []
                   const map = new Map()

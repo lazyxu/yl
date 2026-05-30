@@ -51,4 +51,22 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const rec = await PindouReminder.findByPk(id);
+    if (!rec) return res.status(404).json({ error: 'not found' });
+
+    const errMsg = validateBody(req.body);
+    if (errMsg) return res.status(400).json({ error: errMsg });
+
+    const { operation, items, occurred_at, note, image_path } = req.body;
+    await rec.update({ operation, items, occurred_at, note, image_path });
+    res.json(rec && typeof rec.toJSON === 'function' ? rec.toJSON() : rec);
+  } catch (err) {
+    console.error('Error in PUT /api/reminders/:id', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
