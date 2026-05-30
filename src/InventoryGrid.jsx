@@ -46,17 +46,52 @@ export default function InventoryGrid({ groupedInventory = [], findPalette = ()=
     })
   }
 
+  function toggleAll(){
+    setVisibleGroups(prev => {
+      const allSelected = letters.length > 0 && letters.every(l => prev.has(l))
+      return allSelected ? new Set() : new Set(letters)
+    })
+  }
+
+  const groupCounts = React.useMemo(() => {
+    const m = new Map()
+    for (const [l, items] of groupedInventory) {
+      const cnt = (items || []).reduce((s, it) => s + (Number(it.count) || 0), 0)
+      m.set(l, cnt)
+    }
+    return m
+  }, [groupedInventory])
+
   return (
     <Box sx={{ pr:0, width: '100%' }}>
       {/* 如果只有一个分组且名称为 '全部'，隐藏列选择复选行 */}
       {!(letters.length === 1 && letters[0] === '全部') && (
         <Box sx={{ mb:1 }}>
           <FormGroup row>
+            {/* 全选 控件 */}
+            {letters.length > 0 && (() => {
+              const allSelected = letters.every(l => visibleGroups.has(l))
+              const someSelected = letters.some(l => visibleGroups.has(l)) && !allSelected
+              return (
+                <FormControlLabel
+                  key="__all__"
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onChange={() => toggleAll()}
+                    />
+                  }
+                  label="全选"
+                />
+              )
+            })()}
             {letters.map(letter => (
               <FormControlLabel
                 key={letter}
                 control={<Checkbox size="small" checked={visibleGroups.has(letter)} onChange={() => toggleGroup(letter)} />}
-                label={letter}
+                label={`${letter} (${groupCounts.get(letter) || 0})`}
               />
             ))}
           </FormGroup>
