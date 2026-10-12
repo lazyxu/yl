@@ -1,150 +1,120 @@
-import React, { useState, lazy, Suspense } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, Suspense } from 'react'
 import './App.css'
-import Calendar from './Calendar'
-const PindouConsume = lazy(() => import('./PindouConsume'))
-const History = lazy(() => import('./History'))
-import Inventory from './Inventory'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
-// use a simple Box as header instead of MUI AppBar/Toolbar
 import IconButton from '@mui/material/IconButton'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
+import PaletteIcon from '@mui/icons-material/Palette'
 import Typography from '@mui/material/Typography'
-import Button from '@mui/material/Button'
-import ButtonGroup from '@mui/material/ButtonGroup'
-import Box from '@mui/material/Box'
+import BottomNavigation from '@mui/material/BottomNavigation'
+import BottomNavigationAction from '@mui/material/BottomNavigationAction'
 import { useSearchParams } from 'react-router-dom'
+import { createPindouDraft } from './pindouDraft'
+import useKeyboardViewport from './useKeyboardViewport'
+
+const Calendar = React.lazy(() => import('./Calendar'))
+const Inventory = React.lazy(() => import('./Inventory'))
+const PindouConsume = React.lazy(() => import('./PindouConsume'))
+const History = React.lazy(() => import('./History'))
+const views = ['日历', '拼豆', '历史', '补豆', '消耗']
+const theme = createTheme({
+  palette: { mode: 'light' },
+  components: {
+    MuiButton: { styleOverrides: { root: { minHeight: 44 } } },
+    MuiIconButton: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
+    MuiToggleButton: { styleOverrides: { root: { minHeight: 44 } } },
+    MuiCheckbox: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
+    MuiInputBase: { styleOverrides: { root: { minHeight: 44 }, input: { fontSize: 16 } } },
+  },
+})
+
+function Page({ name, active, positions, children }) {
+  const element = useRef(null)
+  useLayoutEffect(() => {
+    if (active && element.current) element.current.scrollTop = positions.current[name] || 0
+  }, [active, name, positions])
+  return (
+    <section ref={element} className="app-page" data-view={name} aria-label={name} hidden={!active}
+      onScroll={event => { if (active) positions.current[name] = event.currentTarget.scrollTop }}>
+      <Suspense fallback={<div className="page-loading" role="status">正在加载…</div>}>{children}</Suspense>
+    </section>
+  )
+}
 
 function App() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const view = searchParams.get('view') || '日历'
-  const [operationForForm, setOperationForForm] = React.useState('补豆')
-  const [pindouModalOpen, setPindouModalOpen] = useState(false)
+  const requestedView = searchParams.get('view') || '日历'
+  const view = views.includes(requestedView) ? requestedView : '日历'
+  const [visited, setVisited] = useState(() => new Set([view]))
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0)
-  const [initialRowsForForm, setInitialRowsForForm] = useState(null)
+  const [drafts, setDrafts] = useState(() => ({ 补豆: createPindouDraft(), 消耗: createPindouDraft() }))
+  const [formBusy, setFormBusy] = useState(false)
+  const lastPindouView = useRef(view === '日历' ? '拼豆' : view)
+  const currentView = useRef(view)
+  const positions = useRef({})
+  const { keyboardOpen, height } = useKeyboardViewport()
+  const primaryView = view === '日历' ? '日历' : '拼豆'
+  const isForm = view === '补豆' || view === '消耗'
 
-  function navigateToView(v) {
-    setSearchParams({ view: v })
+  useEffect(() => {
+    currentView.current = view
+    if (view !== '日历') lastPindouView.current = view
+    setVisited(previous => previous.has(view) ? previous : new Set([...previous, view]))
+  }, [view])
+
+  const navigateToView = useCallback(nextView => {
+    if (nextView === view) return
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('view', nextView)
+    setSearchParams(nextParams)
+  }, [searchParams, setSearchParams, view])
+
+  function openPindouWith(operation, initialRows = null) {
+    if (initialRows?.length) setDrafts(previous => ({ ...previous, [operation]: createPindouDraft(initialRows) }))
+    navigateToView(operation)
   }
 
-  const theme = createTheme({
-    palette: { mode: 'light' }
-  })
-
-  
-
-  function openPindouWith(op, initialRows = null) {
-    setOperationForForm(op)
-    setInitialRowsForForm(initialRows)
-    // navigate to corresponding page
-    if (op === '补豆') navigateToView('补豆')
-    else if (op === '消耗') navigateToView('消耗')
+  function clearDraft(operation) {
+    setDrafts(previous => ({ ...previous, [operation]: createPindouDraft() }))
+    positions.current[operation] = 0
   }
 
-  function onPindouAdded() {
-    // bump key so Inventory refetches
-    setInventoryRefreshKey(k => k + 1)
+  function onPindouAdded(operation) {
+    clearDraft(operation)
+    setInventoryRefreshKey(key => key + 1)
+    if (currentView.current === operation) navigateToView('拼豆')
   }
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', '--appbar-h': '40px' }}>
-        <Box
-          component="header"
-          role="banner"
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            // include safe-area inset in height and padding to avoid notch/status-bar overlap
-            paddingTop: 'env(safe-area-inset-top)',
-            minHeight: 'calc(var(--appbar-h) + env(safe-area-inset-top))',
-            height: 'calc(var(--appbar-h) + env(safe-area-inset-top))',
-            gap: 0,
-            py: 0,
-            zIndex: (t) => t.zIndex.appBar,
-            // 临时背景色，便于在真机上验证（部署前移除）
-            bgcolor: 'rgba(0,0,255,0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            px: 1
-          }}
-        >
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontSize: { xs: '0.95rem', sm: '1rem' }, lineHeight: 1.1, py: 0 }}>
-              {view === '补豆' ? operationForForm : view}
-            </Typography>
-            <ButtonGroup
-              color="inherit"
-              variant="text"
-              size="small"
-              sx={{
-                ml: 0,
-                gap: 1,
-                borderRadius: 1,
-                bgcolor: 'action.hover',
-                '& .MuiButton-root': {
-                  borderRadius: 1,
-                  px: 1.2,
-                  py: 0.4,
-                  minWidth: 72,
-                  fontWeight: 500,
-                },
-              }}
-            >
-              <Button
-                variant={'text'}
-                color={'inherit'}
-                onClick={() => navigateToView('日历')}
-                sx={{ fontSize: '0.95rem' }}
-                disableElevation
-              >
-                日历
-              </Button>
-              <Button
-                variant={'text'}
-                color={'inherit'}
-                onClick={() => navigateToView('拼豆')}
-                sx={{ fontSize: '0.95rem' }}
-                disableElevation
-              >
-                拼豆
-              </Button>
-            </ButtonGroup>
-        </Box>
-
-        <Box component="main" sx={{ p: 0, pt: 'calc(var(--appbar-h) + env(safe-area-inset-top))', maxWidth: '100vw', mx: 0, width: '100vw', boxSizing: 'border-box', flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-          {view === '日历' && <Calendar />}
-          {view === '拼豆' && (
-            <Inventory onAction={(op, rows) => openPindouWith(op, rows)} refreshKey={inventoryRefreshKey} onNavigate={(v) => navigateToView(v)} />
-          )}
-
-          {view === '历史' && (
-            <Box sx={{ p: 1 }}>
-              <Suspense fallback={<div>加载中...</div>}>
-                <History onNavigate={(v) => navigateToView(v)} refreshKey={inventoryRefreshKey} />
-              </Suspense>
-            </Box>
-          )}
-
-          {view === '补豆' && (
-            <Box sx={{ p: 1 }}>
-              <Suspense fallback={<div>加载中...</div>}>
-                <PindouConsume initialOperation={operationForForm} initialRows={initialRowsForForm} onClose={() => navigateToView('拼豆')} onAdded={() => { onPindouAdded(); navigateToView('拼豆') }} />
-              </Suspense>
-            </Box>
-          )}
-
-          {view === '消耗' && (
-            <Box sx={{ p: 1 }}>
-              <Suspense fallback={<div>加载中...</div>}>
-                <PindouConsume initialRows={initialRowsForForm} onClose={() => navigateToView('拼豆')} onAdded={() => { onPindouAdded(); navigateToView('拼豆') }} />
-              </Suspense>
-            </Box>
-          )}
-        </Box>
-      </Box>
+      <div className="app-shell" data-keyboard-open={keyboardOpen} style={keyboardOpen ? { '--keyboard-height': `${height}px` } : undefined}>
+        <header className="app-header">
+          {view !== '日历' && view !== '拼豆' && <IconButton aria-label="返回库存" disabled={formBusy} onClick={() => navigateToView('拼豆')}><ArrowBackIcon /></IconButton>}
+          <Typography component="h1" className="app-title">{view}</Typography>
+        </header>
+        <main className="app-content">
+          {(visited.has('日历') || view === '日历') && <Page name="日历" active={view === '日历'} positions={positions}><Calendar active={view === '日历'} /></Page>}
+          {(visited.has('拼豆') || view === '拼豆') && <Page name="拼豆" active={view === '拼豆'} positions={positions}><Inventory active={view === '拼豆'} onAction={openPindouWith} refreshKey={inventoryRefreshKey} onNavigate={navigateToView} /></Page>}
+          {(visited.has('历史') || view === '历史') && <Page name="历史" active={view === '历史'} positions={positions}><History active={view === '历史'} onNavigate={navigateToView} refreshKey={inventoryRefreshKey} /></Page>}
+          {isForm && <Page key={view} name={view} active positions={positions}>
+            <PindouConsume initialOperation={view} draft={drafts[view]}
+              loading={formBusy}
+              onDraftChange={update => setDrafts(previous => ({ ...previous, [view]: update(previous[view]) }))}
+              onBusyChange={setFormBusy}
+              onClose={() => { clearDraft(view); navigateToView('拼豆') }}
+              onAdded={() => onPindouAdded(view)} />
+          </Page>}
+        </main>
+        <footer className="app-footer" hidden={keyboardOpen}>
+          <BottomNavigation component="nav" aria-label="主导航" showLabels value={primaryView}
+            onChange={(_, value) => navigateToView(value === '拼豆' ? lastPindouView.current : '日历')}>
+            <BottomNavigationAction label="日历" value="日历" aria-current={primaryView === '日历' ? 'page' : undefined} icon={<CalendarMonthIcon />} disabled={formBusy} />
+            <BottomNavigationAction label="拼豆" value="拼豆" aria-current={primaryView === '拼豆' ? 'page' : undefined} icon={<PaletteIcon />} disabled={formBusy} />
+          </BottomNavigation>
+        </footer>
+      </div>
     </ThemeProvider>
   )
 }

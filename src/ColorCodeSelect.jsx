@@ -11,7 +11,7 @@ function findPalette(code){
   return MARD.find(p => p.code === code)
 }
 
-export default function ColorCodeSelect({ options = [], value = [], onChange = ()=>{}, label = '选择色号', placeholder = '搜索或选择', sx = {} }){
+export default function ColorCodeSelect({ options = [], value = [], disabled = false, onChange = ()=>{}, label = '选择色号', placeholder = '搜索或选择', sx = {} }){
   const allOptions = React.useMemo(() => [ALL_KEY, ...options], [options])
 
   function handleChange(e, v, reason){
@@ -31,6 +31,7 @@ export default function ColorCodeSelect({ options = [], value = [], onChange = (
   return (
     <Autocomplete
       multiple
+      disabled={disabled}
       size='small'
       options={allOptions}
       value={value}

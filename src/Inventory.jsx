@@ -41,7 +41,7 @@ const ColorCard = React.memo(function ColorCard({ it, findPalette, threshold }){
 
 // API base inlined as '/api'
 
-function Inventory({ onAction, refreshKey, onNavigate = ()=>{} }) {
+function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} }) {
   const [inventory, setInventory] = useState([])
   const [threshold, setThreshold] = useState(() => {
     const v = localStorage.getItem('pindou-threshold')
@@ -55,8 +55,12 @@ function Inventory({ onAction, refreshKey, onNavigate = ()=>{} }) {
   const [sortOrder, setSortOrder] = useState('none') // 'none' | 'asc' | 'desc'
   // color-blind mode removed
 
-  useEffect(() => { fetchInventory() }, [])
-  useEffect(() => { if (typeof refreshKey !== 'undefined') fetchInventory() }, [refreshKey])
+  useEffect(() => {
+    if (!active) return
+    const controller = new AbortController()
+    fetchInventory(controller.signal)
+    return () => controller.abort()
+  }, [active, refreshKey])
 
   // history moved to separate page
 
@@ -111,15 +115,16 @@ function Inventory({ onAction, refreshKey, onNavigate = ()=>{} }) {
 
   const findPalette = useCallback((code) => MARD.find(p => p.code === code), [])
 
-  async function fetchInventory() {
+  async function fetchInventory(signal) {
     setLoading(true)
     try {
-      const res = await fetch('/api/inventory')
+      const res = await fetch('/api/inventory', { signal })
       const data = await res.json()
-      setInventory(data)
+      if (!res.ok || !Array.isArray(data)) throw new Error('库存暂时无法更新')
+      if (!signal.aborted) setInventory(data)
     } catch (err) {
-      console.error(err)
-    } finally { setLoading(false) }
+      if (err.name !== 'AbortError') console.error(err)
+    } finally { if (!signal.aborted) setLoading(false) }
   }
 
   async function fetchReminders(){
@@ -150,7 +155,7 @@ function Inventory({ onAction, refreshKey, onNavigate = ()=>{} }) {
 
   return (
     <Box sx={{ p:1 }}>
-      <Box sx={{display:'flex',alignItems:'center',justifyContent:'space-between',mb:1}}>
+      <Box sx={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:1,mb:1}}>
         <Typography variant="h5" sx={{fontSize:{xs:'1.1rem',sm:'1.25rem',md:'1.4rem'},lineHeight:1.25}}>库存总览</Typography>
           <Box sx={{display:'flex',alignItems:'center',gap:1}}>
           {/* 色弱模式已移除 */}
@@ -162,13 +167,13 @@ function Inventory({ onAction, refreshKey, onNavigate = ()=>{} }) {
         </Box>
       </Box>
 
-      <Box sx={{display:'flex',alignItems:'center',gap:1,mb:1}}>
+      <Box sx={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:1,mb:1}}>
         <TextField label="阈值预警（颗）" type="number" size="small" value={threshold} onChange={e=>saveThreshold(Number(e.target.value))} sx={{width:110}} />
-        <ToggleButtonGroup size="small" value={displayMode} exclusive onChange={(e, v)=>{ if (v) setDisplayMode(v) }} sx={{ ml:1, mr:1 }}>
+        <ToggleButtonGroup size="small" value={displayMode} exclusive onChange={(e, v)=>{ if (v) setDisplayMode(v) }}>
           <ToggleButton value="all">全部: {displayedInventory.length} 项</ToggleButton>
           <ToggleButton value="low">低于阈值: {lowCount} 项</ToggleButton>
         </ToggleButtonGroup>
-        <ToggleButtonGroup size="small" value={sortOrder} exclusive onChange={(e, v)=>{ if (v) setSortOrder(v) }} sx={{ ml:1 }}>
+        <ToggleButtonGroup size="small" value={sortOrder} exclusive onChange={(e, v)=>{ if (v) setSortOrder(v) }}>
           <ToggleButton value="none">默认</ToggleButton>
           <ToggleButton value="asc">升序</ToggleButton>
         </ToggleButtonGroup>

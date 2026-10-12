@@ -1,8 +1,75 @@
-#root {
-  min-height: 100vh;
+html, body, #root {
   width: 100%;
+  height: 100%;
   margin: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
+
+body { overflow: hidden; }
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  background: #fff;
+}
+
+@supports (height: 100dvh) {
+  .app-shell { height: 100dvh; }
+}
+
+.app-shell[data-keyboard-open="true"] { height: var(--keyboard-height); }
+
+.app-header {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  min-height: calc(48px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid #eceef2;
+  background: #fff;
+}
+
+.app-header .app-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.app-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.app-page {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 env(safe-area-inset-right, 0px) 16px env(safe-area-inset-left, 0px);
+}
+
+.app-page[hidden], .app-footer[hidden] { display: none; }
+
+.app-footer {
+  flex: none;
+  border-top: 1px solid #e5e8ef;
+  padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: #fff;
+}
+
+.app-footer .MuiBottomNavigation-root { height: 60px; }
+.app-footer .MuiBottomNavigationAction-root { max-width: none; min-height: 44px; color: #667085; gap: 2px; }
+.app-footer .MuiBottomNavigationAction-root.Mui-selected { color: #1976d2; background: #f0f6ff; }
+.app-footer .MuiBottomNavigationAction-label,
+.app-footer .MuiBottomNavigationAction-label.Mui-selected { font-size: 13px; font-weight: 600; }
+
+.app-shell input, .app-shell textarea, .app-shell select { font-size: 16px; }
+.app-shell .header button { min-height: 44px; min-width: 44px; }
+.page-loading { padding: 24px 16px; color: #667085; }

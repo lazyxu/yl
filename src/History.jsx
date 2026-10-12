@@ -13,7 +13,7 @@ function findPalette(code){
   return MARD.find(p => p.code === code)
 }
 
-export default function History({ onNavigate = ()=>{}, refreshKey }){
+export default function History({ active = true, onNavigate = ()=>{}, refreshKey }){
   const [records, setRecords] = useState([])
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -27,18 +27,23 @@ export default function History({ onNavigate = ()=>{}, refreshKey }){
     return `/api/upload/${filename}`
   }
 
-  async function fetchReminders(){
+  async function fetchReminders(signal){
     setRecordsLoading(true)
     try{
-      const res = await fetch('/api/reminders')
+      const res = await fetch('/api/reminders', { signal })
       const data = await res.json()
-      setRecords(Array.isArray(data) ? data : [])
+      if (!signal.aborted) setRecords(Array.isArray(data) ? data : [])
     }catch(err){
-      console.error(err)
-    }finally{ setRecordsLoading(false) }
+      if (err.name !== 'AbortError') console.error(err)
+    }finally{ if (!signal.aborted) setRecordsLoading(false) }
   }
 
-  useEffect(() => { fetchReminders() }, [refreshKey])
+  useEffect(() => {
+    if (!active) return
+    const controller = new AbortController()
+    fetchReminders(controller.signal)
+    return () => controller.abort()
+  }, [active, refreshKey])
 
   async function handleDeleteRecord(id){
     if (!window.confirm('确认删除该历史记录？该操作不可恢复。')) return;

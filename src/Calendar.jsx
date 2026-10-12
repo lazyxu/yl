@@ -14,7 +14,7 @@ const 经期状态映射 = {
   黄体期: '精力下降、情绪波动、emo',
 }
 
-const Calendar = () => {
+const Calendar = ({ active = true }) => {
   const today = moment();
   const [currentMonth, setCurrentMonth] = useState(moment().startOf('month'));
   const [transitionBuffer, setTransitionBuffer] = useState(false); // 过渡动画控制
@@ -42,10 +42,11 @@ const Calendar = () => {
   }, []);
 
   useEffect(() => {
+    if (!active) { setSettingsOpen(false); return }
     const controller = new AbortController();
     reloadSettings(controller.signal);
     return () => controller.abort();
-  }, [reloadSettings]);
+  }, [active, reloadSettings]);
 
   // 开始触摸时记录起始 X 坐标
   const onTouchStart = (e) => {
