@@ -1,6 +1,8 @@
 tmp
 eng.traineddata
 releases
+/backups/
+/server/uploads/
 
 # Logs
 logs

@@ -1,82 +1,69 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# release_deploy.sh
-# 用途：调用 release.sh 生成发布包，打包为 tar.gz，并（可选）通过 scp 上传到远端并在远端解包、切换 current、以 pm2 启动。
-# 默认为演示模式（dry-run）：只在本地打包并打印 scp/ssh 命令；使用 --upload 才会实际执行远端传输与启动。
-
+# Build, verify a local data backup, then deploy to the existing application.
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
-
 DRYRUN=0
 REMOTE_USER="root"
 REMOTE_HOST="t-fluid.com"
+REMOTE_PORT="22"
 REMOTE_BASE="/yl0126"
+BACKUP_DIR="$ROOT_DIR/backups"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dryrun) DRYRUN=1; shift ;;
-    --host) REMOTE_HOST="$2"; shift 2 ;;
-    --user) REMOTE_USER="$2"; shift 2 ;;
-    --help) echo "Usage: $0 [--dryrun|--no-dryrun] [--host host] [--user user]"; exit 0 ;;
-    *) echo "Unknown arg: $1"; exit 1 ;;
+    --no-dryrun) DRYRUN=0; shift ;;
+    --host|--user|--port|--base|--backup-dir)
+      [ "$#" -ge 2 ] || { echo "Missing value for $1" >&2; exit 1; }
+      case "$1" in
+        --host) REMOTE_HOST="$2" ;;
+        --user) REMOTE_USER="$2" ;;
+        --port) REMOTE_PORT="$2" ;;
+        --base) REMOTE_BASE="$2" ;;
+        --backup-dir) BACKUP_DIR="$2" ;;
+      esac
+      shift 2 ;;
+    --help)
+      echo "Usage: $0 [--dryrun|--no-dryrun] [--host host] [--user user] [--port port] [--base /path] [--backup-dir local-path]"
+      exit 0 ;;
+    *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
 
-echo "==> 生成发布（调用 ./release.sh）"
-if [ ! -x ./release.sh ]; then
-  echo "错误：缺少可执行的 release.sh" >&2
-  exit 1
-fi
-./release.sh
+[[ "$REMOTE_HOST" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ && "$REMOTE_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ && "$REMOTE_PORT" =~ ^[0-9]+$ ]] || { echo "Invalid remote target" >&2; exit 1; }
+[[ "$REMOTE_BASE" == /* && "$REMOTE_BASE" != / && "$REMOTE_BASE" != *..* && "$REMOTE_BASE" =~ ^/[a-zA-Z0-9_/-]+$ ]] || { echo "Invalid remote base" >&2; exit 1; }
 
-latest=$(ls -1 releases | grep '^release-' | sort | tail -n1)
-if [ -z "$latest" ]; then
-  echo "错误：未找到 releases 下的发布目录" >&2
-  exit 1
-fi
+echo "==> Build release"
+bash ./release.sh
+latest=$(cat releases/.latest-release)
+[[ "$latest" == release-* && "$latest" != */* ]] || { echo "Invalid release name" >&2; exit 1; }
 release_dir="releases/$latest"
-
-echo "==> 准备发布目录: $release_dir"
-
-# 不再创建压缩包，改为直接将发布目录通过 scp -r 复制到远端 ${REMOTE_BASE}
-# 使用 tar over ssh：在本地打包发布目录内容并在远端直接解到 ${REMOTE_BASE}，实现一次性无痕写入目标目录
-scp_cmd="tar -C ${release_dir} -czf - . | ssh ${REMOTE_USER}@${REMOTE_HOST} 'mkdir -p ${REMOTE_BASE} && tar -C ${REMOTE_BASE} -xzf -'"
-ssh_cmd="ssh ${REMOTE_USER}@${REMOTE_HOST} 'cd ${REMOTE_BASE} && ./start.sh pm2'"
+[ -d "$release_dir" ] || { echo "Missing release directory" >&2; exit 1; }
 
 if [ "$DRYRUN" -eq 1 ]; then
-  echo "==> 演示模式（dry-run，未实际上传）。可使用 --no-dryrun 执行上传与远端启动。"
-  echo "示例一次性写入命令（tar over ssh）："
-  echo "  $scp_cmd"
-  echo "示例远端启动命令:"
-  echo "  $ssh_cmd"
-  echo "注意：发布目录若包含 server/.env，会随同上传。如需避免，请在打包前从发布目录移除该文件。"
+  echo "Preview: $release_dir -> $REMOTE_USER@$REMOTE_HOST:$REMOTE_BASE"
+  echo "A verified data backup will be saved to $BACKUP_DIR before a real deploy."
+  echo "Dry-run complete; no remote connection was made."
   exit 0
 fi
 
-echo "==> 开始上传到 ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE}（使用 tar over ssh）" 
-echo "运行: $scp_cmd"
-if [ "$DRYRUN" -eq 0 ]; then
-  # 执行流式打包并在远端解压到目标目录
-  tar -C "$release_dir" -czf - . | ssh ${REMOTE_USER}@${REMOTE_HOST} "mkdir -p ${REMOTE_BASE} && tar -C ${REMOTE_BASE} -xzf -"
-  echo "上传完成。"
-  # 上传并启用 nginx 配置（模板位于 deploy/nginx/yl0126.conf）
-  if [ -f "deploy/nginx/yl0126.conf" ]; then
-    echo "准备并上传 nginx 配置模板到远端 /etc/nginx/sites-available/"
-    echo "上传 nginx 配置到远端 /tmp 并移动到 /etc/nginx/conf.d/（需要 sudo 权限时会使用 sudo）"
-    # 直接将仓库中的配置文件上传到远端 /tmp，再在远端移动到 /etc/nginx/conf.d/
-    scp deploy/nginx/yl0126.conf ${REMOTE_USER}@${REMOTE_HOST}:/tmp/yl0126.conf
-    if [ "${REMOTE_USER}" = "root" ]; then
-      ssh ${REMOTE_USER}@${REMOTE_HOST} "mkdir -p /etc/nginx/conf.d && mv /tmp/yl0126.conf /etc/nginx/conf.d/yl0126.conf && nginx -t && systemctl reload nginx || echo 'nginx reload failed'"
-    else
-      ssh ${REMOTE_USER}@${REMOTE_HOST} "sudo mkdir -p /etc/nginx/conf.d && sudo mv /tmp/yl0126.conf /etc/nginx/conf.d/yl0126.conf && sudo nginx -t && sudo systemctl reload nginx || echo 'nginx reload failed'"
-    fi
-  else
-    echo "警告：未在 repo 中找到 deploy/nginx/yl0126.conf，跳过 nginx 配置上传。"
-  fi
-  echo "在远端执行启动："
-  echo "运行: $ssh_cmd"
-  ssh ${REMOTE_USER}@${REMOTE_HOST} "cd ${REMOTE_BASE} && ./start.sh pm2"
-fi
+echo "==> Back up remote MySQL, uploads and .env to local storage"
+bash ./backup_data.sh --host "$REMOTE_HOST" --user "$REMOTE_USER" --port "$REMOTE_PORT" --base "$REMOTE_BASE" --backup-dir "$BACKUP_DIR"
 
-echo "部署完成。远端 pm2 状态建议手动检查： ssh ${REMOTE_USER}@${REMOTE_HOST} 'pm2 status'"
+ssh_options=(-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -p "$REMOTE_PORT")
+target="$REMOTE_USER@$REMOTE_HOST"
+echo "==> Upload $release_dir"
+# Runtime data and credentials are never copied from the local release.
+tar -C "$release_dir" --exclude=.env --exclude=uploads -czf - . |
+  ssh "${ssh_options[@]}" "$target" "cd '$REMOTE_BASE' && tar -xzf -"
+
+if [ -f deploy/nginx/yl0126.conf ]; then
+  scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -P "$REMOTE_PORT" deploy/nginx/yl0126.conf "$target:/tmp/yl0126.conf"
+  privilege=""
+  [ "$REMOTE_USER" = root ] || privilege="sudo "
+  ssh "${ssh_options[@]}" "$target" "${privilege}mkdir -p /etc/nginx/conf.d && ${privilege}mv /tmp/yl0126.conf /etc/nginx/conf.d/yl0126.conf && ${privilege}nginx -t && ${privilege}systemctl reload nginx"
+fi
+ssh "${ssh_options[@]}" "$target" "cd '$REMOTE_BASE' && bash ./start.sh pm2"
+echo "Deploy complete: $latest. Version record: $REMOTE_BASE/release.json"

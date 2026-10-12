@@ -39,8 +39,7 @@ export async function recognizeImage(input, { lang = 'eng', psm = 6, whitelist =
 }
 
 // 解析 OCR 文本，提取色号和数量
-import fs from 'fs'
-const MARD = JSON.parse(fs.readFileSync(new URL('../colorPalettes/mard.json', import.meta.url), 'utf8'))
+import MARD from '../colorPalettes/mard.json'
 
 export function parseOcrText(text, { palette = MARD, fallbackCode = null } = {}){
   const t = (text || '').toUpperCase()
@@ -124,4 +123,3 @@ export async function recognizeAndParse(input, opts = {}){
   const text = res && res.text ? res.text : (res && res.data && res.data.text ? res.data.text : '')
   return parseOcrText(text, parseOptions)
 }
-

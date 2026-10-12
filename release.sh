@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # release.sh
-# 用途：构建前端，收集后端，生成发布包 releases/release-<version>-<timestamp>.tar.gz
+# 用途：构建前端，收集后端，生成带 Git 版本记录的发布目录。
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR"
@@ -41,8 +41,8 @@ if [ -d "server" ]; then
   (shopt -s dotglob; for p in server/* server/.[!.]* server/..?*; do
     [ -e "$p" ] || continue
     base=$(basename "$p")
-    # 跳过 server/dist 以及常见锁文件与 .envd（保留 server/.env 的复制）
-    if [ "$base" = "dist" ] || [ "$base" = "yarn.lock" ] || [ "$base" = "package-lock.json" ] || [ "$base" = ".envd" ]; then
+    # 数据和环境配置保留在部署机器，不从开发机器覆盖。
+    if [ "$base" = "dist" ] || [ "$base" = "uploads" ] || [ "$base" = "node_modules" ] || [[ "$base" == .env* ]] || [ "$base" = "yarn.lock" ] || [ "$base" = "package-lock.json" ]; then
       continue
     fi
     cp -r "$p" "$outdir/"
@@ -52,11 +52,6 @@ if [ -d "server" ]; then
   echo "==> 将前端构建产物复制到 dist（后端将从 ./dist 提供静态文件）"
   cp -r "$build_dir" "$outdir/dist"
 
-  # 若仓库根目录有 .env，则将其复制到发布目录根
-  if [ -f ".env" ]; then
-    echo "==> 复制根目录 .env 到发布目录根"
-    cp ".env" "$outdir/.env"
-  fi
 fi
 
 echo "==> 处理发布 package.json（仅从 server/package.json 复制）"
@@ -103,6 +98,9 @@ else
 fi
 SH
 chmod +x "$outdir/start.sh" || true
+
+node ./scripts/release-metadata.mjs "$ROOT_DIR" "$outdir" "$release_name"
+printf '%s\n' "$release_name" > "$releases_dir/.latest-release"
 
 echo "==> 完成：发布目录已生成 -> ${outdir}"
 
