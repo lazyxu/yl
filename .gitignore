@@ -3,6 +3,7 @@ eng.traineddata
 releases
 /backups/
 /server/uploads/
+.history
 
 # Logs
 logs
