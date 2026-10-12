@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-exec node "$ROOT_DIR/scripts/data-backup.mjs" backup "$@"
+exec bash "$ROOT_DIR/scripts/data-command.sh" backup "$@"

@@ -49,6 +49,8 @@ bash release_deploy.sh
 
 备份失败会中止发布。发布目录不包含开发机的 `.env` 或 `uploads`，生产配置和数据保留在远端。可用 `--host`、`--user`、`--port`、`--base` 指定目标，`--backup-dir` 指定本地备份根目录。必须从保存备份的开发机器发起发布；CI 仅做验证，不自动发布。
 
+Windows Git Bash 下，备份/恢复/校验入口会保留远端 `--base` 的 Unix 路径，防止 `/yl0126` 被自动转换为开发机的 Git 安装路径；本地备份目录仍正常转换为 Windows 路径。不要通过关闭参数校验来绕过远端路径错误。
+
 ```bash
 # 独立备份（Windows 也可直接执行 node scripts/data-backup.mjs backup）
 bash backup_data.sh

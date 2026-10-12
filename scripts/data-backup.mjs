@@ -17,9 +17,12 @@ function options(args) {
   const values = { '--host': 'host', '--user': 'user', '--port': 'port', '--base': 'base', '--backup-dir': 'backupDir' };
   for (let i = 0; i < args.length; i++) {
     const value = args[i];
-    if (values[value]) {
-      if (!args[i + 1] || args[i + 1].startsWith('--')) throw new Error(`Missing value: ${value}`);
-      result[values[value]] = args[++i];
+    const separator = value.indexOf('=');
+    const key = separator < 0 ? value : value.slice(0, separator);
+    if (values[key]) {
+      const next = separator < 0 ? args[++i] : value.slice(separator + 1);
+      if (!next || next.startsWith('--')) throw new Error(`Missing value: ${key}`);
+      result[values[key]] = next;
     } else if (value === '--apply') result.apply = true;
     else if (value === '--local') result.local = true;
     else if (value === '--restore-env') result.restoreEnv = true;

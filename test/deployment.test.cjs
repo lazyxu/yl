@@ -34,8 +34,8 @@ test('restore rejects missing or damaged backups before connecting to a target',
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
-test('verify accepts a complete archive and rejects an internally changed payload', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yl-valid-backup-'));
+test('verify accepts a complete archive through Node and Bash and rejects changed payloads', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yl valid-backup-'));
   const payload = path.join(tmp, 'payload');
   const crypto = require('node:crypto');
   const hash = file => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -56,6 +56,9 @@ test('verify accepts a complete archive and rejects an internally changed payloa
     pack();
     const valid = run(['verify', tmp]);
     assert.equal(valid.status, 0, valid.stderr);
+    const bash = process.env.BASH_BIN || (process.platform === 'win32' ? 'D:/Programs/Git/bin/bash.exe' : 'bash');
+    const bashValid = spawnSync(bash, [path.join(root, 'verify_backup.sh').replace(/\\/g, '/'), tmp.replace(/\\/g, '/')], { encoding: 'utf8' });
+    assert.equal(bashValid.status, 0, bashValid.stderr);
     fs.writeFileSync(path.join(payload, 'database.sql'), 'tampered');
     pack();
     const invalid = run(['verify', tmp]);
@@ -74,6 +77,49 @@ test('commands reject target paths and arguments that could address unrelated da
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /invalid|unknown/i);
   }
+});
+
+test('CLI accepts equals-form target options without weakening target validation', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yl-inline-options-'));
+  try {
+    const accepted = run(['restore', tmp, '--base=/yl0126', '--host=unreachable.invalid', '--backup-dir=./backups']);
+    assert.notEqual(accepted.status, 0);
+    assert.match(accepted.stderr, /ENOENT/);
+    assert.doesNotMatch(accepted.stderr, /Invalid target|Unknown argument|ssh:/);
+    const rejected = run(['backup', '--base=/']);
+    assert.match(rejected.stderr, /Invalid target/);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('Bash wrappers preserve remote POSIX paths while converting local Windows paths', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yl-bash-arguments-'));
+  const bash = process.env.BASH_BIN || (process.platform === 'win32' ? 'D:/Programs/Git/bin/bash.exe' : 'bash');
+  const capture = path.join(tmp, 'capture.cjs');
+  try {
+    fs.writeFileSync(capture, 'console.log(JSON.stringify(process.argv.slice(1))); process.exit(0);\n');
+    const localDirectory = path.join(tmp, 'backup directory');
+    const nativeToShell = value => process.platform === 'win32'
+      ? value.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`)
+      : value;
+    for (const [wrapper, action] of [['backup_data.sh', 'backup'], ['restore_data.sh', 'restore'], ['verify_backup.sh', 'verify']]) {
+      const args = [path.join(root, wrapper).replace(/\\/g, '/')];
+      if (action !== 'backup') args.push(nativeToShell(localDirectory));
+      args.push('--base', '/yl0126', '--backup-dir', nativeToShell(localDirectory), '--port', '22');
+      const result = spawnSync(bash, args, { encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: `--require="${capture.replace(/\\/g, '/')}"` } });
+      assert.equal(result.status, 0, result.stderr);
+      const received = JSON.parse(result.stdout);
+      const option = name => {
+        const inline = received.find(arg => arg.startsWith(`${name}=`));
+        return inline ? inline.slice(name.length + 1) : received[received.indexOf(name) + 1];
+      };
+      assert.equal(option('--base'), '/yl0126', `${wrapper} must not convert the remote path into a Windows path`);
+      assert.equal(option('--port'), '22');
+      assert.equal(path.resolve(option('--backup-dir')), localDirectory);
+      assert.equal(path.resolve(received[0]), cli);
+      assert.equal(received[1], action);
+      if (action !== 'backup') assert.equal(path.resolve(received[2]), localDirectory);
+    }
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
 test('the remote agent executes when delivered through SSH stdin', () => {

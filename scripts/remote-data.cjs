@@ -37,7 +37,12 @@ function filesUnder(base, relative = '') {
 
 function verifyArchive(archive, expectedSha) {
   if (expectedSha && sha256(archive) !== expectedSha) throw new Error('Backup SHA256 checksum mismatch');
-  const names = run('tar', ['-tzf', archive]).trim().split(/\r?\n/);
+  // GNU tar treats a drive-letter archive path as a remote host specification.
+  // Use the archive's directory as cwd and a local filename for GNU/BSD tar.
+  const archivePath = path.resolve(archive);
+  const archiveFile = path.basename(archivePath);
+  const tarOptions = { cwd: path.dirname(archivePath) };
+  const names = run('tar', ['-tzf', archiveFile], tarOptions).trim().split(/\r?\n/);
   for (const raw of names) {
     const name = raw.replace(/^\.\//, '').replace(/\/$/, '');
     if (!name || name.includes('\\') || name.split('/').some(p => p === '..' || p === '.') ||
@@ -45,14 +50,14 @@ function verifyArchive(archive, expectedSha) {
       throw new Error(`Invalid archive member: ${raw}`);
     }
   }
-  const listing = run('tar', ['-tvzf', archive]);
+  const listing = run('tar', ['-tvzf', archiveFile], tarOptions);
   if (listing.split(/\r?\n/).filter(Boolean).some(line => !/^[-d]/.test(line))) {
     throw new Error('Archive links and special files are not allowed');
   }
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'yl-verify-'));
   fs.chmodSync(directory, 0o700);
   try {
-    run('tar', ['-xzf', archive, '-C', directory]);
+    run('tar', ['-xzf', archiveFile, '-C', directory], tarOptions);
     const metadata = JSON.parse(fs.readFileSync(path.join(directory, 'metadata.json'), 'utf8'));
     if (metadata.formatVersion !== 1 || !metadata.files || !metadata.database ||
         !/^[a-zA-Z0-9_]+$/.test(metadata.database.characterSet) ||
