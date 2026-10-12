@@ -1,24 +1,13 @@
 import moment from 'moment';
+import defaultShiftRules from '../server/config/shift-defaults.json';
 
-const startDateList = [
-  { startDate: moment('2024-12-27'), shifts: ['白班', '白班', '夜班', '休息', '休息', '夜班', '休息', '休息'] },
-  { startDate: moment('2025-11-20'), shifts: ['白班', '白班', '休息', '夜班', '夜班', '休息', '休息', '休息'] },
-  { startDate: moment('2026-01-24'), shifts: ['白班', '白班', '休息', '夜班', '夜班', '休息', '休息', '休息'] },
-  { startDate: moment('2026-10-05'), shifts: ['白班', '白班', '休息', '夜班', '夜班', '休息', '休息', '休息'] },
-];
-
-export const getShift = (date) => {
-  for (let i = startDateList.length - 1; i >= 0; i--) {
-    if (date.isSameOrAfter(startDateList[i].startDate, 'day')) {
-      const { startDate, shifts } = startDateList[i];
-      const diffDays = date.diff(startDate, 'days');
-      return shifts[(diffDays % 8 + 8) % 8];
-    }
-  }
-  // 如果日期早于所有已知起始日期，使用第一个起始日期计算
-  const { startDate, shifts } = startDateList[0];
-    const diffDays = date.diff(startDate, 'days');
-    return shifts[(diffDays % 8 + 8) % 8];
+export const getShift = (date, rules = defaultShiftRules) => {
+  if (!Array.isArray(rules) || !rules.length) return '';
+  const ordered = [...rules].sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const day = moment(date).startOf('day');
+  const rule = [...ordered].reverse().find(item => day.isSameOrAfter(moment(item.startDate, 'YYYY-MM-DD', true), 'day')) || ordered[0];
+  const diffDays = day.diff(moment(rule.startDate, 'YYYY-MM-DD', true), 'days');
+  return rule.shifts[(diffDays % rule.shifts.length + rule.shifts.length) % rule.shifts.length];
 };
 
 // moment('2025-01-14')

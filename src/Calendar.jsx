@@ -1,8 +1,11 @@
 import moment from 'moment';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import './Calendar.css';
 import { getDaysTogether, getMenstrualState, getShift } from './utils';
-import { Box } from '@mui/material';
+import { Alert, Box, Button } from '@mui/material';
+import defaultRules from '../server/config/shift-defaults.json';
+import ShiftSettings from './ShiftSettings';
+import { loadShiftSettings } from './shiftSettingsApi';
 
 const 经期状态映射 = {
   经期: '腰酸、烦躁、疲惫、压力大',
@@ -18,6 +21,31 @@ const Calendar = () => {
   const [startX, setStartX] = useState(0);
   const [translateX, setTranslateX] = useState(0); // 用于水平拖拽偏移
   const [selectedDate, setSelectedDate] = useState(today);
+  const [settings, setSettings] = useState({ rules: defaultRules, version: null });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [settingsError, setSettingsError] = useState('');
+  const [savedNotice, setSavedNotice] = useState(false);
+
+  const reloadSettings = useCallback(async signal => {
+    setLoadingSettings(true);
+    setSettingsError('');
+    try {
+      const loaded = await loadShiftSettings(signal);
+      setSettings(loaded);
+      return loaded;
+    } catch (error) {
+      if (error.name !== 'AbortError') setSettingsError('无法读取排班设置，当前按已加载的规则显示。请重新加载后再修改。');
+    } finally {
+      if (!signal?.aborted) setLoadingSettings(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    reloadSettings(controller.signal);
+    return () => controller.abort();
+  }, [reloadSettings]);
 
   // 开始触摸时记录起始 X 坐标
   const onTouchStart = (e) => {
@@ -79,7 +107,7 @@ const Calendar = () => {
       const isCurrentMonth = day.month() === currentMonth.month();
       const isToday = day.isSame(today, 'day');
       const isSelected = day.isSame(selectedDate, 'day');
-      const shift = getShift(day);
+      const shift = getShift(day, settings.rules);
       // const menstrualState = getMenstrualState(day); // 获取经期状态
 
       days.push(
@@ -110,6 +138,12 @@ const Calendar = () => {
     <Box sx={{ p: 1 }}>
       <div
         className="calendar-container">
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button size="small" onClick={() => { setSavedNotice(false); setSettingsOpen(true) }} disabled={loadingSettings || settings.version === null}>排班设置</Button>
+        </Box>
+        {loadingSettings && <Alert severity="info">正在加载排班设置…</Alert>}
+        {settingsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
+        {savedNotice && <Alert severity="success" onClose={() => setSavedNotice(false)}>排班设置已保存</Alert>}
         <div className="header">
           <button onClick={handleSlidePrevious}>
             ←
@@ -137,11 +171,12 @@ const Calendar = () => {
           {generateCalendar()}
         </div>
         <div className="selected-date-info">
-          <p>{selectedDate.format('YYYY年MM月DD日')} {getShift(selectedDate)}</p>
+          <p>{selectedDate.format('YYYY年MM月DD日')} {getShift(selectedDate, settings.rules)}</p>
           <p>第 {getDaysTogether(selectedDate)} 天</p>
           {/* <p>{经期状态映射[state]}</p> */}
         </div>
       </div>
+      <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onReload={() => reloadSettings()} onSaved={saved => { setSettings(saved); setSettingsOpen(false); setSavedNotice(true) }} />
     </Box>
   );
 };

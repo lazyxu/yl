@@ -7,7 +7,7 @@ const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 
-test('real MySQL backup restores rows, binary uploads, and optional configuration', { skip: !process.env.BACKUP_TEST_MYSQL }, () => {
+test('real MySQL backup restores rows, shift settings, binary uploads, and optional configuration', { skip: !process.env.BACKUP_TEST_MYSQL }, () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yl-roundtrip-'));
   const base = path.join(tmp, 'app');
   const backups = path.join(tmp, 'backups');
@@ -36,10 +36,13 @@ test('real MySQL backup restores rows, binary uploads, and optional configuratio
     const photo = Buffer.from([0, 1, 2, 255, 128, 0, 90]);
     fs.writeFileSync(path.join(base, 'uploads/photo.bin'), photo);
     mysql(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE TABLE \`${database}\`.reminders (id INT PRIMARY KEY, note TEXT, image_path TEXT) ENGINE=InnoDB; INSERT INTO \`${database}\`.reminders VALUES (1,'备份恢复验证','photo.bin');`);
+    const shiftRules = [{ startDate: '2026-10-12', shifts: ['休息', '夜班', '白班'] }];
+    mysql(`CREATE TABLE \`${database}\`.app_settings (\`key\` VARCHAR(64) PRIMARY KEY, value JSON NOT NULL, version INT UNSIGNED NOT NULL) ENGINE=InnoDB; INSERT INTO \`${database}\`.app_settings VALUES ('shift-rules','${JSON.stringify(shiftRules)}',7);`);
     cli(['backup', '--local', '--base', base, '--backup-dir', backups]);
     const saved = path.join(backups, fs.readdirSync(backups)[0]);
     cli(['verify', saved]);
     mysql(`UPDATE \`${database}\`.reminders SET note='changed'; CREATE TABLE \`${database}\`.extra_table (id INT) ENGINE=InnoDB;`);
+    mysql(`UPDATE \`${database}\`.app_settings SET value=JSON_ARRAY(), version=8 WHERE \`key\`='shift-rules';`);
     fs.writeFileSync(path.join(base, 'uploads/photo.bin'), 'changed');
     fs.writeFileSync(path.join(base, 'uploads/extra.bin'), 'extra');
     fs.writeFileSync(path.join(base, '.env'), env.replace('original', 'changed'));
@@ -63,9 +66,12 @@ test('real MySQL backup restores rows, binary uploads, and optional configuratio
     }
     cli(['restore', saved, '--local', '--base', base, '--backup-dir', backups]);
     assert.equal(mysql(`SELECT note FROM \`${database}\`.reminders`), 'changed', 'preview must leave the target unchanged');
+    assert.equal(mysql(`SELECT version FROM \`${database}\`.app_settings WHERE \`key\`='shift-rules'`), '8', 'preview must preserve changed settings');
     const backupsBeforeApply = fs.readdirSync(backups).length;
     cli(['restore', saved, '--local', '--base', base, '--backup-dir', backups, '--apply', '--no-pm2']);
     assert.equal(mysql(`SELECT note FROM \`${database}\`.reminders`), '备份恢复验证');
+    assert.deepEqual(JSON.parse(mysql(`SELECT value FROM \`${database}\`.app_settings WHERE \`key\`='shift-rules'`)), shiftRules);
+    assert.equal(mysql(`SELECT version FROM \`${database}\`.app_settings WHERE \`key\`='shift-rules'`), '7');
     assert.equal(mysql(`SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='${database}' AND TABLE_NAME='extra_table'`), '0');
     assert.deepEqual(fs.readFileSync(path.join(base, 'uploads/photo.bin')), photo);
     assert.equal(fs.existsSync(path.join(base, 'uploads/extra.bin')), false);

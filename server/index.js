@@ -14,6 +14,7 @@ const sequelize = require('./sequelize');
 const remindersRouter = require('./routes/reminders');
 const inventoryRouter = require('./routes/inventory');
 const uploadRouter = require('./routes/upload');
+const settingsRouter = require('./routes/settings');
 const mysql = require('mysql2/promise');
 
 const app = express();
@@ -22,6 +23,7 @@ const corsOptions = {
   credentials: true,
 };
 app.use(cors(corsOptions));
+app.use('/api/settings/shifts', settingsRouter);
 app.use(express.json());
 
 app.use('/api/reminders', remindersRouter);
@@ -48,7 +50,8 @@ if (distPath) {
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   if (res.headersSent) return next(err);
-  res.status(500).json({ error: err && err.message ? err.message : 'internal server error' });
+  if (err.type === 'entity.too.large') return res.status(413).json({ error: '请求内容过大，请减少设置后重试' });
+  res.status(err.status === 400 ? 400 : 500).json({ error: err && err.message ? err.message : 'internal server error' });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -78,11 +81,19 @@ async function start() {
     await sequelize.authenticate();
     // sync with alter to add new nullable columns like image_path
     await sequelize.sync({ alter: true });
-    app.listen(PORT, HOST, () => console.log(`Server started on ${HOST}:${PORT}`));
+    await settingsRouter.initializeShiftSettings();
+    return await new Promise((resolve, reject) => {
+      const server = app.listen(PORT, HOST, () => {
+        console.log(`Server started on ${HOST}:${server.address().port}`);
+        resolve(server);
+      });
+      server.once('error', reject);
+    });
   } catch (err) {
     console.error('Failed to start server', err);
     process.exit(1);
   }
 }
 
-start();
+if (require.main === module) start();
+module.exports = { start };
