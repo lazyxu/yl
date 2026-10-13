@@ -46,6 +46,17 @@
 .shift-edit-day .MuiIconButton-root { color: #8b97a8; }
 .shift-edit-day .MuiIconButton-root.Mui-disabled { color: #c4cbd5; }
 .shift-editor-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.shift-edit-dialog .shift-settings-content { padding-top: 20px; }
+.shift-settings-dialog .shift-confirm-actions { padding: 12px 18px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid #e6eaf0; }
+.shift-confirm-actions > button { flex: 1; }
+.shift-edit-hint { font-size: 13px; color: #637187; margin: 16px 0; }
+.shift-sort-days { display: grid; gap: 8px; }
+.shift-sort-day { display: flex; align-items: center; gap: 8px; padding: 6px; background: #fff; border: 1px solid #e0e6ef; border-radius: 10px; }
+.shift-sort-day > label { flex: 1; min-width: 0; display: grid; gap: 4px; color: #637187; font-size: 12px; }
+.shift-sort-day select { width: 100%; min-width: 0; height: 44px; border: 0; border-radius: 8px; padding: 6px; font: inherit; font-size: 16px; }
+.shift-sort-day .shift-drag-handle { touch-action: none; -webkit-touch-callout: none; user-select: none; cursor: grab; color: #76869e; }
+.shift-sort-day.shift-day-dragging { border-color: #1976d2; box-shadow: 0 2px 8px #1976d233; }
+.shift-day-dragging .shift-drag-handle { cursor: grabbing; }
 @media (max-width: 600px) {
   .shift-settings-dialog .MuiDialog-paper { border-radius: 0; height: 100%; }
   @supports (height: 100dvh) { .shift-settings-dialog .MuiDialog-paper { max-height: 100dvh; } }
