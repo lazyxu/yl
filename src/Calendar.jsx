@@ -6,6 +6,7 @@ import { Alert, Box, Button } from '@mui/material';
 import defaultRules from '../server/config/shift-defaults.json';
 import ShiftSettings from './ShiftSettings';
 import { loadShiftSettings } from './shiftSettingsApi';
+import { shiftStyle } from './shifts';
 
 const 经期状态映射 = {
   经期: '腰酸、烦躁、疲惫、压力大',
@@ -25,14 +26,13 @@ const Calendar = ({ active = true }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [settingsError, setSettingsError] = useState('');
-  const [savedNotice, setSavedNotice] = useState(false);
 
   const reloadSettings = useCallback(async signal => {
     setLoadingSettings(true);
     setSettingsError('');
     try {
       const loaded = await loadShiftSettings(signal);
-      setSettings(loaded);
+      setSettings(current => current.version === null || loaded.version >= current.version ? loaded : current);
       return loaded;
     } catch (error) {
       if (error.name !== 'AbortError') setSettingsError('无法读取排班设置，当前按已加载的规则显示。请重新加载后再修改。');
@@ -125,6 +125,7 @@ const Calendar = ({ active = true }) => {
           </div>
           <div
             className={`shift ${shift}`}
+            style={shiftStyle(shift)}
           >
             {shift}
           </div>
@@ -140,11 +141,10 @@ const Calendar = ({ active = true }) => {
       <div
         className="calendar-container">
         <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button size="small" onClick={() => { setSavedNotice(false); setSettingsOpen(true) }} disabled={loadingSettings || settings.version === null}>排班设置</Button>
+          <Button size="small" onClick={() => setSettingsOpen(true)} disabled={loadingSettings || settings.version === null}>排班设置</Button>
         </Box>
         {loadingSettings && <Alert severity="info">正在加载排班设置…</Alert>}
         {settingsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
-        {savedNotice && <Alert severity="success" onClose={() => setSavedNotice(false)}>排班设置已保存</Alert>}
         <div className="header">
           <button onClick={handleSlidePrevious}>
             ←
@@ -177,7 +177,7 @@ const Calendar = ({ active = true }) => {
           {/* <p>{经期状态映射[state]}</p> */}
         </div>
       </div>
-      <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onReload={() => reloadSettings()} onSaved={saved => { setSettings(saved); setSettingsOpen(false); setSavedNotice(true) }} />
+      <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onReload={() => reloadSettings()} onSaved={setSettings} />
     </Box>
   );
 };

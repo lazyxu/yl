@@ -1,0 +1,57 @@
+.shift-settings-dialog .MuiDialog-paper { border-radius: 18px; }
+.shift-settings-dialog[data-keyboard-open="true"] .MuiDialog-container { align-items: flex-start; }
+.shift-settings-dialog .shift-settings-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 10px max(20px, env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid #e6eaf0; font-size: 20px;
+}
+.shift-settings-dialog .shift-settings-content {
+  padding: 18px max(18px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));
+  background: #f5f7fb; overscroll-behavior-y: contain;
+}
+.shift-settings-dialog button { min-height: 44px; }
+.shift-settings-dialog .MuiIconButton-root { width: 44px; height: 44px; flex: none; }
+.shift-settings-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.shift-settings-toolbar > .MuiButton-root { padding-inline: 20px; border-radius: 10px; }
+.shift-settings-toolbar > span { font-size: 13px; color: #526279; }
+.shift-settings-toolbar > .shift-sync-error { color: #a53c38; }
+.shift-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: #526279; margin-bottom: 22px; }
+.shift-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.shift-legend-item i { width: 12px; height: 12px; border-radius: 4px; }
+.shift-settings-error { margin-bottom: 20px; }
+.shift-settings-error .MuiAlert-message { min-width: 0; }
+.shift-settings-error .MuiAlert-action { align-items: center; }
+.shift-timeline-rule { position: relative; border-left: 2px solid #dae1ec; margin-left: 5px; padding: 0 0 24px 20px; }
+.shift-timeline-rule:last-child { border-color: transparent; padding-bottom: 0; }
+.shift-timeline-rule::before { content: ''; position: absolute; left: -6px; top: 14px; width: 10px; height: 10px; border-radius: 50%; background: #99a8bd; }
+.shift-timeline-rule.shift-rule-active::before { background: #1976d2; }
+.shift-rule-header { display: flex; gap: 6px; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+.shift-rule-header > div { min-width: 0; flex: 1; }
+.shift-rule-header > button { flex: none; min-width: 44px; padding-inline: 6px; }
+.shift-rule-date { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: #253248; font-weight: 600; font-size: 17px; padding-top: 8px; }
+.shift-rule-status { font-weight: 400; font-size: 11px; color: #526279; background: #e7ecf3; padding: 2px 6px; border-radius: 5px; }
+.shift-rule-active .shift-rule-status { color: #185ca3; background: #e3effe; }
+.shift-rule-interval { margin-top: 5px; color: #637187; font-size: 12px; overflow-wrap: anywhere; }
+.shift-cycle { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.shift-cycle-day { display: flex; flex-direction: column; gap: 3px; text-align: center; }
+.shift-day-number { font-size: 11px; color: #66758b; }
+.shift-cycle-chip { padding: 6px 2px; border-radius: 6px; font-size: 13px; }
+.shift-rule-editor { padding: 14px; margin-top: 14px; background: #fff; border: 1px solid #e0e6ef; border-radius: 12px; }
+.shift-date-field { display: grid; gap: 7px; font-size: 13px; color: #637187; }
+.shift-date-field input { width: 100%; min-width: 0; box-sizing: border-box; height: 44px; border: 1px solid #d4dce8; border-radius: 8px; padding: 8px; background: #fff; color: #253248; font: inherit; font-size: 16px; }
+.shift-edit-days { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 8px; margin: 18px 0 10px; }
+.shift-edit-day { display: flex; align-items: flex-end; min-width: 0; }
+.shift-edit-day > label { flex: 1; min-width: 0; display: grid; gap: 6px; color: #637187; font-size: 12px; }
+.shift-edit-day select { width: 100%; min-width: 0; height: 44px; border: 0; border-radius: 8px; padding-inline: 7px 0; font: inherit; font-size: 16px; }
+.shift-edit-day .MuiIconButton-root { color: #8b97a8; }
+.shift-edit-day .MuiIconButton-root.Mui-disabled { color: #c4cbd5; }
+.shift-editor-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .shift-settings-dialog .MuiDialog-paper { border-radius: 0; height: 100%; }
+  @supports (height: 100dvh) { .shift-settings-dialog .MuiDialog-paper { max-height: 100dvh; } }
+}
+@media (max-width: 360px) {
+  .shift-settings-dialog .shift-settings-content { padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+  .shift-timeline-rule { padding-left: 14px; }
+  .shift-rule-editor { padding: 10px; }
+}
