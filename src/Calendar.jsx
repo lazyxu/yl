@@ -1,5 +1,5 @@
 import moment from 'moment';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './Calendar.css';
 import { getDaysTogether, getMenstrualState, getShift } from './utils';
 import { Alert, Box, Button } from '@mui/material';
@@ -7,6 +7,9 @@ import defaultRules from '../server/config/shift-defaults.json';
 import ShiftSettings from './ShiftSettings';
 import { loadShiftSettings } from './shiftSettingsApi';
 import { shiftStyle } from './shifts';
+import CalendarDay from './CalendarDay';
+import DayShiftEditor from './DayShiftEditor';
+import { loadDayShifts } from './shiftSettingsApi';
 
 const 经期状态映射 = {
   经期: '腰酸、烦躁、疲惫、压力大',
@@ -26,6 +29,11 @@ const Calendar = ({ active = true }) => {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [settingsError, setSettingsError] = useState('');
+  const [dayShifts, setDayShifts] = useState({ overrides: {}, version: null });
+  const [loadingDayShifts, setLoadingDayShifts] = useState(true);
+  const [dayShiftsError, setDayShiftsError] = useState('');
+  const [dayEditor, setDayEditor] = useState(null);
+  const gestureBlocked = useRef(false);
 
   const reloadSettings = useCallback(async signal => {
     setLoadingSettings(true);
@@ -41,20 +49,47 @@ const Calendar = ({ active = true }) => {
     }
   }, []);
 
+  const reloadDayShifts = useCallback(async signal => {
+    setLoadingDayShifts(true); setDayShiftsError('');
+    try {
+      const loaded = await loadDayShifts(signal);
+      setDayShifts(current => current.version === null || loaded.version >= current.version ? loaded : current);
+      return loaded;
+    } catch (error) {
+      if (error.name !== 'AbortError') setDayShiftsError('无法读取单日调整，请重新加载后再修改。');
+    } finally { if (!signal?.aborted) setLoadingDayShifts(false); }
+  }, []);
+
   useEffect(() => {
     if (!active) { setSettingsOpen(false); return }
     const controller = new AbortController();
     reloadSettings(controller.signal);
+    reloadDayShifts(controller.signal);
     return () => controller.abort();
-  }, [active, reloadSettings]);
+  }, [active, reloadSettings, reloadDayShifts]);
+
+  const canAdjust = active && !loadingSettings && !loadingDayShifts && settings.version !== null && dayShifts.version !== null;
+  const shiftFor = day => {
+    const override = dayShifts.overrides[day.format('YYYY-MM-DD')];
+    return override?.shift || getShift(day, settings.rules);
+  };
+  const adjustDay = day => {
+    if (!canAdjust) return;
+    gestureBlocked.current = true;
+    setTranslateX(0);
+    setSelectedDate(day);
+    setDayEditor({ date: day.format('YYYY-MM-DD'), baseShift: getShift(day, settings.rules), snapshot: { ...dayShifts, overrides: { ...dayShifts.overrides } } });
+  };
 
   // 开始触摸时记录起始 X 坐标
   const onTouchStart = (e) => {
+    gestureBlocked.current = Boolean(dayEditor);
     setStartX(e.touches[0].clientX);
   };
 
   // 拖拽过程中更新 X 轴偏移
   const onTouchMove = (e) => {
+    if (gestureBlocked.current || dayEditor) return;
     const currentX = e.touches[0].clientX;
     const deltaX = currentX - startX;
     setTranslateX(deltaX);
@@ -62,6 +97,7 @@ const Calendar = ({ active = true }) => {
 
   // 释放触摸时根据水平滑动判断是否切换月份并复位偏移
   const onTouchEnd = (e) => {
+    if (gestureBlocked.current || dayEditor) { setTranslateX(0); return; }
     const endX = e.changedTouches[0].clientX;
     const threshold = 50; // 滑动距离阈值
     if (!transitionBuffer) {
@@ -108,15 +144,20 @@ const Calendar = ({ active = true }) => {
       const isCurrentMonth = day.month() === currentMonth.month();
       const isToday = day.isSame(today, 'day');
       const isSelected = day.isSame(selectedDate, 'day');
-      const shift = getShift(day, settings.rules);
+      const shift = shiftFor(day);
+      const override = dayShifts.overrides[day.format('YYYY-MM-DD')];
       // const menstrualState = getMenstrualState(day); // 获取经期状态
 
       days.push(
-        <div
+        <CalendarDay
           key={day.format('YYYY-MM-DD')}
           style={isCurrentMonth ? {} : { opacity: 0.5 }}
           className={`day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
-          onClick={() => handleDateClick(day)}
+          data-date={day.format('YYYY-MM-DD')}
+          aria-label={`${day.format('YYYY年MM月DD日')} ${shift}${override?.kind === 'swap' ? '，换班' : ''}`}
+          canAdjust={canAdjust}
+          onSelect={() => handleDateClick(day)}
+          onAdjust={() => adjustDay(day)}
         >
           <div
             className={`date`}
@@ -129,7 +170,8 @@ const Calendar = ({ active = true }) => {
           >
             {shift}
           </div>
-        </div>
+          {override?.kind === 'swap' && <span className="day-adjustment-mark" aria-hidden="true">换</span>}
+        </CalendarDay>
       );
       currentDay.add(1, 'day');
     }
@@ -145,6 +187,7 @@ const Calendar = ({ active = true }) => {
         </Box>
         {loadingSettings && <Alert severity="info">正在加载排班设置…</Alert>}
         {settingsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
+        {dayShiftsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
         <div className="header">
           <button onClick={handleSlidePrevious}>
             ←
@@ -172,12 +215,17 @@ const Calendar = ({ active = true }) => {
           {generateCalendar()}
         </div>
         <div className="selected-date-info">
-          <p>{selectedDate.format('YYYY年MM月DD日')} {getShift(selectedDate, settings.rules)}</p>
+          <p>{selectedDate.format('YYYY年MM月DD日')} {shiftFor(selectedDate)}</p>
+          {dayShifts.overrides[selectedDate.format('YYYY-MM-DD')]?.kind === 'swap' && <p>与 {dayShifts.overrides[selectedDate.format('YYYY-MM-DD')].partner} 换班</p>}
+          {dayShifts.overrides[selectedDate.format('YYYY-MM-DD')]?.note && <p className="day-adjustment-note">{dayShifts.overrides[selectedDate.format('YYYY-MM-DD')].note}</p>}
+          <Button onClick={() => adjustDay(selectedDate)} disabled={!canAdjust}>调整当天排班</Button>
           <p>第 {getDaysTogether(selectedDate)} 天</p>
           {/* <p>{经期状态映射[state]}</p> */}
         </div>
       </div>
       <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onReload={() => reloadSettings()} onSaved={setSettings} />
+      {dayEditor && <DayShiftEditor key={dayEditor.date} {...dayEditor} open={active} onCancel={() => setDayEditor(null)} onReload={reloadDayShifts}
+        onSaved={saved => { setDayShifts(current => current.version === null || saved.version >= current.version ? saved : current); setDayEditor(null); }} />}
     </Box>
   );
 };

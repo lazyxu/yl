@@ -37,12 +37,15 @@ test('real MySQL backup restores rows, shift settings, binary uploads, and optio
     fs.writeFileSync(path.join(base, 'uploads/photo.bin'), photo);
     mysql(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE TABLE \`${database}\`.reminders (id INT PRIMARY KEY, note TEXT, image_path TEXT) ENGINE=InnoDB; INSERT INTO \`${database}\`.reminders VALUES (1,'备份恢复验证','photo.bin');`);
     const shiftRules = [{ startDate: '2026-10-12', shifts: ['休息', '夜班', '白班'] }];
+    const dayOverrides = { '2026-10-13': { kind: 'swap', shift: '夜班', partner: '同事甲', note: '单日恢复验证' } };
     mysql(`CREATE TABLE \`${database}\`.app_settings (\`key\` VARCHAR(64) PRIMARY KEY, value JSON NOT NULL, version INT UNSIGNED NOT NULL) ENGINE=InnoDB; INSERT INTO \`${database}\`.app_settings VALUES ('shift-rules','${JSON.stringify(shiftRules)}',7);`);
+    mysql(`INSERT INTO \`${database}\`.app_settings VALUES ('shift-day-overrides','${JSON.stringify(dayOverrides)}',2);`);
     cli(['backup', '--local', '--base', base, '--backup-dir', backups]);
     const saved = path.join(backups, fs.readdirSync(backups)[0]);
     cli(['verify', saved]);
     mysql(`UPDATE \`${database}\`.reminders SET note='changed'; CREATE TABLE \`${database}\`.extra_table (id INT) ENGINE=InnoDB;`);
     mysql(`UPDATE \`${database}\`.app_settings SET value=JSON_ARRAY(), version=8 WHERE \`key\`='shift-rules';`);
+    mysql(`UPDATE \`${database}\`.app_settings SET value=JSON_OBJECT(), version=3 WHERE \`key\`='shift-day-overrides';`);
     fs.writeFileSync(path.join(base, 'uploads/photo.bin'), 'changed');
     fs.writeFileSync(path.join(base, 'uploads/extra.bin'), 'extra');
     fs.writeFileSync(path.join(base, '.env'), env.replace('original', 'changed'));
@@ -72,6 +75,8 @@ test('real MySQL backup restores rows, shift settings, binary uploads, and optio
     assert.equal(mysql(`SELECT note FROM \`${database}\`.reminders`), '备份恢复验证');
     assert.deepEqual(JSON.parse(mysql(`SELECT value FROM \`${database}\`.app_settings WHERE \`key\`='shift-rules'`)), shiftRules);
     assert.equal(mysql(`SELECT version FROM \`${database}\`.app_settings WHERE \`key\`='shift-rules'`), '7');
+    assert.deepEqual(JSON.parse(mysql(`SELECT value FROM \`${database}\`.app_settings WHERE \`key\`='shift-day-overrides'`)), dayOverrides);
+    assert.equal(mysql(`SELECT version FROM \`${database}\`.app_settings WHERE \`key\`='shift-day-overrides'`), '2');
     assert.equal(mysql(`SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='${database}' AND TABLE_NAME='extra_table'`), '0');
     assert.deepEqual(fs.readFileSync(path.join(base, 'uploads/photo.bin')), photo);
     assert.equal(fs.existsSync(path.join(base, 'uploads/extra.bin')), false);

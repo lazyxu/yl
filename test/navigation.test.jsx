@@ -94,6 +94,17 @@ test('拼豆子页有明确的主导航归属，浏览器后退后仍保留日�
   expect(document.querySelector('.header h2').textContent).toBe(chosenMonth)
 })
 
+test('日历与拼豆主页不重复显示顶部标题栏，子页保留返回库存', async () => {
+  await mount()
+  expect(host.querySelector('.app-header')).toBeNull()
+  expect(button('日历').getAttribute('aria-current')).toBe('page')
+  await click('拼豆')
+  expect(host.querySelector('.app-header')).toBeNull()
+  expect(button('拼豆').getAttribute('aria-current')).toBe('page')
+  await click('补豆')
+  expect(button('返回库存')).toBeTruthy()
+})
+
 test('库存筛选和排序在跨模块切换后保留', async () => {
   global.fetch = jest.fn(async url => ({
     ok: true, status: 200, statusText: 'OK',

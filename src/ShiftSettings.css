@@ -39,6 +39,10 @@
 .shift-rule-editor { padding: 14px; margin-top: 14px; background: #fff; border: 1px solid #e0e6ef; border-radius: 12px; }
 .shift-date-field { display: grid; gap: 7px; font-size: 13px; color: #637187; }
 .shift-date-field input { width: 100%; min-width: 0; box-sizing: border-box; height: 44px; border: 1px solid #d4dce8; border-radius: 8px; padding: 8px; background: #fff; color: #253248; font: inherit; font-size: 16px; }
+.shift-date-field select, .shift-date-field textarea { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; border: 1px solid #d4dce8; border-radius: 8px; padding: 8px; background: #fff; color: #253248; font: inherit; font-size: 16px; }
+.shift-date-field + .shift-date-field { margin-top: 16px; }
+.shift-day-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; color: #253248; }
+.shift-day-title .shift-cycle-chip { padding-inline: 12px; }
 .shift-edit-days { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 8px; margin: 18px 0 10px; }
 .shift-edit-day { display: flex; align-items: flex-end; min-width: 0; }
 .shift-edit-day > label { flex: 1; min-width: 0; display: grid; gap: 6px; color: #637187; font-size: 12px; }

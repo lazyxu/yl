@@ -15,6 +15,7 @@ const remindersRouter = require('./routes/reminders');
 const inventoryRouter = require('./routes/inventory');
 const uploadRouter = require('./routes/upload');
 const settingsRouter = require('./routes/settings');
+const dayShiftsRouter = require('./routes/day-shifts');
 const mysql = require('mysql2/promise');
 
 const app = express();
@@ -23,6 +24,7 @@ const corsOptions = {
   credentials: true,
 };
 app.use(cors(corsOptions));
+app.use('/api/settings/shifts/overrides', dayShiftsRouter);
 app.use('/api/settings/shifts', settingsRouter);
 app.use(express.json());
 

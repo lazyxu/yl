@@ -5,7 +5,7 @@ import ShiftEditDialog from './ShiftEditDialog'
 import SortableShiftDays from './SortableShiftDays'
 import { saveShiftSettings } from './shiftSettingsApi'
 
-export default function ShiftRuleEditor({ rule, snapshot, onCancel, onSaved, onReload }) {
+export default function ShiftRuleEditor({ open = true, rule, snapshot, onCancel, onSaved, onReload }) {
   const [startDate, setStartDate] = useState(rule?.startDate || '')
   const [days, setDays] = useState(() => (rule?.shifts || snapshot.rules[snapshot.rules.length - 1].shifts).map((shift, id) => ({ id, shift })))
   const nextId = useRef(days.length)
@@ -32,7 +32,7 @@ export default function ShiftRuleEditor({ rule, snapshot, onCancel, onSaved, onR
     catch { setError({ message: '重新加载失败，草稿仍保留', status: 409 }) }
     finally { busy.current = false; setSaving(false) }
   }
-  return <ShiftEditDialog title={rule ? '编辑排班' : '新增排班'} titleId="shift-rule-editor-title" saving={saving} onCancel={onCancel} onConfirm={() => confirm()} confirmDisabled={locked || deleting}>
+  return <ShiftEditDialog open={open} title={rule ? '编辑排班' : '新增排班'} titleId="shift-rule-editor-title" saving={saving} onCancel={onCancel} onConfirm={() => confirm()} confirmDisabled={locked || deleting}>
     {error && <Alert severity="error" action={locked ? <Button color="inherit" onClick={reload} disabled={saving}>重新加载</Button> : undefined}>{error.message}{locked && '。重新加载后关闭弹窗，请重新编辑。'}</Alert>}
     <label className="shift-date-field">生效日期<input type="date" aria-label="生效日期" value={startDate} disabled={saving || locked} onChange={event => update(() => setStartDate(event.target.value))} /></label>
     <p className="shift-edit-hint">长按左侧拖动柄调整顺序，确认后按新顺序循环。键盘可用 Alt＋方向键。</p>

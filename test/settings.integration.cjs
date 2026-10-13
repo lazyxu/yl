@@ -21,8 +21,10 @@ test('MySQL API seeds defaults, persists edits across restart, rejects invalid a
     await admin.query(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
     sequelize = require('../server/sequelize');
     const router = require('../server/routes/settings');
+    const dayRouter = require('../server/routes/day-shifts');
     await sequelize.sync();
     const app = express();
+    app.use('/api/settings/shifts/overrides', dayRouter);
     app.use('/api/settings/shifts', router);
     const listen = () => new Promise(resolve => { server = app.listen(0, '0.0.0.0', resolve); });
     await listen();
@@ -48,6 +50,23 @@ test('MySQL API seeds defaults, persists edits across restart, rejects invalid a
       save([{ startDate: '2026-10-12', shifts: ['夜班'] }], updated.version),
     ]);
     assert.deepEqual(concurrent.map(r => r.status).sort(), [200, 409], 'only one simultaneous save may succeed');
+    const dayApi = () => `${api()}/overrides`;
+    const initialDays = await fetch(dayApi()).then(r => r.json());
+    assert.deepEqual(initialDays, { overrides: {}, version: 0 });
+    const saveDay = (date, override, version) => fetch(`${dayApi()}/${date}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ override, version }) });
+    const standby = { kind: 'standby', shift: '备班', partner: '', note: '临时备班' };
+    const swap = { kind: 'swap', shift: '夜班', partner: '同事甲', note: '换班验证' };
+    assert.equal((await saveDay('2026-10-13', standby, 0)).status, 200);
+    assert.equal((await saveDay('2026-10-14', swap, 1)).status, 200);
+    assert.equal((await saveDay('2026-02-30', null, 2)).status, 400);
+    assert.equal((await saveDay('2026-10-15', { kind: 'swap', shift: '白班', partner: '' }, 2)).status, 400);
+    assert.equal((await saveDay('2026-10-15', standby, 0)).status, 409);
+    const concurrentDays = await Promise.all([saveDay('2026-10-15', standby, 2), saveDay('2026-10-16', swap, 2)]);
+    assert.deepEqual(concurrentDays.map(r => r.status).sort(), [200, 409]);
+    assert.equal((await saveDay('2026-10-13', null, 3)).status, 200);
+    const persistedDays = await fetch(dayApi()).then(r => r.json());
+    assert.equal(persistedDays.overrides['2026-10-13'], undefined);
+    assert.deepEqual(persistedDays.overrides['2026-10-14'], swap, 'editing or clearing one date must preserve other dates');
     const latest = await fetch(api()).then(r => r.json());
     const largeRules = Array.from({ length: 100 }, (_, i) => ({
       startDate: new Date(Date.UTC(2027, 0, i + 1)).toISOString().slice(0, 10),
@@ -75,6 +94,7 @@ test('MySQL API seeds defaults, persists edits across restart, rejects invalid a
       freshProcess.once('exit', code => { clearTimeout(deadline); reject(new Error(`Fresh backend exited (${code}): ${stderr}`)); });
     });
     assert.deepEqual(await fetch(`http://127.0.0.1:${freshPort}/api/settings/shifts`).then(r => r.json()), persisted, 'a fresh index.js process must keep database settings');
+    assert.deepEqual(await fetch(`http://127.0.0.1:${freshPort}/api/settings/shifts/overrides`).then(r => r.json()), persistedDays, 'standby, swaps and notes must survive a fresh backend process');
     const row = await sequelize.query('SELECT value FROM app_settings WHERE `key` = "shift-rules"', { type: sequelize.QueryTypes.SELECT });
     assert.equal(row.length, 1);
     assert.deepEqual(typeof row[0].value === 'string' ? JSON.parse(row[0].value) : row[0].value, largeRules);

@@ -28,6 +28,6 @@ export default function ShiftSettings({ open, settings, onClose, onSaved, onRelo
         </section>)}</div>
       </DialogContent>
     </Dialog>
-    {open && editor && <ShiftRuleEditor {...editor} onCancel={() => setEditor(null)} onSaved={saved => { onSaved(saved); setEditor(null) }} onReload={onReload} />}
+    {editor && <ShiftRuleEditor {...editor} open={open} onCancel={() => setEditor(null)} onSaved={saved => { onSaved(saved); setEditor(null) }} onReload={onReload} />}
   </>
 }

@@ -44,6 +44,7 @@ body { overflow: hidden; }
   min-height: 0;
   min-width: 0;
 }
+.app-shell[data-module-page="true"] .app-content { margin-top: env(safe-area-inset-top, 0px); }
 
 .app-page {
   position: absolute;

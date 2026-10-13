@@ -56,6 +56,7 @@ function App() {
   const { keyboardOpen, height } = useKeyboardViewport()
   const primaryView = view === '日历' ? '日历' : '拼豆'
   const isForm = view === '补豆' || view === '消耗'
+  const isModulePage = view === '日历' || view === '拼豆'
 
   useEffect(() => {
     currentView.current = view
@@ -89,11 +90,11 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <div className="app-shell" data-keyboard-open={keyboardOpen} style={keyboardOpen ? { '--keyboard-height': `${height}px` } : undefined}>
-        <header className="app-header">
-          {view !== '日历' && view !== '拼豆' && <IconButton aria-label="返回库存" disabled={formBusy} onClick={() => navigateToView('拼豆')}><ArrowBackIcon /></IconButton>}
+      <div className="app-shell" data-module-page={isModulePage} data-keyboard-open={keyboardOpen} style={keyboardOpen ? { '--keyboard-height': `${height}px` } : undefined}>
+        {!isModulePage && <header className="app-header">
+          <IconButton aria-label="返回库存" disabled={formBusy} onClick={() => navigateToView('拼豆')}><ArrowBackIcon /></IconButton>
           <Typography component="h1" className="app-title">{view}</Typography>
-        </header>
+        </header>}
         <main className="app-content">
           {(visited.has('日历') || view === '日历') && <Page name="日历" active={view === '日历'} positions={positions}><Calendar active={view === '日历'} /></Page>}
           {(visited.has('拼豆') || view === '拼豆') && <Page name="拼豆" active={view === '拼豆'} positions={positions}><Inventory active={view === '拼豆'} onAction={openPindouWith} refreshKey={inventoryRefreshKey} onNavigate={navigateToView} /></Page>}
