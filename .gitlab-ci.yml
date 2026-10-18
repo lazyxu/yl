@@ -22,6 +22,7 @@ test-and-build:
     - node --test test/deployment.test.cjs test/garden-validation.test.cjs
     - bash -n release.sh release_deploy.sh backup_data.sh restore_data.sh verify_backup.sh scripts/data-command.sh
     - npm run build
+    - node --test test/pwa.test.cjs
   artifacts:
     paths:
       - dist/
