@@ -418,7 +418,12 @@ export default function Garden({ active = true }) {
     {selectedPlant ? <FlowerDetail key={selectedPlant} id={selectedPlant} active={active} species={species} onBack={() => goPlant(null)} onChange={refresh} onSpecies={fetchSpecies} notify={notify} /> :
       <Box className="garden-enter">
         <SectionTitle title="我的花园" detail="一起记录每一次生长。"
-          action={<Button variant="contained" color="success" startIcon={<Add />} onClick={() => setCreating(true)}>添加花卉</Button>} />
+          action={<Stack direction="row" gap={.5} alignItems="center">
+            <IconButton component="a" href="/api/garden/export" title="导出花园数据（含照片原图）" aria-label="导出花园数据">
+              <DownloadOutlined />
+            </IconButton>
+            <Button variant="contained" color="success" startIcon={<Add />} onClick={() => setCreating(true)}>添加花卉</Button>
+          </Stack>} />
         <Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 2 }}><Tab label="花卉" icon={<YardOutlined />} iconPosition="start" /><Tab label="成长日历" icon={<CalendarMonthOutlined />} iconPosition="start" /></Tabs>
         {tab === 0 ? <>
           <Stack spacing={1.4} mb={2}>

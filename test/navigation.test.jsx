@@ -322,3 +322,10 @@ test('花园是第三个一级模块，默认仍为日历，切回拼豆保持�
   await click('日历')
   expect(button('日历').getAttribute('aria-current')).toBe('page')
 })
+
+test('花园提供完整备份下载入口', async () => {
+  await mount('花园')
+  const link = document.querySelector('a[aria-label="导出花园数据"]')
+  expect(link).not.toBeNull()
+  expect(link.getAttribute('href')).toBe('/api/garden/export')
+})
