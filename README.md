@@ -1,4 +1,4 @@
-# 悦 & 亮
+# yl
 
 React/Vite 前端和 Express/MySQL 后端。GitLab `origin` 为主仓库，默认推送目标为 `origin`。
 
