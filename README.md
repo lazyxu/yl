@@ -10,7 +10,7 @@
 - **手机 PWA**：在支持的浏览器中通过 HTTPS 打开后可以安装到主屏幕；本阶段不承诺离线记录，Service Worker 不缓存 API 或照片。普通 HTTP 局域网地址通常无法安装为 PWA（localhost 例外）。
 - **不做家庭登录**：本阶段不包含登录、成员注册和权限管理。所有可访问当前 yl 的用户也能操作花园，包括修改/删除照片，公网使用者须自行通过现有服务器访问控制限制访问。
 - **数据持久化**：新表为 `garden_species`、`garden_plants`、`garden_entries`、`garden_photos`。媒体保存在 `server/uploads/garden/{originals,thumbs,previews}`；yue/yl 现有 `uploads` 备份/恢复递归覆盖这些文件。
-- **上传约束**：JPEG、PNG、WEBP、HEIC；单张 20 MiB，最多 8 张，总计 90 MiB。前端发送带毫秒的 ISO 时间，后端兼容时区与毫秒；花园首页提供下载完整 ZIP 原图与清单的入口。原图始终保留；Sharp 支持的格式生成 JPEG 缩略图和高分辨率预览。服务器环境缺少 HEIC 编码器时保留原图，在支持 HEIC 的客户端直接查看，其他客户端的 HEIC 预览可能不可用。
+- **上传约束**：JPEG、PNG、WEBP、HEIC；单张 20 MiB，最多 8 张，总计 90 MiB。前端提交带时区、精确到秒的 ISO 时间以兼容旧版服务器；后端仍兼容毫秒和时区偏移；花园首页提供下载完整 ZIP 原图与清单的入口。原图始终保留；Sharp 支持的格式生成 JPEG 缩略图和高分辨率预览。服务器环境缺少 HEIC 编码器时保留原图，在支持 HEIC 的客户端直接查看，其他客户端的 HEIC 预览可能不可用。
 - **备份/恢复和发布**：继续使用 `bash release_deploy.sh`（发布前 MySQL + uploads 备份）、`backup_data.sh`、`restore_data.sh`、PM2。发布前必须先通过 MySQL 新表集成测试；新版本不允许清空原日历或拼豆数据。
 - **本地验证**：`node --test test/garden-validation.test.cjs`；前端按原 `npm ci --legacy-peer-deps && npm run build`；MySQL 联调使用 `BACKUP_TEST_MYSQL=1 node --test test/garden.integration.cjs`（先安装 server 依赖并设置测试数据库环境）。
 

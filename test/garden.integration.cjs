@@ -52,7 +52,8 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     // Exercise the same payload builder used by the mobile camera UI.
     const { observedPayload } = await import('../src/gardenApi.js')
     const photoPayload = observedPayload('2026-10-18T21:00', '开花了', '家人')
-    assert.match(photoPayload.observed_at, /\.\d{3}Z$/)
+    assert.match(photoPayload.observed_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
+    assert.doesNotMatch(photoPayload.observed_at, /\.\d{3}Z$/)
     for (const [key, value] of Object.entries(photoPayload)) data.set(key, value)
     data.append('photos', new Blob([png], { type: 'image/png' }), 'flower.png')
     const entry = await request('/entries', { method: 'POST', body: data })
@@ -71,6 +72,7 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     const month = await request('/calendar')
     assert.equal(month.body[0].day, '2026-10-18')
     const updatedPayload = observedPayload('2026-10-18T22:00', '开花第二天', '另一位家人')
+    assert.match(updatedPayload.observed_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
     const update = await request('/entries/' + entry.body.id, json(updatedPayload, 'PATCH'))
     assert.equal(update.code, 200)
     assert.equal((await request('/entries?plant_id=' + id)).body.items[0].note, '开花第二天')
