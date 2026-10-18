@@ -113,7 +113,7 @@ function App() {
         </main>
         <footer className="app-footer" hidden={keyboardOpen}>
           <BottomNavigation component="nav" aria-label="主导航" showLabels value={primaryView}
-            onChange={(_, value) => navigateToView(value === '拼豆' ? lastPindouView.current : '日历')}>
+            onChange={(_, value) => navigateToView(value === '拼豆' ? lastPindouView.current : value)}>
             <BottomNavigationAction label="日历" value="日历" aria-current={primaryView === '日历' ? 'page' : undefined} icon={<CalendarMonthIcon />} disabled={formBusy} />
             <BottomNavigationAction label="拼豆" value="拼豆" aria-current={primaryView === '拼豆' ? 'page' : undefined} icon={<PaletteIcon />} disabled={formBusy} />
             <BottomNavigationAction label="花园" value="花园" aria-current={primaryView === '花园' ? 'page' : undefined} icon={<LocalFloristOutlinedIcon />} disabled={formBusy} />
