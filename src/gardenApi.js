@@ -17,8 +17,24 @@ export function localInputTime(date = new Date()) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
 export function observedPayload(input, note, author) {
+  // datetime-local values carry the user's wall time but no timezone suffix.
+  // Convert using the browser timezone, then send RFC 3339 at second precision:
+  // older deployed yl servers reject the millisecond suffix from toISOString().
+  const parts = typeof input === 'string'
+    ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(input)
+    : null
+  const date = parts ? new Date(input) : new Date(NaN)
+  if (!Number.isFinite(date.getTime()) ||
+    date.getFullYear() !== Number(parts?.[1]) ||
+    date.getMonth() + 1 !== Number(parts?.[2]) ||
+    date.getDate() !== Number(parts?.[3]) ||
+    date.getHours() !== Number(parts?.[4]) ||
+    date.getMinutes() !== Number(parts?.[5]) ||
+    (parts?.[6] != null && date.getSeconds() !== Number(parts[6]))) {
+    throw new Error('记录时间无效，请重新选择日期和时间')
+  }
   return {
-    observed_at: new Date(input).toISOString(),
+    observed_at: date.toISOString().replace(/\.\d{3}Z$/, 'Z'),
     local_date: input.slice(0, 10),
     note: note || '',
     author_name: author || '',

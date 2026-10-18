@@ -46,12 +46,18 @@ test('frontend observedPayload milliseconds are accepted by the API validator', 
   const { observedPayload } = await import('../src/gardenApi.js')
   // This uses the exact payload factory called by the mobile photo editor.
   const payload = observedPayload('2026-10-18T21:00', '开花了', '家人')
-  assert.match(payload.observed_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+  // The historic server accepts a timezone designator, but not milliseconds.
+  const historicBackend = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(Z|[+-]\d{2}:\d{2})$/
+  assert.match(payload.observed_at, historicBackend)
+  assert.doesNotMatch(payload.observed_at, /\.\d{3}Z$/)
   const saved = normalizeEntry(payload)
   assert.equal(saved.local_date, '2026-10-18')
   assert.equal(saved.author_name, '家人')
   assert.equal(saved.note, '开花了')
-  assert.equal(saved.observed_at.toISOString(), payload.observed_at)
+  assert.equal(saved.observed_at.toISOString(), payload.observed_at.replace(/Z$/, '.000Z'))
+  assert.throws(() => observedPayload('2026-02-30T12:30', '', ''), /无效/)
+  assert.throws(() => observedPayload('2026-10-18T25:00', '', ''), /无效/)
+  assert.throws(() => observedPayload('2026-10-18T21:00Z', '', ''), /无效/)
   const withOffset = normalizeEntry({
     observed_at: '2026-10-18T21:00:00.125+09:00',
     local_date: '2026-10-18',
