@@ -14,6 +14,8 @@ const sequelize = require('./sequelize');
 const remindersRouter = require('./routes/reminders');
 const inventoryRouter = require('./routes/inventory');
 const uploadRouter = require('./routes/upload');
+const gardenRouter = require('./routes/garden');
+// Load garden Sequelize models and associations before the startup schema sync.
 const settingsRouter = require('./routes/settings');
 const dayShiftsRouter = require('./routes/day-shifts');
 const mysql = require('mysql2/promise');
@@ -31,6 +33,7 @@ app.use(express.json());
 app.use('/api/reminders', remindersRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/garden', gardenRouter);
 
 // 如果存在前端构建产物，则让 Express 提供静态文件并回退到 index.html
 // 优先使用 server/dist（便于在发布目录直接从 server 运行），否则回退到 ../dist

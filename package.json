@@ -8,7 +8,9 @@
     "build": "vite build",
     "test": "jest",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prebuild": "node scripts/generate-pwa-icons.mjs",
+    "predev": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.12.0",

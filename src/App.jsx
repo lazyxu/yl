@@ -6,6 +6,7 @@ import IconButton from '@mui/material/IconButton'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
 import PaletteIcon from '@mui/icons-material/Palette'
+import LocalFloristOutlinedIcon from '@mui/icons-material/LocalFloristOutlined'
 import Typography from '@mui/material/Typography'
 import BottomNavigation from '@mui/material/BottomNavigation'
 import BottomNavigationAction from '@mui/material/BottomNavigationAction'
@@ -17,7 +18,8 @@ const Calendar = React.lazy(() => import('./Calendar'))
 const Inventory = React.lazy(() => import('./Inventory'))
 const PindouConsume = React.lazy(() => import('./PindouConsume'))
 const History = React.lazy(() => import('./History'))
-const views = ['日历', '拼豆', '历史', '补豆', '消耗']
+const Garden = React.lazy(() => import('./Garden'))
+const views = ['日历', '拼豆', '历史', '补豆', '消耗', '花园']
 const theme = createTheme({
   palette: { mode: 'light' },
   components: {
@@ -50,17 +52,17 @@ function App() {
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0)
   const [drafts, setDrafts] = useState(() => ({ 补豆: createPindouDraft(), 消耗: createPindouDraft() }))
   const [formBusy, setFormBusy] = useState(false)
-  const lastPindouView = useRef(view === '日历' ? '拼豆' : view)
+  const lastPindouView = useRef(['拼豆', '历史', '补豆', '消耗'].includes(view) ? view : '拼豆')
   const currentView = useRef(view)
   const positions = useRef({})
   const { keyboardOpen, height } = useKeyboardViewport()
-  const primaryView = view === '日历' ? '日历' : '拼豆'
+  const primaryView = view === '日历' ? '日历' : view === '花园' ? '花园' : '拼豆'
   const isForm = view === '补豆' || view === '消耗'
-  const isModulePage = view === '日历' || view === '拼豆'
+  const isModulePage = view === '日历' || view === '拼豆' || view === '花园'
 
   useEffect(() => {
     currentView.current = view
-    if (view !== '日历') lastPindouView.current = view
+    if (['拼豆', '历史', '补豆', '消耗'].includes(view)) lastPindouView.current = view
     setVisited(previous => previous.has(view) ? previous : new Set([...previous, view]))
   }, [view])
 
@@ -99,6 +101,7 @@ function App() {
           {(visited.has('日历') || view === '日历') && <Page name="日历" active={view === '日历'} positions={positions}><Calendar active={view === '日历'} /></Page>}
           {(visited.has('拼豆') || view === '拼豆') && <Page name="拼豆" active={view === '拼豆'} positions={positions}><Inventory active={view === '拼豆'} onAction={openPindouWith} refreshKey={inventoryRefreshKey} onNavigate={navigateToView} /></Page>}
           {(visited.has('历史') || view === '历史') && <Page name="历史" active={view === '历史'} positions={positions}><History active={view === '历史'} onNavigate={navigateToView} refreshKey={inventoryRefreshKey} /></Page>}
+          {(visited.has('花园') || view === '花园') && <Page name="花园" active={view === '花园'} positions={positions}><Garden active={view === '花园'} /></Page>}
           {isForm && <Page key={view} name={view} active positions={positions}>
             <PindouConsume initialOperation={view} draft={drafts[view]}
               loading={formBusy}
@@ -110,9 +113,10 @@ function App() {
         </main>
         <footer className="app-footer" hidden={keyboardOpen}>
           <BottomNavigation component="nav" aria-label="主导航" showLabels value={primaryView}
-            onChange={(_, value) => navigateToView(value === '拼豆' ? lastPindouView.current : '日历')}>
+            onChange={(_, value) => navigateToView(value === '拼豆' ? lastPindouView.current : value)}>
             <BottomNavigationAction label="日历" value="日历" aria-current={primaryView === '日历' ? 'page' : undefined} icon={<CalendarMonthIcon />} disabled={formBusy} />
             <BottomNavigationAction label="拼豆" value="拼豆" aria-current={primaryView === '拼豆' ? 'page' : undefined} icon={<PaletteIcon />} disabled={formBusy} />
+            <BottomNavigationAction label="花园" value="花园" aria-current={primaryView === '花园' ? 'page' : undefined} icon={<LocalFloristOutlinedIcon />} disabled={formBusy} />
           </BottomNavigation>
         </footer>
       </div>

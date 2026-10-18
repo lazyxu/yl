@@ -19,9 +19,10 @@ test-and-build:
   script:
     - npm ci --legacy-peer-deps
     - npm test -- --runInBand --testPathIgnorePatterns='test/(ocr|recognize.image).test.js'
-    - node --test test/deployment.test.cjs
+    - node --test test/deployment.test.cjs test/garden-validation.test.cjs
     - bash -n release.sh release_deploy.sh backup_data.sh restore_data.sh verify_backup.sh scripts/data-command.sh
     - npm run build
+    - node --test test/pwa.test.cjs
   artifacts:
     paths:
       - dist/
@@ -43,7 +44,7 @@ backup-restore:
     - npm ci --legacy-peer-deps
     - bash scripts/wait-for-mysql.sh
     - npm install --prefix server --omit=dev --package-lock=false
-    - node --test test/backup.integration.cjs test/settings.integration.cjs
+    - node --test test/backup.integration.cjs test/settings.integration.cjs test/garden.integration.cjs
 
 # Full-image OCR currently has a pre-existing C5/107 recognition failure.
 # Keep it visible as an optional job instead of hiding or weakening assertions.

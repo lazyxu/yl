@@ -35,6 +35,9 @@ test('real MySQL backup restores rows, shift settings, binary uploads, and optio
     fs.writeFileSync(config, `[client]\nhost=${host}\nport=${port}\nuser=${user}\npassword=${password}\n`);
     const photo = Buffer.from([0, 1, 2, 255, 128, 0, 90]);
     fs.writeFileSync(path.join(base, 'uploads/photo.bin'), photo);
+    const gardenOriginal = path.join(base, 'uploads/garden/originals/photo-for-backup.jpg');
+    fs.mkdirSync(path.dirname(gardenOriginal), { recursive: true });
+    fs.writeFileSync(gardenOriginal, photo);
     mysql(`CREATE DATABASE \`${database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE TABLE \`${database}\`.reminders (id INT PRIMARY KEY, note TEXT, image_path TEXT) ENGINE=InnoDB; INSERT INTO \`${database}\`.reminders VALUES (1,'备份恢复验证','photo.bin');`);
     const shiftRules = [{ startDate: '2026-10-12', shifts: ['休息', '夜班', '白班'] }];
     const dayOverrides = { '2026-10-13': { kind: 'swap', shift: '夜班', partner: '同事甲', note: '单日恢复验证' } };
@@ -48,6 +51,8 @@ test('real MySQL backup restores rows, shift settings, binary uploads, and optio
     mysql(`UPDATE \`${database}\`.app_settings SET value=JSON_OBJECT(), version=3 WHERE \`key\`='shift-day-overrides';`);
     fs.writeFileSync(path.join(base, 'uploads/photo.bin'), 'changed');
     fs.writeFileSync(path.join(base, 'uploads/extra.bin'), 'extra');
+    fs.writeFileSync(gardenOriginal, 'garden-changed');
+    fs.writeFileSync(path.join(base, 'uploads/garden/originals/extra.jpg'), 'garden-extra');
     fs.writeFileSync(path.join(base, '.env'), env.replace('original', 'changed'));
     // A local target must explicitly opt out of PM2, just like an SSH target.
     const pm2Required = spawnSync(process.execPath, [path.join(root, 'scripts/data-backup.mjs'), 'restore', saved, '--local', '--base', base, '--backup-dir', backups, '--apply'], { encoding: 'utf8' });
@@ -79,6 +84,8 @@ test('real MySQL backup restores rows, shift settings, binary uploads, and optio
     assert.equal(mysql(`SELECT version FROM \`${database}\`.app_settings WHERE \`key\`='shift-day-overrides'`), '2');
     assert.equal(mysql(`SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='${database}' AND TABLE_NAME='extra_table'`), '0');
     assert.deepEqual(fs.readFileSync(path.join(base, 'uploads/photo.bin')), photo);
+    assert.deepEqual(fs.readFileSync(gardenOriginal), photo, 'garden nested originals must be backed up');
+    assert.equal(fs.existsSync(path.join(base, 'uploads/garden/originals/extra.jpg')), false, 'garden uploads created after backup must be removed on restore');
     assert.equal(fs.existsSync(path.join(base, 'uploads/extra.bin')), false);
     assert.match(fs.readFileSync(path.join(base, '.env'), 'utf8'), /RESTORE_SENTINEL=changed/);
     assert.equal(fs.readdirSync(backups).length, backupsBeforeApply + 1, 'apply must create a pre-restore backup');

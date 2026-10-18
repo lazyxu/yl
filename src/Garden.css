@@ -1,0 +1,100 @@
+.garden-root {
+  padding: 12px max(12px, env(safe-area-inset-right, 0px)) 28px max(12px, env(safe-area-inset-left, 0px));
+  max-width: 1160px;
+  margin: auto;
+}
+.garden-root .MuiButton-containedSuccess {
+  background-color: #447e56;
+}
+.garden-cover {
+  background: #e7f0e5;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.garden-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.garden-picture-button {
+  cursor: pointer;
+  width: 100%;
+  display: block;
+  border: 0;
+  border-radius: 9px;
+  padding: 0;
+  overflow: hidden;
+  background: #e9f0e8;
+}
+.garden-picture-button img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.25;
+  object-fit: cover;
+}
+.garden-square img { aspect-ratio: 1; }
+.garden-large-photo {
+  display: block;
+  object-fit: contain;
+  max-width: 100%;
+  max-height: calc(100dvh - 130px);
+}
+.garden-compare-photo {
+  width: 100%;
+  max-height: 460px;
+  object-fit: contain;
+  background: #ebf0e8;
+  border-radius: 10px;
+}
+.garden-draft-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #e9f0e8;
+}
+.garden-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+.garden-calendar-day {
+  border: 0;
+  border-radius: 10px;
+  height: 54px;
+  position: relative;
+  background: none;
+  color: #203e2d;
+  font-size: 14px;
+  cursor: pointer;
+}
+.garden-calendar-day:disabled { cursor: default; }
+.garden-calendar-day:not(:disabled):hover { background: #e8f2e5; }
+.garden-calendar-day.garden-calendar-selected { color: #fff; background: #467e54; }
+.garden-calendar-day i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #518862;
+  border-radius: 50%;
+  bottom: 5px;
+  left: calc(50% - 3px);
+}
+.garden-calendar-day.garden-calendar-selected i { background: #fff; }
+.garden-enter {
+  animation: garden-enter 180ms ease-out;
+}
+@keyframes garden-enter {
+  from { opacity: .75; }
+  to { opacity: 1; }
+}
+@media (min-width: 600px) {
+  .garden-root { padding: 24px 24px 40px; }
+  .garden-calendar-day { height: 72px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .garden-enter { animation: none; }
+}

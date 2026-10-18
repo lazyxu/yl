@@ -8,6 +8,7 @@ import App from '../src/App'
 jest.setTimeout(30000)
 
 jest.mock('../src/App.css', () => ({}))
+jest.mock('../src/Garden.css', () => ({}))
 jest.mock('../src/Calendar.css', () => ({}))
 jest.mock('../src/ShiftSettings.css', () => ({}))
 
@@ -28,7 +29,7 @@ beforeEach(() => {
   localStorage.clear()
   global.fetch = jest.fn(async url => ({
     ok: true, status: 200, statusText: 'OK',
-    json: async () => url === '/api/inventory' || url === '/api/reminders' ? [] : { rules: [{ startDate: '2024-01-01', shifts: ['休息'] }], version: 0 },
+    json: async () => url === '/api/inventory' || url === '/api/reminders' || String(url).startsWith('/api/garden/') ? [] : { rules: [{ startDate: '2024-01-01', shifts: ['休息'] }], version: 0 },
   }))
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -306,4 +307,18 @@ test('保存中浏览器返回并重开表单仍禁用输入，避免重复提�
   } finally {
     await act(async () => finishSave())
   }
+})
+
+test('花园是第三个一级模块，默认仍为日历，切回拼豆保持导航归属', async () => {
+  await mount()
+  expect(button('日历').getAttribute('aria-current')).toBe('page')
+  await click('花园')
+  expect(button('花园').getAttribute('aria-current')).toBe('page')
+  expect(document.querySelector('[data-view="花园"]')).not.toBeNull()
+  await click('拼豆')
+  expect(button('拼豆').getAttribute('aria-current')).toBe('page')
+  await click('花园')
+  expect(button('花园').getAttribute('aria-current')).toBe('page')
+  await click('日历')
+  expect(button('日历').getAttribute('aria-current')).toBe('page')
 })
