@@ -56,14 +56,35 @@ test('备班和备注只在确认后生效，取消不写入，次日循环保�
   expect(host.querySelector('.selected-date-info').textContent).toContain('临时值备班')
 })
 
-test('换班记录对方和换后班次，可再次编辑或还原而不影响其他日期', async () => {
+test('不填换班对象也能确认，重新加载后保留换后班次和备注', async () => {
+  await mount(); await longPress('2026-10-13'); await change(field('调整类型'), 'swap')
+  expect(field('换班对象')).not.toBeNull()
+  await change(field('换后的班次'), '夜班'); await change(field('备注（可选）'), '临时调整'); await click('确认')
+  expect(editor()).toBeNull()
+  expect(writes).toHaveLength(1)
+  expect(writes[0].body.override).toEqual({ kind: 'swap', shift: '夜班', partner: '', note: '临时调整' })
+  await act(async () => root.render(<Calendar active={false} />))
+  await act(async () => root.render(<Calendar active />))
+  expect(day('2026-10-13').querySelector('.shift').textContent).toBe('夜班')
+  expect(day('2026-10-13').querySelector('.day-adjustment-mark')).not.toBeNull()
+  expect(host.querySelector('.selected-date-info').textContent).toContain('已换班')
+  expect(host.querySelector('.selected-date-info').textContent).toContain('临时调整')
+  await longPress('2026-10-13')
+  expect(field('换班对象').value).toBe('')
+  expect(field('换后的班次').value).toBe('夜班')
+})
+
+test('换班对象可填写或清空，再次编辑或还原不影响其他日期', async () => {
   database.overrides['2026-10-12'] = { kind: 'standby', shift: '备班', partner: '', note: '' }
   await mount(); await longPress('2026-10-13'); await change(field('调整类型'), 'swap')
-  await click('确认'); expect(writes).toHaveLength(0)
-  await change(field('换班对象'), '同事甲'); await change(field('换后的班次'), '夜班'); await click('确认')
+  await change(field('换班对象'), ' 同事甲 '); await change(field('换后的班次'), '夜班'); await click('确认')
   expect(day('2026-10-13').querySelector('.shift').textContent).toBe('夜班')
   expect(host.querySelector('.selected-date-info').textContent).toContain('同事甲')
   await longPress('2026-10-13'); expect(field('换班对象').value).toBe('同事甲')
+  await change(field('换班对象'), '   '); await click('确认')
+  expect(writes[1].body.override).toEqual({ kind: 'swap', shift: '夜班', partner: '', note: '' })
+  expect(host.querySelector('.selected-date-info').textContent).toContain('已换班')
+  await longPress('2026-10-13')
   await change(field('调整类型'), 'normal'); await click('确认')
   expect(database.overrides['2026-10-13']).toBeUndefined()
   expect(database.overrides['2026-10-12'].kind).toBe('standby')

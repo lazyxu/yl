@@ -8,7 +8,8 @@ function normalizeDayOverride(date, value) {
   if (typeof note !== 'string' || note.length > 500) invalid('备注不能超过 500 个字符');
   if (value.kind === 'standby') return { kind: 'standby', shift: '备班', partner: '', note: note.trim() };
   if (!['白班', '夜班', '休息'].includes(value.shift)) invalid('请选择换后的班次');
-  if (typeof value.partner !== 'string' || !value.partner.trim() || value.partner.trim().length > 80) invalid('请填写换班对象，最多 80 个字符');
-  return { kind: 'swap', shift: value.shift, partner: value.partner.trim(), note: note.trim() };
+  const partner = value.partner ?? '';
+  if (typeof partner !== 'string' || partner.trim().length > 80) invalid('换班对象必须是文本，最多 80 个字符');
+  return { kind: 'swap', shift: value.shift, partner: partner.trim(), note: note.trim() };
 }
 module.exports = { normalizeDayOverride };

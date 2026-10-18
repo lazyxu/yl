@@ -73,6 +73,7 @@ const Calendar = ({ active = true }) => {
     const override = dayShifts.overrides[day.format('YYYY-MM-DD')];
     return override?.shift || getShift(day, settings.rules);
   };
+  const selectedOverride = dayShifts.overrides[selectedDate.format('YYYY-MM-DD')];
   const adjustDay = day => {
     if (!canAdjust) return;
     gestureBlocked.current = true;
@@ -216,8 +217,8 @@ const Calendar = ({ active = true }) => {
         </div>
         <div className="selected-date-info">
           <p>{selectedDate.format('YYYY年MM月DD日')} {shiftFor(selectedDate)}</p>
-          {dayShifts.overrides[selectedDate.format('YYYY-MM-DD')]?.kind === 'swap' && <p>与 {dayShifts.overrides[selectedDate.format('YYYY-MM-DD')].partner} 换班</p>}
-          {dayShifts.overrides[selectedDate.format('YYYY-MM-DD')]?.note && <p className="day-adjustment-note">{dayShifts.overrides[selectedDate.format('YYYY-MM-DD')].note}</p>}
+          {selectedOverride?.kind === 'swap' && <p>{selectedOverride.partner ? `与 ${selectedOverride.partner} 换班` : '已换班'}</p>}
+          {selectedOverride?.note && <p className="day-adjustment-note">{selectedOverride.note}</p>}
           <Button onClick={() => adjustDay(selectedDate)} disabled={!canAdjust}>调整当天排班</Button>
           <p>第 {getDaysTogether(selectedDate)} 天</p>
           {/* <p>{经期状态映射[state]}</p> */}

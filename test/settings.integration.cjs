@@ -59,14 +59,19 @@ test('MySQL API seeds defaults, persists edits across restart, rejects invalid a
     assert.equal((await saveDay('2026-10-13', standby, 0)).status, 200);
     assert.equal((await saveDay('2026-10-14', swap, 1)).status, 200);
     assert.equal((await saveDay('2026-02-30', null, 2)).status, 400);
-    assert.equal((await saveDay('2026-10-15', { kind: 'swap', shift: '白班', partner: '' }, 2)).status, 400);
+    assert.equal((await saveDay('2026-10-15', { kind: 'swap', shift: '白班', partner: 123 }, 2)).status, 400);
+    const swapWithoutPartner = { kind: 'swap', shift: '白班', partner: '', note: '对象未填写' };
+    assert.equal((await saveDay('2026-10-17', swapWithoutPartner, 2)).status, 200);
+    assert.equal((await saveDay('2026-10-18', { kind: 'swap', shift: '休息' }, 3)).status, 200);
     assert.equal((await saveDay('2026-10-15', standby, 0)).status, 409);
-    const concurrentDays = await Promise.all([saveDay('2026-10-15', standby, 2), saveDay('2026-10-16', swap, 2)]);
+    const concurrentDays = await Promise.all([saveDay('2026-10-15', standby, 4), saveDay('2026-10-16', swap, 4)]);
     assert.deepEqual(concurrentDays.map(r => r.status).sort(), [200, 409]);
-    assert.equal((await saveDay('2026-10-13', null, 3)).status, 200);
+    assert.equal((await saveDay('2026-10-13', null, 5)).status, 200);
     const persistedDays = await fetch(dayApi()).then(r => r.json());
     assert.equal(persistedDays.overrides['2026-10-13'], undefined);
     assert.deepEqual(persistedDays.overrides['2026-10-14'], swap, 'editing or clearing one date must preserve other dates');
+    assert.deepEqual(persistedDays.overrides['2026-10-17'], swapWithoutPartner, 'swaps without a partner must persist');
+    assert.deepEqual(persistedDays.overrides['2026-10-18'], { kind: 'swap', shift: '休息', partner: '', note: '' }, 'omitted partner and note must normalize to empty strings');
     const latest = await fetch(api()).then(r => r.json());
     const largeRules = Array.from({ length: 100 }, (_, i) => ({
       startDate: new Date(Date.UTC(2027, 0, i + 1)).toISOString().slice(0, 10),
