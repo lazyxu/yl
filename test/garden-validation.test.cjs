@@ -42,7 +42,7 @@ test('media signature and path normalization', () => {
   assert.equal(MAX_ENTRY_BYTES, 90 * 1024 * 1024)
 })
 
-test('frontend observedPayload milliseconds are accepted by the API validator', async () => {
+test('frontend observedPayload emits timezone-aware seconds accepted by old and new APIs', async () => {
   const { observedPayload } = await import('../src/gardenApi.js')
   // This uses the exact payload factory called by the mobile photo editor.
   const payload = observedPayload('2026-10-18T21:00', '开花了', '家人')
