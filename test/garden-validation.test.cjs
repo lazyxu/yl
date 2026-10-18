@@ -41,3 +41,21 @@ test('media signature and path normalization', () => {
   assert.equal(MAX_PHOTOS, 8)
   assert.equal(MAX_ENTRY_BYTES, 90 * 1024 * 1024)
 })
+
+test('frontend observedPayload milliseconds are accepted by the API validator', async () => {
+  const { observedPayload } = await import('../src/gardenApi.js')
+  // This uses the exact payload factory called by the mobile photo editor.
+  const payload = observedPayload('2026-10-18T21:00', '开花了', '家人')
+  assert.match(payload.observed_at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/)
+  const saved = normalizeEntry(payload)
+  assert.equal(saved.local_date, '2026-10-18')
+  assert.equal(saved.author_name, '家人')
+  assert.equal(saved.note, '开花了')
+  assert.equal(saved.observed_at.toISOString(), payload.observed_at)
+  const withOffset = normalizeEntry({
+    observed_at: '2026-10-18T21:00:00.125+09:00',
+    local_date: '2026-10-18',
+  })
+  assert.equal(withOffset.observed_at.toISOString(), '2026-10-18T12:00:00.125Z')
+  assert.throws(() => normalizeEntry({ observed_at: '2026-10-18T21:00:00.12', local_date: '2026-10-18' }), /时区/)
+})

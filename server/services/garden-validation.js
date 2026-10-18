@@ -49,7 +49,7 @@ function normalizePlant(payload) {
 function normalizeEntry(payload) {
   const p = payload || {}
   const raw = p.observed_at
-  if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/.test(raw)) {
+  if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/.test(raw)) {
     throw badRequest('记录时间应为带时区的 ISO 8601 时间')
   }
   const ms = Date.parse(raw)
