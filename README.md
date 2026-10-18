@@ -1,5 +1,19 @@
 # yl
 
+## 花园日记：第三个一级模块
+
+2026-10 起，yl 在现有日历和拼豆之外，增加「花园」模块。**首页仍为日历**，底部切换「日历 / 拼豆 / 花园」，保留现有日历状态、拼豆库存/历史/补豆/消耗操作。
+
+花园主要功能：按株与品种管理花卉、种植日期与位置、拍照上传 1–8 张、记录时间和备注、可选记录者昵称、成长时间线、照片网格、成长前后对比、成长日历、花卉归档、完整 ZIP 导出。Web 与手机浏览器复用同一个 React 前端和 Node API。
+
+- **技术选型不变**：React + JavaScript + MUI；Express + Sequelize + MySQL；SSH 发布、PM2/Nginx 和原 GitLab CI。
+- **不做家庭登录**：本阶段不包含登录、成员注册和权限管理。所有可访问当前 yl 的用户也能操作花园，包括修改/删除照片，公网使用者须自行通过现有服务器访问控制限制访问。
+- **数据持久化**：新表为 `garden_species`、`garden_plants`、`garden_entries`、`garden_photos`。媒体保存在 `server/uploads/garden/{originals,thumbs,previews}`；yue/yl 现有 `uploads` 备份/恢复递归覆盖这些文件。
+- **上传约束**：JPEG、PNG、WEBP、HEIC；单张 20 MiB，最多 8 张，总计 90 MiB。原图始终保留；Sharp 支持的格式生成 JPEG 缩略图和高分辨率预览。服务器环境缺少 HEIC 编码器时保留原图，在支持 HEIC 的客户端直接查看，其他客户端的 HEIC 预览可能不可用。
+- **备份/恢复和发布**：继续使用 `bash release_deploy.sh`（发布前 MySQL + uploads 备份）、`backup_data.sh`、`restore_data.sh`、PM2。发布前必须先通过 MySQL 新表集成测试；新版本不允许清空原日历或拼豆数据。
+- **本地验证**：`node --test test/garden-validation.test.cjs`；前端按原 `npm ci --legacy-peer-deps && npm run build`；MySQL 联调使用 `BACKUP_TEST_MYSQL=1 node --test test/garden.integration.cjs`（先安装 server 依赖并设置测试数据库环境）。
+
+
 React/Vite 前端和 Express/MySQL 后端。GitLab `origin` 为主仓库，默认推送目标为 `origin`。
 
 ## 版本基准
