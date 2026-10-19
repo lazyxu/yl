@@ -121,3 +121,69 @@ test('切换到其他模块再回来保留单日弹窗未确认草稿', async ()
   expect(field('备注（可选）')?.value).toBe('待确认的备注')
   expect(writes).toHaveLength(0)
 })
+
+
+test('日历横向拖动用单个 rAF 更新 transform，不在 touchmove 时重渲染月份', async () => {
+  const oldFrame = window.requestAnimationFrame
+  const oldCancel = window.cancelAnimationFrame
+  const frames = []
+  window.requestAnimationFrame = jest.fn(callback => { frames.push(callback); return frames.length })
+  window.cancelAnimationFrame = jest.fn()
+  function swipeEvent(grid, type, x, y = 70) {
+    const event = new Event(type, { bubbles: true, cancelable: true })
+    Object.assign(event, {
+      touches: type === 'touchend' || type === 'touchcancel' ? [] : [{ clientX: x, clientY: y }],
+      changedTouches: [{ clientX: x, clientY: y }],
+    })
+    grid.dispatchEvent(event)
+  }
+  try {
+    await mount()
+    const grid = host.querySelector('.calendar')
+    const firstDay = day('2026-10-13')
+    const initialMonth = host.querySelector('.header h2').textContent
+    await act(async () => {
+      swipeEvent(grid, 'touchstart', 230)
+      for (const x of [205, 180, 150, 120, 100]) swipeEvent(grid, 'touchmove', x)
+    })
+    expect(window.requestAnimationFrame).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('.calendar')).toBe(grid)
+    expect(day('2026-10-13')).toBe(firstDay)
+    expect(host.querySelector('.header h2').textContent).toBe(initialMonth)
+    await act(async () => frames[0]())
+    expect(grid.style.transform).toBe('translate3d(-58.5px, 0, 0)')
+    await act(async () => swipeEvent(grid, 'touchend', 100))
+    expect(host.querySelector('.header h2').textContent).not.toBe(initialMonth)
+    expect(grid.style.transform).toBe('')
+  } finally {
+    window.requestAnimationFrame = oldFrame
+    window.cancelAnimationFrame = oldCancel
+  }
+})
+
+test('日历纵向滚动、Safari 边缘手势以及取消不会误切月份', async () => {
+  await mount()
+  const grid = host.querySelector('.calendar')
+  const initialMonth = host.querySelector('.header h2').textContent
+  function touch(type, x, y) {
+    const event = new Event(type, { bubbles: true, cancelable: true })
+    Object.assign(event, {
+      touches: type === 'touchend' || type === 'touchcancel' ? [] : [{ clientX: x, clientY: y }],
+      changedTouches: [{ clientX: x, clientY: y }],
+    })
+    grid.dispatchEvent(event)
+  }
+  await act(async () => {
+    touch('touchstart', 230, 20)
+    touch('touchmove', 210, 150)
+    touch('touchend', 80, 180)
+    touch('touchstart', 12, 70)
+    touch('touchmove', 190, 70)
+    touch('touchend', 190, 70)
+    touch('touchstart', 230, 70)
+    touch('touchmove', 100, 70)
+    touch('touchcancel', 100, 70)
+  })
+  expect(host.querySelector('.header h2').textContent).toBe(initialMonth)
+  expect(grid.style.transform).toBe('')
+})

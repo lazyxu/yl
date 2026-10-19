@@ -21,9 +21,10 @@ const 经期状态映射 = {
 const Calendar = ({ active = true }) => {
   const today = moment();
   const [currentMonth, setCurrentMonth] = useState(moment().startOf('month'));
-  const [transitionBuffer, setTransitionBuffer] = useState(false); // 过渡动画控制
-  const [startX, setStartX] = useState(0);
-  const [translateX, setTranslateX] = useState(0); // 用于水平拖拽偏移
+  const calendarRef = useRef(null);
+  const swipeStart = useRef(null);
+  const swipeFrame = useRef(null);
+  const swipeDelta = useRef(0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [settings, setSettings] = useState({ rules: defaultRules, version: null });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -34,6 +35,33 @@ const Calendar = ({ active = true }) => {
   const [dayShiftsError, setDayShiftsError] = useState('');
   const [dayEditor, setDayEditor] = useState(null);
   const gestureBlocked = useRef(false);
+  // Touch moves only mutate a compositor transform once per animation frame.
+  // The month grid must never re-render on every touchmove.
+  function resetSwipeTransform() {
+    if (swipeFrame.current !== null) {
+      if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(swipeFrame.current);
+      else clearTimeout(swipeFrame.current);
+      swipeFrame.current = null;
+    }
+    swipeDelta.current = 0;
+    if (calendarRef.current) calendarRef.current.style.transform = '';
+  }
+  function scheduleSwipeTransform(pixels) {
+    swipeDelta.current = pixels;
+    if (swipeFrame.current !== null) return;
+    const paint = () => {
+      swipeFrame.current = null;
+      if (calendarRef.current) calendarRef.current.style.transform =
+        'translate3d(' + swipeDelta.current + 'px, 0, 0)';
+    };
+    swipeFrame.current = typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame(paint)
+      : setTimeout(paint, 16);
+  }
+  useEffect(() => () => {
+    resetSwipeTransform();
+  }, []);
+
 
   const reloadSettings = useCallback(async signal => {
     setLoadingSettings(true);
@@ -77,57 +105,62 @@ const Calendar = ({ active = true }) => {
   const adjustDay = day => {
     if (!canAdjust) return;
     gestureBlocked.current = true;
-    setTranslateX(0);
+    resetSwipeTransform();
+    swipeStart.current = null;
     setSelectedDate(day);
     setDayEditor({ date: day.format('YYYY-MM-DD'), baseShift: getShift(day, settings.rules), snapshot: { ...dayShifts, overrides: { ...dayShifts.overrides } } });
   };
 
-  // 开始触摸时记录起始 X 坐标
-  const onTouchStart = (e) => {
+  const onTouchStart = (event) => {
+    if (!active) return;
     gestureBlocked.current = Boolean(dayEditor);
-    setStartX(e.touches[0].clientX);
+    const touch = event.touches[0];
+    if (!touch) return;
+    resetSwipeTransform();
+    swipeStart.current = {
+      x: touch.clientX, y: touch.clientY, axis: null,
+      edge: touch.clientX <= 24 || touch.clientX >= window.innerWidth - 24,
+    };
   };
-
-  // 拖拽过程中更新 X 轴偏移
-  const onTouchMove = (e) => {
-    if (gestureBlocked.current || dayEditor) return;
-    const currentX = e.touches[0].clientX;
-    const deltaX = currentX - startX;
-    setTranslateX(deltaX);
-  };
-
-  // 释放触摸时根据水平滑动判断是否切换月份并复位偏移
-  const onTouchEnd = (e) => {
-    if (gestureBlocked.current || dayEditor) { setTranslateX(0); return; }
-    const endX = e.changedTouches[0].clientX;
-    const threshold = 50; // 滑动距离阈值
-    if (!transitionBuffer) {
-      if (startX - endX > threshold) {
-        handleSlideNext();
-      } else if (endX - startX > threshold) {
-        handleSlidePrevious();
-      }
+  const onTouchMove = (event) => {
+    const start = swipeStart.current;
+    if (!active || gestureBlocked.current || dayEditor || !start || start.edge) return;
+    const touch = event.touches[0];
+    if (!touch || event.touches.length !== 1) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (!start.axis) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      start.axis = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
     }
-    // 重置水平偏移，Y轴保持不变
-    setTranslateX(0);
+    if (start.axis !== 'horizontal') return;
+    scheduleSwipeTransform(Math.max(-120, Math.min(120, dx * 0.45)));
   };
-
-  // 切换到上一个月
+  const onTouchEnd = (event) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    resetSwipeTransform();
+    if (!active || gestureBlocked.current || dayEditor || !start || start.edge || start.axis === 'vertical') return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) <= 50 || Math.abs(dx) <= Math.abs(dy) * 1.25) return;
+    if (dx < 0) handleSlideNext();
+    else handleSlidePrevious();
+  };
+  const onTouchCancel = () => {
+    swipeStart.current = null;
+    resetSwipeTransform();
+  };
   const handleSlidePrevious = () => {
-    setCurrentMonth(currentMonth.clone().subtract(1, 'month'));
-    setTransitionBuffer(true);
+    resetSwipeTransform();
+    setCurrentMonth(month => month.clone().subtract(1, 'month'));
   };
-
-  // 切换到下一个月
   const handleSlideNext = () => {
-    setCurrentMonth(currentMonth.clone().add(1, 'month'));
-    setTransitionBuffer(true);
+    resetSwipeTransform();
+    setCurrentMonth(month => month.clone().add(1, 'month'));
   };
-
-  useEffect(() => {
-    // 动画结束后恢复状态
-    setTransitionBuffer(false);
-  }, [currentMonth]);
 
   const handleDateClick = (day) => {
     setSelectedDate(day);
@@ -199,14 +232,11 @@ const Calendar = ({ active = true }) => {
           </button>
         </div>
         <div className="calendar"
+          ref={calendarRef}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
-          // 仅对 X 轴进行平移，Y轴没有变化
-          style={{
-            transform: `translate(${translateX}px)`,
-            transition: transitionBuffer ? 'transform 0.3s ease' : 'none'
-          }}
+          onTouchCancel={onTouchCancel}
         >
           {['日', '一', '二', '三', '四', '五', '六'].map(day => (
             <div key={day} className="weekday">
