@@ -29,7 +29,14 @@ beforeEach(() => {
   localStorage.clear()
   global.fetch = jest.fn(async url => ({
     ok: true, status: 200, statusText: 'OK',
-    json: async () => url === '/api/inventory' || url === '/api/reminders' || String(url).startsWith('/api/garden/') ? [] : { rules: [{ startDate: '2024-01-01', shifts: ['休息'] }], version: 0 },
+    json: async () => {
+      const uri = String(url)
+      if (uri.startsWith('/api/garden/plants?') || uri.startsWith('/api/garden/calendar/day?')) {
+        return { items: [], total: 0, has_more: false, next_cursor: null }
+      }
+      if (uri === '/api/inventory' || uri === '/api/reminders' || uri.startsWith('/api/garden/')) return []
+      return { rules: [{ startDate: '2024-01-01', shifts: ['休息'] }], version: 0 }
+    },
   }))
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -383,4 +390,33 @@ test('已手动应用数量时清空批量数量输入仍然可以提交', async
   expect(button('补豆').disabled).toBe(false)
   await click('补豆')
   expect(submitted.items).toEqual(expect.arrayContaining([{ color: 'A1', count: 23 }]))
+})
+
+
+test('花园列表通过游标加载全部记录且保留总数，不显示固定上限截断', async () => {
+  const flowers = Array.from({ length: 45 }, (_, index) => ({
+    id: index + 1, name: '花卉' + (index + 1), species_name: '月季',
+    planted_on: null, photo_count: 0, latest_photo_id: 0,
+    location: '', status: 'active',
+  }))
+  global.fetch = jest.fn(async url => {
+    const uri = String(url)
+    const body = uri.startsWith('/api/garden/plants?') ? (() => {
+      const after = uri.includes('&cursor=after-first')
+      return {
+        items: after ? flowers.slice(36) : flowers.slice(0, 36),
+        total: 45, has_more: !after,
+        next_cursor: after ? null : 'after-first',
+      }
+    })() : uri === '/api/garden/species' || uri === '/api/inventory' || uri === '/api/reminders'
+      ? [] : { rules: [{ startDate: '2024-01-01', shifts: ['休息'] }], version: 0 }
+    return { ok: true, status: 200, json: async () => body }
+  })
+  await mount('花园')
+  expect(document.body.textContent).toContain('已显示 36 / 45 株')
+  expect(document.body.textContent).not.toContain('花卉45')
+  await click('加载更多花卉')
+  expect(document.body.textContent).toContain('已显示 45 / 45 株')
+  expect(document.body.textContent).toContain('花卉45')
+  expect(button('加载更多花卉')).toBeUndefined()
 })

@@ -103,7 +103,7 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     assert.equal(firstPage.body.items.length, 36)
     assert.equal(Number(firstPage.body.total), 43)
     assert.equal(firstPage.body.has_more, true)
-    assert.ok(statements.length <= 4, 'plant list SQL count must remain constant; got ' + statements.length)
+    assert.equal(statements.length, 3, 'one plant query, one count query, one photo aggregation are expected')
     const nextPage = await request('/plants?status=all&limit=36&cursor=' + encodeURIComponent(firstPage.body.next_cursor))
     assert.equal(nextPage.code, 200)
     assert.equal(nextPage.body.items.length, 7)
