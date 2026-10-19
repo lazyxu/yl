@@ -1,20 +1,12 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import Box from '@mui/material/Box'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
-import Chip from '@mui/material/Chip'
 import ColorCodeSelect from './ColorCodeSelect'
-import Dialog from '@mui/material/Dialog'
-import DialogTitle from '@mui/material/DialogTitle'
-import DialogContent from '@mui/material/DialogContent'
-import DialogActions from '@mui/material/DialogActions'
-import IconButton from '@mui/material/IconButton'
-import CloseIcon from '@mui/icons-material/Close'
  
 import Input from '@mui/material/Input'
 // use dynamic import for tesseract to handle different bundler export shapes
-import ColorSwatch from './ColorSwatch'
 import MARD from './colorPalettes/mard.json'
 import InventoryGrid from './InventoryGrid'
  
@@ -52,8 +44,6 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
     })
   }
 
-  const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes])
-
   const canApplyToSelected = useMemo(() => {
     if (!selectedCodes || selectedCodes.length === 0) return false
     if (applyCount === '' || applyCount == null) return false
@@ -61,7 +51,19 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
     return Number.isInteger(n) && n > 0
   }, [selectedCodes, applyCount])
 
-  // removed canSubmit: use canApplyToSelected instead as requested
+  // A manually entered per-color count is enough to submit, even when the
+  // optional bulk count field has not been filled in.
+  const canSubmit = canApplyToSelected || Object.values(itemsMap).some(value =>
+    Number.isSafeInteger(Number(value)) && Number(value) > 0)
+  const grouped = useMemo(() => {
+    const map = new Map()
+    allCodes.forEach(code => {
+      const key = (code || '').charAt(0).toUpperCase() || '#'
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push({ color: code, count: Number(itemsMap[code] || 0) })
+    })
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  }, [allCodes, itemsMap])
 
   function updateCount(code, v){
     const n = Number(v) || 0
@@ -80,7 +82,7 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
   }
 
   async function handleSubmit(){
-    if (loading || submitting.current) return
+    if (loading || submitting.current || !canSubmit) return
     // 如果有填写“应用到所选”的数量，则先在提交数据中应用该数量（但不依赖 setState 异步）
     let submitMap = { ...itemsMap }
     if (canApplyToSelected) {
@@ -94,7 +96,7 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
       })
     }
 
-    const items = Object.entries(submitMap).filter(([,cnt]) => Number(cnt) > 0).map(([color,cnt]) => ({ color, count: Number(cnt) }))
+    const items = Object.entries(submitMap).filter(([, cnt]) => Number.isSafeInteger(Number(cnt)) && Number(cnt) > 0).map(([color, cnt]) => ({ color, count: Number(cnt) }))
     if (items.length === 0) return alert('请先输入要' + initialOperation + '的数量')
     submitting.current = true
     setLoading(true)
@@ -102,14 +104,14 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
       // 优先使用用户选择的文件上传为提交图片
       let imagePath = null
       if (imgFile) {
-        try{
-          const form = new FormData()
-          form.append('image', imgFile)
-          const up = await fetch('/api/upload', { method: 'POST', body: form })
-          const uj = await up.json()
-          if (!up.ok) throw new Error(uj && uj.error ? uj.error : 'upload failed')
-          imagePath = uj.path || uj.filename || null
-        }catch(e){ console.warn('user-selected image upload skipped', e) }
+        const form = new FormData()
+        form.append('image', imgFile)
+        const up = await fetch('/api/upload', { method: 'POST', body: form })
+        const uj = await up.json().catch(() => ({}))
+        if (!up.ok || !uj.ok || !uj.filename) {
+          throw new Error(uj.error || '图片上传失败，请重试；已保留本次草稿')
+        }
+        imagePath = uj.filename
       }
 
       const body = { operation: initialOperation, items, occurred_at: new Date().toISOString(), note, image_path: imagePath }
@@ -126,29 +128,6 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
       setLoading(false)
     }
   }
-
-  
-
-  function hexToRgb(hex){
-    const c = (hex||'#000000').replace('#','')
-    return { r: parseInt(c.substr(0,2),16), g: parseInt(c.substr(2,2),16), b: parseInt(c.substr(4,2),16) }
-  }
-
-  function colorDistance(a,b){
-    return Math.sqrt((a.r-b.r)**2 + (a.g-b.g)**2 + (a.b-b.b)**2)
-  }
-
-  function findNearestCodeByRgb(rgb){
-    let best = null, bestDist = Infinity
-    MARD.forEach(p => {
-      const r = hexToRgb(p.hex)
-      const d = colorDistance(rgb, r)
-      if (d < bestDist){ bestDist = d; best = p.code }
-    })
-    return best
-  }
-
-  
 
   
 
@@ -196,7 +175,7 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
             <img src={imgPreview} alt="preview" style={{ maxWidth:120, maxHeight:90, borderRadius:4, border:'1px solid #eee' }} />
           </Box>
         )}
-        <Button size="small" onClick={() => { if (imgPreview) { const w = window.open(); if (w) w.document.body.innerHTML = `<img src="${imgPreview}" style="max-width:100%">` } }}>预览</Button>
+        <Button size="small" onClick={() => { if (imgPreview) { const w = window.open('', '_blank', 'noopener'); if (w) { const el = w.document.createElement('img'); el.src = imgPreview; el.style.maxWidth = '100%'; w.document.body.appendChild(el) } } }}>预览</Button>
       </Box>
 
       <Box sx={{ mb:1 }}>
@@ -204,26 +183,12 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
       </Box>
 
       <Box sx={{ display:'flex', gap:1, mt:0, mb:1 }}>
-        <Button variant="contained" onClick={handleSubmit} disabled={!canApplyToSelected || loading}>{loading ? '正在保存…' : initialOperation}</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || loading}>{loading ? '正在保存…' : initialOperation}</Button>
         <Button onClick={onClose} disabled={loading}>取消</Button>
       </Box>
       {hasDraft && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>切换页面会保留填写内容；刷新或关闭网页会清空。</Typography>}
 
-      {(() => {
-        const grouped = useMemo(() => {
-          const map = new Map()
-          allCodes.forEach(code => {
-            const key = (code || '').charAt(0).toUpperCase() || '#'
-            if (!map.has(key)) map.set(key, [])
-            map.get(key).push({ color: code, count: Number(itemsMap[code] || 0) })
-          })
-          return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0]))
-        }, [allCodes, itemsMap])
-
-        return (
-          <InventoryGrid groupedInventory={grouped} findPalette={findPalette} showZero={false} />
-        )
-      })()}
+      <InventoryGrid groupedInventory={grouped} findPalette={findPalette} showZero={false} />
 
     </Box>
 

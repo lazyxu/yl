@@ -25,8 +25,6 @@ const ColorCard = React.memo(function ColorCard({ it, findPalette }){
 })
 
 export default function InventoryGrid({ groupedInventory = [], findPalette = ()=>{}, showZero = false }){
-  if (!Array.isArray(groupedInventory) || groupedInventory.length === 0) return null
-
   const letters = groupedInventory.map(([l]) => l)
   const firstLetter = letters.length ? letters[0] : undefined
   const [visibleGroups, setVisibleGroups] = React.useState(() => (firstLetter ? new Set([firstLetter]) : new Set()))
@@ -69,6 +67,8 @@ export default function InventoryGrid({ groupedInventory = [], findPalette = ()=
     }
     return m
   }, [groupedInventory])
+
+  if (!Array.isArray(groupedInventory) || groupedInventory.length === 0) return null
 
   return (
     <Box sx={{ pr:0, width: '100%' }}>
