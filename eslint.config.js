@@ -31,6 +31,8 @@ export default [
       // The existing project uses React 19 function components without runtime PropTypes.
       // Keep rules-of-hooks/exhaustive-deps active; disable only PropTypes bookkeeping.
       'react/prop-types': 'off',
+      // Jest still transpiles JSX using the classic React.createElement runtime.
+      'react/jsx-uses-react': 'error',
       'react/jsx-no-target-blank': 'off',
       'react-refresh/only-export-components': [
         'warn',
