@@ -54,16 +54,23 @@ bash ./backup_data.sh --host "$REMOTE_HOST" --user "$REMOTE_USER" --port "$REMOT
 
 ssh_options=(-o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new -p "$REMOTE_PORT")
 target="$REMOTE_USER@$REMOTE_HOST"
-echo "==> Upload $release_dir"
-# Runtime data and credentials are never copied from the local release.
+echo "==> Upload $release_dir into an isolated version directory"
+[[ "$latest" =~ ^release-[A-Za-z0-9._-]+$ && "$latest" != *..* ]] || {
+  echo "Invalid release name" >&2; exit 1;
+}
+remote_stage="$REMOTE_BASE/.yl-releases/$latest"
+# Deliberately refuse to overwrite an existing release (which may be serving).
+ssh "${ssh_options[@]}" "$target" "mkdir -p '$REMOTE_BASE/.yl-releases' && mkdir '$remote_stage'"
+# Keep uploads and credentials exclusively in the stable BASE directory.
 tar -C "$release_dir" --exclude=.env --exclude=uploads -czf - . |
-  ssh "${ssh_options[@]}" "$target" "cd '$REMOTE_BASE' && tar -xzf -"
+  ssh "${ssh_options[@]}" "$target" "tar -xzf - -C '$remote_stage'"
 
+with_nginx=0
 if [ -f deploy/nginx/yl0126.conf ]; then
-  scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -P "$REMOTE_PORT" deploy/nginx/yl0126.conf "$target:/tmp/yl0126.conf"
-  privilege=""
-  [ "$REMOTE_USER" = root ] || privilege="sudo "
-  ssh "${ssh_options[@]}" "$target" "${privilege}mkdir -p /etc/nginx/conf.d && ${privilege}mv /tmp/yl0126.conf /etc/nginx/conf.d/yl0126.conf && ${privilege}nginx -t && ${privilege}systemctl reload nginx"
+  scp -o BatchMode=yes -o StrictHostKeyChecking=accept-new -P "$REMOTE_PORT" deploy/nginx/yl0126.conf "$target:$remote_stage/.nginx-new.conf"
+  with_nginx=1
 fi
-ssh "${ssh_options[@]}" "$target" "cd '$REMOTE_BASE' && bash ./start.sh pm2"
-echo "Deploy complete: $latest. Version record: $REMOTE_BASE/release.json"
+
+echo "==> Activate staged PM2 process with automatic code rollback on failure"
+ssh "${ssh_options[@]}" "$target" "bash -s -- '$REMOTE_BASE' '$remote_stage' '$with_nginx'" < "$ROOT_DIR/scripts/activate-staged-release.sh"
+echo "Deploy complete: $latest. Version record: $remote_stage/release.json"
