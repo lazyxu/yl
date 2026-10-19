@@ -164,8 +164,17 @@ router.get('/photos/:id/:variant', wrap(async (req, res) => {
   const photo = await GardenPhoto.findByPk(id)
   if (!photo) return reject(res, '照片不存在', 404)
   const location = photoLocation(photo, req.params.variant)
-  noCache(res)
+  const derived = req.params.variant === 'thumb' || req.params.variant === 'preview'
+  // Each derivative uses an immutable UUID filename; originals and ZIP exports
+  // remain non-cacheable. Private caches save bandwidth on repeated gallery visits.
+  if (derived) {
+    const tag = '"garden-' + photo.id + '-' + req.params.variant + '-' + photo.storage_name + '"'
+    res.setHeader('Cache-Control', 'private, max-age=86400, immutable')
+    res.setHeader('ETag', tag)
+    if (req.headers['if-none-match'] === tag) return res.status(304).end()
+  } else noCache(res)
   res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox")
   res.type(location.mime)
   if (req.query.download === '1') return res.download(location.path, photo.original_name)
   res.sendFile(location.path)

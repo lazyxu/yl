@@ -18,6 +18,32 @@ const dirs = {
 }
 for (const dir of Object.values(dirs)) fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
 
+// Image decoding is CPU/memory intensive; bound active work and the waiting
+// queue. Raw uploads remain on disk while waiting and route cleanup owns them.
+const MAX_ACTIVE_IMAGES = 2
+const MAX_QUEUED_IMAGES = 8
+let activeImages = 0
+const waitingImages = []
+function withMediaSlot(task) {
+  return new Promise((resolve, reject) => {
+    if (activeImages >= MAX_ACTIVE_IMAGES && waitingImages.length >= MAX_QUEUED_IMAGES) {
+      const busy = new Error('图片处理繁忙，请稍后重试')
+      busy.status = 503
+      return reject(busy)
+    }
+    const start = () => {
+      activeImages++
+      Promise.resolve().then(task).then(
+        value => { activeImages--; waitingImages.shift()?.(); resolve(value) },
+        error => { activeImages--; waitingImages.shift()?.(); reject(error) },
+      )
+    }
+    if (activeImages < MAX_ACTIVE_IMAGES) start()
+    else waitingImages.push(start)
+  })
+}
+
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, dirs.tmp),
@@ -44,7 +70,7 @@ function inside(kind, filename) {
   }
   return path.join(dirs[kind], filename)
 }
-async function savedImage(file) {
+async function processImage(file) {
   const fd = await fs.promises.open(file.path, 'r')
   const signatureBytes = Buffer.alloc(32)
   let read
@@ -56,27 +82,37 @@ async function savedImage(file) {
   await fs.promises.rename(file.path, original)
   let thumbName = null
   let previewName = null
+  let previewCandidate = null
+  let thumbCandidate = null
   try {
-    // Sharp auto-orients JPEG images from EXIF. Unsupported HEIC codecs retain
-    // the original; iOS Safari can show those originals natively.
     const meta = await sharp(original, { limitInputPixels: 60000000 }).metadata()
     if (meta.width > 0 && meta.height > 0 && meta.width * meta.height <= 60000000) {
-      const token = crypto.randomUUID() + '.jpg'
-      await sharp(original, { limitInputPixels: 60000000 }).rotate().resize({
-        width: 560, height: 560, fit: 'inside', withoutEnlargement: true,
-      }).jpeg({ quality: 82 }).toFile(inside('thumbs', token))
-      thumbName = token
+      // Decode the full-resolution original once for the 2048px preview,
+      // then derive the small 560px thumbnail from that bounded preview.
+      previewCandidate = crypto.randomUUID() + '.jpg'
       await sharp(original, { limitInputPixels: 60000000 }).rotate().resize({
         width: 2048, height: 2048, fit: 'inside', withoutEnlargement: true,
-      }).jpeg({ quality: 85 }).toFile(inside('previews', token))
-      previewName = token
+      }).jpeg({ quality: 85 }).toFile(inside('previews', previewCandidate))
+      previewName = previewCandidate
+      thumbCandidate = crypto.randomUUID() + '.jpg'
+      await sharp(inside('previews', previewCandidate)).resize({
+        width: 560, height: 560, fit: 'inside', withoutEnlargement: true,
+      }).jpeg({ quality: 82 }).toFile(inside('thumbs', thumbCandidate))
+      thumbName = thumbCandidate
     } else if (type.mime !== 'image/heic') throw badRequest('图片分辨率不符合要求')
   } catch (err) {
+    // A failed encoder can leave a partially-written output.
+    if (previewCandidate && previewCandidate !== previewName) {
+      try { fs.unlinkSync(inside('previews', previewCandidate)) } catch { /* missing */ }
+    }
+    if (thumbCandidate && thumbCandidate !== thumbName) {
+      try { fs.unlinkSync(inside('thumbs', thumbCandidate)) } catch { /* missing */ }
+    }
     if (type.mime !== 'image/heic') {
       cleanupStored([{ storage_name: name, thumb_name: thumbName, preview_name: previewName }])
       throw badRequest('图片无法解码或超过像素限制')
     }
-    // Optional HEIC codec may be absent on an existing Node SSH host.
+    // On hosts lacking the optional HEIC codec, retain the original for iOS.
     console.warn('garden HEIC preview unavailable; original preserved:', err.message)
   }
   return {
@@ -84,6 +120,7 @@ async function savedImage(file) {
     original_name: safeFilename(file.originalname), mime: type.mime, size_bytes: file.size,
   }
 }
+function savedImage(file) { return withMediaSlot(() => processImage(file)) }
 function cleanupStored(photos) {
   for (const p of photos) {
     for (const [kind, field] of [['originals', 'storage_name'], ['thumbs', 'thumb_name'], ['previews', 'preview_name']]) {
@@ -95,8 +132,9 @@ function cleanupStored(photos) {
 function photoLocation(photo, variant) {
   if (variant === 'original') return { path: inside('originals', photo.storage_name), mime: photo.mime }
   if (variant === 'thumb' && photo.thumb_name) return { path: inside('thumbs', photo.thumb_name), mime: 'image/jpeg' }
+  if (variant === 'thumb' && photo.preview_name) return { path: inside('previews', photo.preview_name), mime: 'image/jpeg' }
   if (variant === 'preview' && photo.preview_name) return { path: inside('previews', photo.preview_name), mime: 'image/jpeg' }
   if (photo.mime === 'image/heic') return { path: inside('originals', photo.storage_name), mime: photo.mime }
   return { path: inside('originals', photo.storage_name), mime: photo.mime }
 }
-module.exports = { dirs, MAX_ENTRY_BYTES, uploadPhotos, cleanupTemporary, savedImage, cleanupStored, photoLocation }
+module.exports = { dirs, MAX_ENTRY_BYTES, uploadPhotos, cleanupTemporary, savedImage, cleanupStored, photoLocation, withMediaSlot }

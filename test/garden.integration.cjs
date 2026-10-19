@@ -67,6 +67,22 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     assert.equal(photoRes.status, 200)
     assert.match(photoRes.headers.get('content-type'), /image\/jpeg/)
     assert.ok((await photoRes.arrayBuffer()).byteLength > 0)
+    assert.match(photoRes.headers.get('cache-control'), /private.*max-age=86400.*immutable/)
+    const etag = photoRes.headers.get('etag')
+    assert.ok(etag, 'derivative thumbnails must expose a stable ETag')
+    const conditional = await fetch(base + '/photos/' + photoId + '/thumb', {
+      headers: { 'If-None-Match': etag },
+    })
+    assert.equal(conditional.status, 304, 'cached derivative revalidates without downloading bytes')
+    const previewRes = await fetch(base + '/photos/' + photoId + '/preview')
+    assert.equal(previewRes.status, 200)
+    assert.match(previewRes.headers.get('content-type'), /image\/jpeg/)
+    const previewMeta = await sharp(Buffer.from(await previewRes.arrayBuffer())).metadata()
+    assert.equal(previewMeta.width, 16)
+    assert.equal(previewMeta.height, 24)
+    const originalRes = await fetch(base + '/photos/' + photoId + '/original')
+    assert.match(originalRes.headers.get('cache-control'), /no-store/)
+
     const items = await request('/calendar/day?date=2026-10-18')
     assert.equal(items.body[0].plant_name, '第一株月季')
     const month = await request('/calendar')
