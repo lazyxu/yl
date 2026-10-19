@@ -69,3 +69,9 @@
 - HEIC 在解码能力不足时，只可保存已通过 ISO-BMFF 基本盒结构验证的原始文件，且下载 MIME 仍为 image/heic。跑得通 HEVC 编码器的 CI 追加真实样本验证；跳过不能冒充真机通过。
 - 本地图片预览 Object URL 必须在 layout effect 创建并在移除、关闭、卸载时撤销，禁止在 React render/useMemo 期间创建资源。
 - SSH 发布必须有故障注入、回滚或可验证的手动恢复证据。真机 Safari/PWA 和真实 SSH staging 通过之前，生产验证仍保持未完成。
+
+## Real-browser E2E smoke tests
+- Before release, run E2E_MYSQL=1 node test/browser-garden.e2e.mjs against disposable MySQL after npm run build, installing real Chromium/WebKit browsers. The harness must create/drop only its randomly named test database and never use production.
+- Browser checks must traverse the actual Express/Sequelize server, not mocked APIs: flower creation, file selection, note saving, original download, deleting entries, calendar/pindou navigation and mobile viewport checks.
+- GitLab browser-e2e is a manual release gate; ordinary Jest/MySQL checks remain automatic. Collect failure screenshots under test-results.
+- Linux desktop WebKit emulation does not certify actual iPhone Safari; iPhone/SSH staging checklist stays open.
