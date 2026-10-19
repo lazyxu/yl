@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import MARD from './colorPalettes/mard.json'
+import { findPalette, PALETTE_CODES } from './palette'
 import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
@@ -70,7 +71,7 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
     const map = new Map((inventory || []).map(i => [i.color, i.count]))
     const list = MARD.map(p => ({ color: p.code, count: map.has(p.code) ? map.get(p.code) : 0 }))
     ;(inventory || []).forEach(i => {
-      if (!MARD.find(p => p.code === i.color)) list.push(i)
+      if (!PALETTE_CODES.has(i.color)) list.push(i)
     })
     return list
   }, [inventory])
@@ -83,6 +84,8 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
 
   // group by first letter of the color code for sectioned display
   const groupedInventory = useMemo(() => {
+    // Global ascending order is derived once below, not also sorted per group.
+    if (sortOrder === 'asc') return []
     const map = new Map();
     ;(filteredInventory || []).forEach(it => {
       const key = (it.color || '').charAt(0).toUpperCase() || '#'
@@ -112,8 +115,6 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
   const lowCount = useMemo(() => {
     return displayedInventory.filter(it => (it.count || 0) <= threshold).length
   }, [displayedInventory, threshold])
-
-  const findPalette = useCallback((code) => MARD.find(p => p.code === code), [])
 
   async function fetchInventory(signal) {
     setLoading(true)

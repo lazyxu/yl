@@ -18,7 +18,7 @@ test-and-build:
   stage: verify
   script:
     - npm ci --legacy-peer-deps
-    - npx eslint src/PindouConsume.jsx src/InventoryGrid.jsx src/History.jsx
+    - npx eslint src/PindouConsume.jsx src/InventoryGrid.jsx src/History.jsx src/palette.js
     - node --test test/pindou-datetime.test.cjs
     - npm test -- --runInBand --testPathIgnorePatterns='test/(ocr|recognize.image).test.js'
     - node --test test/deployment.test.cjs test/garden-validation.test.cjs
