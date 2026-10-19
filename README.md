@@ -110,8 +110,10 @@ bash restore_data.sh 'backups/<备份目录>' --apply --restore-env
 
 可用 `--host`、`--user`、`--port`、`--base` 将备份恢复到另一台机器；该机器需要已配置的应用 `.env` 和后端依赖。恢复数据不会回滚应用代码，需要代码回滚时使用对应 Git 标签和发布包，重新走带备份的发布流程。
 
-## 拼豆上传与本地时间安全约定
+### 花园分页接口与查询成本
 
-拼豆图片上传现在要求实际 JPEG/PNG/WEBP/HEIC 图片（HEIC 取决于 Sharp 解码支持）；服务器检查文件内容、解码并重新编码，剥离不可信元数据，以随机文件名保存。历史图片 URL 在内容与文件扩展名确实匹配时保持可访问，HTML/SVG 等主动内容不能通过图片接口执行。已选图片上传失败时本次补豆/消耗不保存，原草稿保留以便重试。
-
-拼豆历史 `datetime-local` 使用访问设备当地时间，提交保存 ISO UTC 时间。没有填写批量数量时，已有正整数色号数量也允许直接保存。
+- GET /api/garden/plants?status=active&limit=36&cursor=... -> { items, total, has_more, next_cursor }
+- GET /api/garden/calendar/day?date=YYYY-MM-DD&limit=40&cursor=... -> 同结构；前端必须显示总数，并在 has_more=true 时提供继续加载。
+- 不传 limit/cursor 的旧 API 暂保留数组响应，供旧版客户端过渡（历史接口仍有 500 株/200 条上限，不能作为完整数据导出）。ZIP 导出始终使用数据库完整记录。
+- 游标基于排序时间和记录 ID，避免深 offset 分页；查询应按用户请求停止、忽略过期响应。列表照片统计统一通过一次 SQL 聚合完成，而不是对每株花独立查询。
+- MySQL 8.4 集成测试覆盖超过 500 株和单日 200 条记录，逐页验证无重复、无丢失，并核对 SQL 次数。运行前后性能 benchmark 时应使用相同数据量和环境，不能把 SQL 次数直接当作毫秒响应时间。
