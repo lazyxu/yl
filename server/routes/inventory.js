@@ -1,28 +1,16 @@
-const express = require('express');
-const router = express.Router();
-const PindouReminder = require('../models/PindouReminder');
+'use strict'
+const express = require('express')
+const { listInventory } = require('../services/pindou-inventory')
+const router = express.Router()
 
-// Aggregate inventory by color: 补豆 adds, 消耗 subtracts
-router.get('/', async (req, res) => {
+// Reads the materialized inventory projection. Historical reminders are
+// replayed only on first upgrade, not on each page load.
+router.get('/', async (_req, res) => {
   try {
-    const records = await PindouReminder.findAll();
-    const map = {};
-    for (const r of records) {
-      const op = r.operation;
-      const items = r.items || [];
-      for (const it of items) {
-        const code = it.color;
-        const cnt = Number(it.count) || 0;
-        if (!map[code]) map[code] = 0;
-        if (op === '补豆') map[code] += cnt;
-        else if (op === '消耗') map[code] -= cnt;
-      }
-    }
-    const result = Object.keys(map).map(code => ({ color: code, count: map[code] }));
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.json(await listInventory())
+  } catch (error) {
+    console.error('Pindou inventory lookup failed', error)
+    res.status(500).json({ error: '库存暂时无法读取，请稍后重试' })
   }
-});
-
-module.exports = router;
+})
+module.exports = router

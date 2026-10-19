@@ -13,6 +13,7 @@ const cors = require('cors');
 const sequelize = require('./sequelize');
 const remindersRouter = require('./routes/reminders');
 const inventoryRouter = require('./routes/inventory');
+const { ensureInventory } = require('./services/pindou-inventory');
 const uploadRouter = require('./routes/upload');
 const gardenRouter = require('./routes/garden');
 // Load garden Sequelize models and associations before the startup schema sync.
@@ -86,6 +87,7 @@ async function start() {
     await sequelize.authenticate();
     // sync with alter to add new nullable columns like image_path
     await sequelize.sync({ alter: true });
+    await ensureInventory();
     await settingsRouter.initializeShiftSettings();
     return await new Promise((resolve, reject) => {
       const server = app.listen(PORT, HOST, () => {
