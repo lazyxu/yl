@@ -8,11 +8,10 @@ import ColorCodeSelect from './ColorCodeSelect'
 import Input from '@mui/material/Input'
 // use dynamic import for tesseract to handle different bundler export shapes
 import MARD from './colorPalettes/mard.json'
+import { findPalette } from './palette'
 import InventoryGrid from './InventoryGrid'
  
-function findPalette(code){
-  return MARD.find(p => p.code === code)
-}
+
 
 export default function PindouConsume({ initialOperation = '消耗', draft, loading = false, onDraftChange, onBusyChange, onClose = ()=>{}, onAdded = ()=>{} }){
   const { itemsMap, selectedCodes, applyCount, note, imgFile } = draft

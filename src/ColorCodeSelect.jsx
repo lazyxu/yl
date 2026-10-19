@@ -3,13 +3,11 @@ import Autocomplete from '@mui/material/Autocomplete'
 import TextField from '@mui/material/TextField'
 import Chip from '@mui/material/Chip'
 import ColorSwatch from './ColorSwatch'
-import MARD from './colorPalettes/mard.json'
+import { findPalette } from './palette'
 
 const ALL_KEY = '__ALL__'
 
-function findPalette(code){
-  return MARD.find(p => p.code === code)
-}
+
 
 export default function ColorCodeSelect({ options = [], value = [], disabled = false, onChange = ()=>{}, label = '选择色号', placeholder = '搜索或选择', sx = {} }){
   const allOptions = React.useMemo(() => [ALL_KEY, ...options], [options])

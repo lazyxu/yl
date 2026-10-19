@@ -8,11 +8,10 @@ import Button from '@mui/material/Button'
 import ColorSwatch from './ColorSwatch'
 import InventoryGrid from './InventoryGrid'
 import MARD from './colorPalettes/mard.json'
+import { findPalette } from './palette'
 import { toDatetimeLocal, fromDatetimeLocal } from './dateTime'
 
-function findPalette(code){
-  return MARD.find(p => p.code === code)
-}
+
 
 export default function History({ active = true, onNavigate = ()=>{}, refreshKey }){
   const [records, setRecords] = useState([])
