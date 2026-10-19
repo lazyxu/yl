@@ -143,3 +143,7 @@ MARD 调色盘建立一次按色号索引的 Map（src/palette.js），供库存
 
 ### 花园异常图片验证
 花园图片上传校验真实签名，并对解码器无法读取的 HEIC 额外核对 ISO-BMFF ftyp/meta/mdat 容器结构，防止仅包含 HEIC 文件头的假图片落盘；有效 HEIC 在服务器解码器缺失时仍可保留原图。测试包括无文件、恶意或损坏内容、9 张超限、坏时区、上传第二张失败时清理第一张及并发删除。真实 HEVC/HEIC 编码测试仅在 CI 编码器可用时执行，真机 Safari 和服务器 HEIC 解码能力需进一步实测。
+
+### Real browser E2E (Chromium and WebKit)
+Run with a disposable MySQL 8.4 installation: npm ci --legacy-peer-deps; npm install --prefix server --omit=dev --package-lock=false; npm install --no-save --legacy-peer-deps --package-lock=false playwright@1.56.1; npx playwright install --with-deps chromium webkit; npm run build; E2E_MYSQL=1 BACKUP_TEST_HOST=127.0.0.1 BACKUP_TEST_PASSWORD=CI-only-password node test/browser-garden.e2e.mjs.
+The harness starts the real Express application with a randomly named disposable MySQL database, visits mobile Chromium/WebKit and desktop Chromium, and drops the database afterward. GitLab browser-e2e is a manual release validation job. Linux WebKit cannot substitute for actual iPhone Safari tests.

@@ -57,3 +57,33 @@ ocr-integration:
   script:
     - npm ci --legacy-peer-deps
     - npm test -- --runInBand test/ocr.test.js test/recognize.image.test.js
+
+# Browser integration with disposable MySQL and real Chromium/WebKit engines.
+# Manual to keep ordinary pipelines fast; run before staging/production releases.
+browser-e2e:
+  stage: verify
+  when: manual
+  allow_failure: false
+  services:
+    - name: mysql:8.4
+      alias: mysql
+  variables:
+    MYSQL_ROOT_PASSWORD: ci-only-password
+    MYSQL_ROOT_HOST: '%'
+    BACKUP_TEST_HOST: mysql
+    BACKUP_TEST_PASSWORD: ci-only-password
+    E2E_MYSQL: '1'
+  script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends default-mysql-client
+    - npm ci --legacy-peer-deps
+    - bash scripts/wait-for-mysql.sh
+    - npm install --prefix server --omit=dev --package-lock=false
+    - npm install --no-save --legacy-peer-deps --package-lock=false playwright@1.56.1
+    - npx playwright install --with-deps chromium webkit
+    - npm run build
+    - node test/browser-garden.e2e.mjs
+  artifacts:
+    when: always
+    paths:
+      - test-results/
+    expire_in: 7 days
