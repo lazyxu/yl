@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Grid, IconButton, Stack, TextField, Typography } from '@mui/material'
 import { CameraAltOutlined, Close, PhotoLibraryOutlined } from '@mui/icons-material'
 import { gardenRequest, gardenJSON, localInputTime, observedPayload } from '../gardenApi'
@@ -18,8 +18,19 @@ export default function EntryEditor({ open, plantId, editing, onClose, onSaved, 
     setAuthor(editing?.author_name || localStorage.getItem('garden-author') || '')
     setFiles([])
   }, [open, editing])
-  const previews = useMemo(() => files.map(f => ({ file: f, url: URL.createObjectURL(f) })), [files])
-  useEffect(() => () => previews.forEach(p => URL.revokeObjectURL(p.url)), [previews])
+  // Object URLs are resources: create them after commit, never during render.
+  // Layout effect synchronizes previews before paint and cleans up even if the
+  // user cancels the dialog, switches photos or the component unmounts.
+  const [previews, setPreviews] = useState([])
+  useLayoutEffect(() => {
+    if (!open || editing) {
+      setPreviews([])
+      return
+    }
+    const created = files.map(file => ({ file, url: URL.createObjectURL(file) }))
+    setPreviews(created)
+    return () => created.forEach(item => URL.revokeObjectURL(item.url))
+  }, [files, open, editing])
   function selectFiles(value) {
     if (!value) return
     setFiles(old => [...old, ...Array.from(value)].slice(0, 8))
