@@ -86,6 +86,92 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     assert.equal(archived.code, 200)
     assert.equal((await request('/plants')).body.length, 0)
     assert.equal((await request('/plants?status=archived')).body.length, 1)
+    // The legacy endpoint stays an array; the paged endpoint must not truncate
+    // plants or silently discard calendar-day entries.
+    const models = require('../server/models/garden')
+    await models.GardenPlant.bulkCreate(Array.from({ length: 42 }, (_, index) => ({
+      name: '测试花卉' + index, species_id: s.body.id, status: 'active',
+    })))
+    const statements = []
+    const previousLogger = sequelize.options.logging
+    let firstPage
+    try {
+      sequelize.options.logging = sql => { if (/SELECT/i.test(sql)) statements.push(sql) }
+      firstPage = await request('/plants?status=all&limit=36')
+    } finally { sequelize.options.logging = previousLogger }
+    assert.equal(firstPage.code, 200)
+    assert.equal(firstPage.body.items.length, 36)
+    assert.equal(Number(firstPage.body.total), 43)
+    assert.equal(firstPage.body.has_more, true)
+    assert.equal(statements.length, 3, 'one plant query, one count query, one photo aggregation are expected')
+    const nextPage = await request('/plants?status=all&limit=36&cursor=' + encodeURIComponent(firstPage.body.next_cursor))
+    assert.equal(nextPage.code, 200)
+    assert.equal(nextPage.body.items.length, 7)
+    assert.equal(nextPage.body.has_more, false)
+    assert.equal(new Set([...firstPage.body.items, ...nextPage.body.items].map(p => p.id)).size, 43)
+    assert.equal((await request('/plants?status=all')).body.length, 43, 'older clients keep array compatibility')
+    assert.equal((await request('/plants?limit=12&cursor=invalid')).code, 400)
+    assert.ok([...firstPage.body.items, ...nextPage.body.items].some(plant => plant.id === id && plant.photo_count === 1))
+
+    await models.GardenEntry.bulkCreate(Array.from({ length: 4 }, (_, index) => {
+      const ts = Date.UTC(2026, 9, 18, 14, index)
+      return { plant_id: id, observed_at: new Date(ts), observed_ts: ts,
+        local_date: '2026-10-18', note: '连续观察' + index, author_name: '' }
+    }))
+    const dayPage = await request('/calendar/day?date=2026-10-18&limit=2')
+    assert.equal(dayPage.code, 200)
+    assert.equal(Number(dayPage.body.total), 5)
+    assert.equal(dayPage.body.items.length, 2)
+    assert.equal(dayPage.body.has_more, true)
+    const dayNext = await request('/calendar/day?date=2026-10-18&limit=2&cursor=' + encodeURIComponent(dayPage.body.next_cursor))
+    assert.equal(dayNext.code, 200)
+    assert.equal(dayNext.body.items.length, 2)
+    assert.equal(new Set([...dayPage.body.items, ...dayNext.body.items].map(e => e.id)).size, 4)
+    assert.equal((await request('/calendar/day?date=2026-10-18')).body.length, 5)
+    assert.equal((await request('/calendar/day?date=2026-10-18&limit=2&cursor=invalid')).code, 400)
+    // Regression for formerly silent 500-plant and 200-entry cutoffs.
+    await models.GardenPlant.bulkCreate(Array.from({ length: 470 }, (_, index) => ({
+      name: '分页边界花卉' + index, species_id: s.body.id, status: 'active',
+    })))
+    const totalPlants = 513 // original archived plant + 42 + 470
+    const firstLarge = await request('/plants?status=all&limit=75')
+    assert.equal(firstLarge.code, 200)
+    assert.equal(Number(firstLarge.body.total), totalPlants)
+    let plantCursor = firstLarge.body.next_cursor
+    const plantIds = firstLarge.body.items.map(row => row.id)
+    let plantPages = 1
+    while (plantCursor) {
+      const response = await request('/plants?status=all&limit=75&cursor=' + encodeURIComponent(plantCursor))
+      assert.equal(response.code, 200)
+      plantIds.push(...response.body.items.map(row => row.id))
+      plantCursor = response.body.next_cursor
+      plantPages++
+      assert.ok(plantPages <= 9, 'plant pagination cursor must eventually terminate')
+    }
+    assert.equal(plantIds.length, totalPlants)
+    assert.equal(new Set(plantIds).size, totalPlants, 'no plants can be lost or repeated across cursor pages')
+
+    await models.GardenEntry.bulkCreate(Array.from({ length: 205 }, (_, index) => {
+      const ts = Date.UTC(2026, 9, 18, 15, index)
+      return { plant_id: id, observed_at: new Date(ts), observed_ts: ts,
+        local_date: '2026-10-18', note: '分页边界日记' + index, author_name: '' }
+    }))
+    const firstLongDay = await request('/calendar/day?date=2026-10-18&limit=40')
+    assert.equal(firstLongDay.code, 200)
+    assert.equal(Number(firstLongDay.body.total), 210)
+    let dayCursor = firstLongDay.body.next_cursor
+    const dayIds = firstLongDay.body.items.map(row => row.id)
+    let dayPages = 1
+    while (dayCursor) {
+      const response = await request('/calendar/day?date=2026-10-18&limit=40&cursor=' + encodeURIComponent(dayCursor))
+      assert.equal(response.code, 200)
+      dayIds.push(...response.body.items.map(row => row.id))
+      dayCursor = response.body.next_cursor
+      dayPages++
+      assert.ok(dayPages <= 7, 'day pagination cursor must eventually terminate')
+    }
+    assert.equal(dayIds.length, 210)
+    assert.equal(new Set(dayIds).size, 210)
     const deleted = await request('/plants/' + id, { method: 'DELETE' })
     assert.equal(deleted.code, 200)
     assert.equal((await fetch(base + '/photos/' + photoId + '/original')).status, 404)

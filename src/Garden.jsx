@@ -308,6 +308,11 @@ function GardenCalendar({ active, selectPlant, notify }) {
   const [counts, setCounts] = useState([])
   const [selected, setSelected] = useState('')
   const [items, setItems] = useState([])
+  const [dayTotal, setDayTotal] = useState(0)
+  const [dayHasMore, setDayHasMore] = useState(false)
+  const [dayCursor, setDayCursor] = useState(null)
+  const [dayLoadingMore, setDayLoadingMore] = useState(false)
+  const dayRequestGeneration = useRef(0)
   useEffect(() => {
     if (!active) return
     const controller = new AbortController()
@@ -319,11 +324,35 @@ function GardenCalendar({ active, selectPlant, notify }) {
   useEffect(() => {
     if (!active || !selected) return
     const controller = new AbortController()
-    gardenRequest('/calendar/day?date=' + selected, { signal: controller.signal }).then(setItems).catch(err => {
+    const generation = ++dayRequestGeneration.current
+    setItems([])
+    setDayTotal(0)
+    setDayHasMore(false)
+    setDayCursor(null)
+    gardenRequest('/calendar/day?date=' + selected + '&limit=40', { signal: controller.signal }).then(page => {
+      if (controller.signal.aborted || generation !== dayRequestGeneration.current) return
+      setItems(page.items)
+      setDayTotal(page.total)
+      setDayHasMore(page.has_more)
+      setDayCursor(page.next_cursor)
+    }).catch(err => {
       if (err.name !== 'AbortError') notify(err.message, true)
     })
-    return () => controller.abort()
+    return () => { controller.abort(); dayRequestGeneration.current++ }
   }, [active, selected, notify])
+  async function loadMoreDay() {
+    if (!dayHasMore || !dayCursor || dayLoadingMore) return
+    setDayLoadingMore(true)
+    const generation = dayRequestGeneration.current
+    try {
+      const page = await gardenRequest('/calendar/day?date=' + selected + '&limit=40&cursor=' + encodeURIComponent(dayCursor))
+      if (generation !== dayRequestGeneration.current) return
+      setItems(prev => [...prev, ...page.items])
+      setDayHasMore(page.has_more)
+      setDayCursor(page.next_cursor)
+    } catch (err) { notify(err.message, true) }
+    finally { setDayLoadingMore(false) }
+  }
   const dayCounts = useMemo(() => new Map(counts.map(d => [d.day, Number(d.count)])), [counts])
   const offset = (month.getDay() + 6) % 7
   const total = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
@@ -344,7 +373,7 @@ function GardenCalendar({ active, selectPlant, notify }) {
       </button>)}
     </Box>
     <Divider sx={{ my: 2 }} />
-    {selected ? <Stack spacing={1}><Typography fontWeight={700}>{selected} · {dayCounts.get(selected) || 0} 条记录</Typography>
+    {selected ? <Stack spacing={1}><Typography fontWeight={700}>{selected} · {dayTotal || dayCounts.get(selected) || 0} 条记录</Typography>
       {items.map(item => <Card key={item.id} variant="outlined"><CardActionArea onClick={() => selectPlant(item.plant_id)}>
         <Stack direction="row" spacing={1.5} alignItems="center" p={1}>
           <Box sx={{ width: 64, flexShrink: 0 }}><Cover id={item.photo_id} height={64} /></Box>
@@ -352,6 +381,9 @@ function GardenCalendar({ active, selectPlant, notify }) {
         </Stack>
       </CardActionArea></Card>)}
       {items.length === 0 && <Typography color="text.secondary">这一天还没有成长记录。</Typography>}
+      {dayHasMore && <Button variant="outlined" disabled={dayLoadingMore} onClick={loadMoreDay}>
+        {dayLoadingMore ? '加载中…' : '加载更多成长记录'}
+      </Button>}
     </Stack> : <Typography textAlign="center" color="text.secondary" variant="body2">点选日期，回看那一天的花园。</Typography>}
   </Paper>
 }
@@ -367,16 +399,29 @@ export default function Garden({ active = true }) {
   const [tab, setTab] = useState(0)
   const [creating, setCreating] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [plantCursor, setPlantCursor] = useState(null)
+  const [plantHasMore, setPlantHasMore] = useState(false)
+  const [plantTotal, setPlantTotal] = useState(0)
+  const [plantLoadingMore, setPlantLoadingMore] = useState(false)
+  const plantRequestGeneration = useRef(0)
   const [notice, setNotice] = useState(null)
   const notify = useCallback((message, error = false) => setNotice({ message, error }), [])
   const fetchSpecies = useCallback(() => gardenRequest('/species').then(setSpecies).catch(err => notify(err.message, true)), [notify])
-  const loadPlants = useCallback(async (signal) => {
-    setLoading(true)
+  const loadPlants = useCallback(async (signal, cursor = null) => {
+    const generation = cursor ? plantRequestGeneration.current : ++plantRequestGeneration.current
+    if (!cursor) setLoading(true)
     try {
-      const items = await gardenRequest('/plants?status=' + status + '&q=' + encodeURIComponent(search), { signal })
-      if (!signal?.aborted) setPlants(items)
+      const path = '/plants?status=' + status + '&q=' + encodeURIComponent(search) + '&limit=36' +
+        (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
+      const page = await gardenRequest(path, { signal })
+      if (!signal?.aborted && generation === plantRequestGeneration.current) {
+        setPlants(previous => cursor ? [...previous, ...page.items] : page.items)
+        setPlantTotal(page.total)
+        setPlantHasMore(page.has_more)
+        setPlantCursor(page.next_cursor)
+      }
     } catch (err) { if (err.name !== 'AbortError') notify(err.message, true) }
-    finally { if (!signal?.aborted) setLoading(false) }
+    finally { if (!signal?.aborted && !cursor && generation === plantRequestGeneration.current) setLoading(false) }
   }, [search, status, notify])
   useEffect(() => {
     if (!active) return
@@ -386,6 +431,12 @@ export default function Garden({ active = true }) {
     return () => controller.abort()
   }, [active, fetchSpecies, loadPlants])
   function refresh() { loadPlants() }
+  async function loadMorePlants() {
+    if (!plantHasMore || !plantCursor || plantLoadingMore) return
+    setPlantLoadingMore(true)
+    try { await loadPlants(undefined, plantCursor) }
+    finally { setPlantLoadingMore(false) }
+  }
   const goPlant = id => {
     setSearchParams(current => {
       const next = new URLSearchParams(current)
@@ -440,6 +491,12 @@ export default function Garden({ active = true }) {
             </Paper> : group ? <Stack spacing={3.5}>
               {groups.map(([name, list]) => <Box key={name}><Typography variant="h6" mb={1}>{name} <Chip label={list.length + ' 株'} size="small" /></Typography>{grid(list)}</Box>)}
             </Stack> : grid(plants)}
+          {plants.length > 0 && <Stack alignItems="center" gap={1} mt={3} pb={1}>
+            <Typography variant="caption" color="text.secondary">已显示 {plants.length} / {plantTotal} 株</Typography>
+            {plantHasMore && <Button variant="outlined" disabled={plantLoadingMore} onClick={loadMorePlants}>
+              {plantLoadingMore ? '加载中…' : '加载更多花卉'}
+            </Button>}
+          </Stack>}
         </> : <GardenCalendar active={active} selectPlant={goPlant} notify={notify} />}
       </Box>}
     <PlantEditor open={creating} plant={null} species={species} onClose={() => setCreating(false)} onSaved={refresh} onSpecies={fetchSpecies} notify={notify} />

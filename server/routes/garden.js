@@ -1,11 +1,11 @@
 'use strict'
 const express = require('express')
 const fs = require('node:fs')
-const { Op } = require('sequelize')
 const sequelize = require('../sequelize')
 const { GardenSpecies, GardenPlant, GardenEntry, GardenPhoto } = require('../models/garden')
 const { badRequest, validDay, positiveId, text, normalizePlant, normalizeEntry } = require('../services/garden-validation')
 const { MAX_ENTRY_BYTES, uploadPhotos, cleanupTemporary, savedImage, cleanupStored, photoLocation } = require('../services/garden-media')
+const { listPlants, listDay, summarizePlants } = require('../services/garden-query')
 const router = express.Router()
 router.use(express.json({ limit: '128kb' }))
 
@@ -17,17 +17,7 @@ async function requiredPlant(id) {
   return plant
 }
 async function plantSummary(plant) {
-  const p = plant.get({ plain: true })
-  const [photoCount, latest] = await Promise.all([
-    GardenPhoto.count({ include: [{
-      model: GardenEntry, as: 'entry', attributes: [], required: true, where: { plant_id: plant.id },
-    }] }),
-    GardenPhoto.findOne({
-      include: [{ model: GardenEntry, as: 'entry', attributes: [], required: true, where: { plant_id: plant.id } }],
-      order: [[{ model: GardenEntry, as: 'entry' }, 'observed_ts', 'DESC'], ['id', 'DESC']],
-    }),
-  ])
-  return { ...p, species_name: p.species?.name || '', photo_count: photoCount, latest_photo_id: latest?.id || 0 }
+  return (await summarizePlants([plant]))[0]
 }
 function entryResponse(instance) {
   const value = instance.get({ plain: true })
@@ -74,23 +64,7 @@ router.delete('/species/:id', wrap(async (req, res) => {
 }))
 
 router.get('/plants', wrap(async (req, res) => {
-  const status = req.query.status || 'active'
-  if (!['active', 'archived', 'all'].includes(status)) throw badRequest('花卉状态筛选无效')
-  const q = text(req.query.q || '', 100, '搜索关键字')
-  const where = {}
-  if (status !== 'all') where.status = status
-  if (q) where[Op.or] = [{ name: { [Op.like]: '%' + q + '%' } }, { location: { [Op.like]: '%' + q + '%' } }]
-  if (req.query.species_id) {
-    const speciesId = positiveId(req.query.species_id)
-    if (!speciesId) throw badRequest('品种编号无效')
-    where.species_id = speciesId
-  }
-  const list = await GardenPlant.findAll({
-    where, include: [{ model: GardenSpecies, as: 'species', attributes: ['id', 'name'] }],
-    order: [['createdAt', 'DESC'], ['id', 'DESC']],
-    limit: 500,
-  })
-  res.json(await Promise.all(list.map(plantSummary)))
+  res.json(await listPlants(req.query))
 }))
 router.post('/plants', wrap(async (req, res) => {
   const data = normalizePlant(req.body)
@@ -209,22 +183,8 @@ router.get('/calendar', wrap(async (req, res) => {
 }))
 router.get('/calendar/day', wrap(async (req, res) => {
   if (!validDay(req.query.date)) throw badRequest('日历日期无效')
-  const entries = await GardenEntry.findAll({
-    where: { local_date: req.query.date },
-    include: [
-      { model: GardenPlant, as: 'plant', attributes: ['id', 'name'] },
-      { model: GardenPhoto, as: 'photos', attributes: ['id'] },
-    ],
-    order: [['observed_ts', 'DESC'], ['id', 'DESC']],
-    limit: 200,
-  })
-  res.json(entries.map(row => ({
-    id: row.id, plant_id: row.plant_id, plant_name: row.plant?.name || '',
-    note: row.note, observed_at: row.observed_at,
-    photo_id: row.photos?.[0]?.id || 0,
-  })))
+  res.json(await listDay(req.query.date, req.query))
 }))
-
 router.get('/export', wrap(async (_req, res) => {
   const archiver = require('archiver')
   const [species, plants, entries, photos] = await Promise.all([
