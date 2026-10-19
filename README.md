@@ -137,3 +137,6 @@ MARD 调色盘建立一次按色号索引的 Map（src/palette.js），供库存
 
 ### 日历滑动优化
 手机日历触摸移动使用 requestAnimationFrame 与 CSS translate3d，而不是每个 touchmove 更新 React state。识别纵向滚动和边缘手势，防止误切月份；长按调整排班行为保持。Jest 包含多次 move 合并到一个动画帧、纵向滚动和取消操作的回归测试。实际 iOS Safari 仍需真机确认。
+
+### 花园组件结构
+入口 src/Garden.jsx 只保留原有路由和 CSS 兼容。src/garden/GardenScreen.jsx 负责页面切换和汇总；useGardenPlants.js 负责花卉查询、分页、取消和过期结果处理；PlantGrid / PlantEditor / EntryEditor / FlowerDetail / GardenCalendar / GrowthTimeline / GrowthComparison / PhotoViewer / Shared 负责各自的 UI 与交互。拆分不改变 MySQL 表、API 或 SSH 发布。Jest 保留日历/拼豆/花园三模块导航，并增加 Viewer 与时间线回调测试。
