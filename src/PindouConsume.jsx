@@ -65,12 +65,6 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   }, [allCodes, itemsMap])
 
-  function updateCount(code, v){
-    const n = Number(v) || 0
-    if (!Number.isInteger(n) || n < 0) return
-    setItemsMap(prev => ({ ...prev, [code]: n }))
-  }
-
   function applyToSelected(){
     const n = Number(applyCount)
     if (!Number.isInteger(n) || n <= 0) return alert('请输入正整数数量')

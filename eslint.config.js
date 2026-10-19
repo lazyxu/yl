@@ -28,6 +28,9 @@ export default [
       ...react.configs.recommended.rules,
       ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
+      // The existing project uses React 19 function components without runtime PropTypes.
+      // Keep rules-of-hooks/exhaustive-deps active; disable only PropTypes bookkeeping.
+      'react/prop-types': 'off',
       'react/jsx-no-target-blank': 'off',
       'react-refresh/only-export-components': [
         'warn',

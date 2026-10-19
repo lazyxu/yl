@@ -23,7 +23,7 @@ export default function History({ active = true, onNavigate = ()=>{}, refreshKey
   function resolveImageUrl(imagePath){
     if (!imagePath) return null
     if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('/')) return imagePath
-    const parts = imagePath.split(/[\\\/]/)
+    const parts = imagePath.split(/[\\/]/)
     const filename = parts[parts.length-1]
     return `/api/upload/${filename}`
   }
