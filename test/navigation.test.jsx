@@ -329,3 +329,58 @@ test('花园提供完整备份下载入口', async () => {
   expect(link).not.toBeNull()
   expect(link.getAttribute('href')).toBe('/api/garden/export')
 })
+
+test('图片上传失败时阻止写入拼豆记录并保留本次草稿', async () => {
+  const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {})
+  global.fetch = jest.fn(async (url, options) => {
+    if (url === '/api/upload') {
+      return { ok: false, status: 415, json: async () => ({ error: '图片格式不支持' }) }
+    }
+    if (url === '/api/reminders' && options?.method === 'POST') {
+      throw new Error('Upload failure must never create a reminder')
+    }
+    return { ok: true, status: 200, json: async () => url === '/api/inventory' ? [] :
+      { rules: [{ startDate: '2024-01-01', shifts: ['休息'] }], version: 0 } }
+  })
+  await mount('补豆')
+  await fill('选择色号', 'A1')
+  const option = [...document.querySelectorAll('[role="option"]')].find(el => el.textContent.endsWith('A1'))
+  expect(option).toBeTruthy()
+  await act(async () => option.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  await fill('数量', '23')
+  const fileInput = document.querySelector('input[type="file"]')
+  Object.defineProperty(fileInput, 'files', {
+    configurable: true, value: [new File(['invalid image'], 'flower.jpg', { type: 'image/jpeg' })],
+  })
+  await act(async () => fileInput.dispatchEvent(new Event('change', { bubbles: true })))
+  await click('补豆')
+  expect(global.fetch).toHaveBeenCalledWith('/api/upload', expect.objectContaining({ method: 'POST' }))
+  expect(global.fetch.mock.calls.some(([url, args]) => url === '/api/reminders' && args?.method === 'POST')).toBe(false)
+  expect(document.querySelector('[data-view="补豆"]').textContent).toContain('flower.jpg')
+  expect(input('数量').value).toBe('23')
+  expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('图片格式不支持'))
+})
+
+test('已手动应用数量时清空批量数量输入仍然可以提交', async () => {
+  jest.spyOn(window, 'alert').mockImplementation(() => {})
+  let submitted
+  global.fetch = jest.fn(async (url, options) => {
+    if (url === '/api/reminders' && options?.method === 'POST') {
+      submitted = JSON.parse(options.body)
+      return { ok: true, json: async () => ({ id: 9, ...submitted }) }
+    }
+    return { ok: true, json: async () => url === '/api/inventory' ? [] :
+      { rules: [{ startDate: '2024-01-01', shifts: ['休息'] }], version: 0 } }
+  })
+  await mount('补豆')
+  await fill('选择色号', 'A1')
+  const option = [...document.querySelectorAll('[role="option"]')].find(el => el.textContent.endsWith('A1'))
+  expect(option).toBeTruthy()
+  await act(async () => option.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  await fill('数量', '23')
+  await click('应用到所选')
+  await fill('数量', '')
+  expect(button('补豆').disabled).toBe(false)
+  await click('补豆')
+  expect(submitted.items).toEqual(expect.arrayContaining([{ color: 'A1', count: 23 }]))
+})

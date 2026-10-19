@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 import Box from '@mui/material/Box'
 import Typography from '@mui/material/Typography'
 import IconButton from '@mui/material/IconButton'
@@ -8,6 +8,7 @@ import Button from '@mui/material/Button'
 import ColorSwatch from './ColorSwatch'
 import InventoryGrid from './InventoryGrid'
 import MARD from './colorPalettes/mard.json'
+import { toDatetimeLocal, fromDatetimeLocal } from './dateTime'
 
 function findPalette(code){
   return MARD.find(p => p.code === code)
@@ -22,7 +23,7 @@ export default function History({ active = true, onNavigate = ()=>{}, refreshKey
   function resolveImageUrl(imagePath){
     if (!imagePath) return null
     if (/^https?:\/\//i.test(imagePath) || imagePath.startsWith('/')) return imagePath
-    const parts = imagePath.split(/[\\\/]/)
+    const parts = imagePath.split(/[\\/]/)
     const filename = parts[parts.length-1]
     return `/api/upload/${filename}`
   }
@@ -168,7 +169,11 @@ export default function History({ active = true, onNavigate = ()=>{}, refreshKey
                   <Box sx={{ p:1, border:'1px dashed #ddd', borderRadius:1, mb:1 }}>
                     <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1 }}>
                       <Typography variant="body2">编辑时间：</Typography>
-                      <input type="datetime-local" value={new Date(editData.occurred_at).toISOString().slice(0,16)} onChange={e => updateOccurredAt(new Date(e.target.value).toISOString())} />
+                      <input type="datetime-local" aria-label="编辑时间" value={toDatetimeLocal(editData.occurred_at)} onChange={e => {
+                          const value = e.target.value
+                          try { updateOccurredAt(value ? fromDatetimeLocal(value) : '') }
+                          catch { updateOccurredAt('') }
+                        }} />
                     </Box>
                     <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1 }}>
                       <Typography variant="body2">备注：</Typography>
