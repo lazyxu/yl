@@ -1,9 +1,10 @@
 name: Garden PR Temporary Verification
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/garden-timeline-oldest-first
+      - master
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
