@@ -46,7 +46,7 @@ backup-restore:
     - npm ci --legacy-peer-deps
     - bash scripts/wait-for-mysql.sh
     - npm install --prefix server --omit=dev --package-lock=false
-    - node --test test/backup.integration.cjs test/settings.integration.cjs test/garden.integration.cjs test/upload.integration.cjs test/pindou-stock.integration.cjs
+    - node --test test/backup.integration.cjs test/settings.integration.cjs test/garden.integration.cjs test/upload.integration.cjs test/pindou-stock.integration.cjs test/garden-media.test.cjs
 
 # Full-image OCR currently has a pre-existing C5/107 recognition failure.
 # Keep it visible as an optional job instead of hiding or weakening assertions.
