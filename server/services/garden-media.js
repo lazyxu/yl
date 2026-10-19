@@ -70,6 +70,50 @@ function inside(kind, filename) {
   }
   return path.join(dirs[kind], filename)
 }
+// Check ISO-BMFF box lengths and the HEIC metadata payload before accepting
+// HEIC without a server-side decoder. A 12-byte ftyp signature is not an image.
+async function hasHeicStructure(filename) {
+  const fd = await fs.promises.open(filename, 'r')
+  try {
+    const { size } = await fd.stat()
+    if (size < 40) return false
+    const header = Buffer.alloc(16)
+    if ((await fd.read(header, 0, 16, 0)).bytesRead < 16) return false
+    const ftypSize = header.readUInt32BE(0)
+    if (header.toString('ascii', 4, 8) !== 'ftyp' ||
+        ftypSize < 16 || ftypSize > 4096 || ftypSize > size || ftypSize % 4 !== 0) return false
+    const ftyp = Buffer.alloc(ftypSize)
+    if ((await fd.read(ftyp, 0, ftypSize, 0)).bytesRead !== ftypSize) return false
+    const brands = [ftyp.toString('ascii', 8, 12)]
+    for (let offset = 16; offset + 4 <= ftypSize; offset += 4) {
+      brands.push(ftyp.toString('ascii', offset, offset + 4))
+    }
+    if (!brands.some(brand => ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis'].includes(brand))) {
+      return false
+    }
+    let offset = ftypSize, hasMeta = false, hasData = false
+    while (offset + 8 <= size) {
+      const read = await fd.read(header, 0, 16, offset)
+      if (read.bytesRead < 8) return false
+      const kind = header.toString('ascii', 4, 8)
+      let bytes = header.readUInt32BE(0)
+      let headerBytes = 8
+      if (bytes === 1) {
+        if (read.bytesRead < 16) return false
+        const big = header.readBigUInt64BE(8)
+        if (big > BigInt(Number.MAX_SAFE_INTEGER)) return false
+        bytes = Number(big)
+        headerBytes = 16
+      } else if (bytes === 0) bytes = size - offset
+      if (bytes < headerBytes || offset + bytes > size) return false
+      if (kind === 'meta' && bytes >= 16) hasMeta = true
+      if (kind === 'mdat' && bytes > headerBytes) hasData = true
+      offset += bytes
+    }
+    return offset === size && hasMeta && hasData
+  } finally { await fd.close() }
+}
+
 async function processImage(file) {
   const fd = await fs.promises.open(file.path, 'r')
   const signatureBytes = Buffer.alloc(32)
@@ -77,6 +121,9 @@ async function processImage(file) {
   try { read = await fd.read(signatureBytes, 0, 32, 0) } finally { await fd.close() }
   const type = identifyPhoto(signatureBytes.subarray(0, read.bytesRead))
   if (!type) throw badRequest('仅支持 JPEG、PNG、WEBP 和 HEIC 照片')
+  if (type.mime === 'image/heic' && !(await hasHeicStructure(file.path))) {
+    throw badRequest('HEIC 文件结构无效，请使用原始照片重试')
+  }
   const name = crypto.randomUUID() + type.ext
   const original = inside('originals', name)
   await fs.promises.rename(file.path, original)
@@ -137,4 +184,4 @@ function photoLocation(photo, variant) {
   if (photo.mime === 'image/heic') return { path: inside('originals', photo.storage_name), mime: photo.mime }
   return { path: inside('originals', photo.storage_name), mime: photo.mime }
 }
-module.exports = { dirs, MAX_ENTRY_BYTES, uploadPhotos, cleanupTemporary, savedImage, cleanupStored, photoLocation, withMediaSlot }
+module.exports = { dirs, MAX_ENTRY_BYTES, uploadPhotos, cleanupTemporary, savedImage, cleanupStored, photoLocation, withMediaSlot, hasHeicStructure }

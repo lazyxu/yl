@@ -63,6 +63,43 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     assert.equal(diary.body.items[0].author_name, '家人')
     assert.equal(diary.body.items[0].photos.length, 1)
     const photoId = diary.body.items[0].photos[0].id
+
+    // Failed validation must not create diary rows or leave uploaded artifacts.
+    const { dirs: mediaDirs } = require('../server/services/garden-media')
+    const mediaSnapshot = () => Object.entries(mediaDirs).map(([kind, dir]) =>
+      [kind, require('node:fs').readdirSync(dir).sort()])
+    const snapshotBefore = mediaSnapshot()
+    function draftPhotos(buffers, override) {
+      const form = new FormData()
+      form.set('plant_id', String(id))
+      for (const [key, value] of Object.entries(photoPayload)) form.set(key, value)
+      if (override) form.set('observed_at', override)
+      buffers.forEach((bytes, index) => form.append('photos',
+        new Blob([bytes], { type: 'image/jpeg' }), 'camera-' + index + '.jpg'))
+      return form
+    }
+    const beforeFailure = await require('../server/models/garden').GardenEntry.count({ where: { plant_id: id } })
+    const invalidJpeg = Buffer.from([0xff, 0xd8, 0xff, 0x00, 0x00, 0x00, 0x00])
+    const malformedHeic = Buffer.alloc(20)
+    malformedHeic.writeUInt32BE(20, 0)
+    malformedHeic.write('ftypheic', 4)
+    malformedHeic.write('mif1', 16)
+    const invalidUploads = [
+      { body: draftPhotos([]), expected: 400 },
+      { body: draftPhotos([invalidJpeg]), expected: 400 },
+      { body: draftPhotos([malformedHeic]), expected: 400 },
+      { body: draftPhotos([png, invalidJpeg]), expected: 400 },
+      { body: draftPhotos([png], '2026-10-18T21:00:00'), expected: 400 },
+      { body: draftPhotos(Array.from({ length: 9 }, () => png)), expected: 413 },
+    ]
+    for (const invalidCase of invalidUploads) {
+      const attempt = await request('/entries', { method: 'POST', body: invalidCase.body })
+      assert.equal(attempt.code, invalidCase.expected, JSON.stringify(attempt.body))
+      assert.deepEqual(mediaSnapshot(), snapshotBefore,
+        'failed uploads must clean temporary, original, thumbnail and preview files')
+      assert.equal(await require('../server/models/garden').GardenEntry.count({ where: { plant_id: id } }), beforeFailure)
+    }
+
     const photoRes = await fetch(base + '/photos/' + photoId + '/thumb')
     assert.equal(photoRes.status, 200)
     assert.match(photoRes.headers.get('content-type'), /image\/jpeg/)
@@ -188,6 +225,14 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     }
     assert.equal(dayIds.length, 210)
     assert.equal(new Set(dayIds).size, 210)
+    const concurrentDeletes = await Promise.all(Array.from({ length: 6 }, () =>
+      request('/entries/' + entry.body.id, { method: 'DELETE' })))
+    assert.ok(concurrentDeletes.some(result => result.code === 200))
+    assert.ok(concurrentDeletes.every(result => [200, 404].includes(result.code)),
+      'concurrent delete operations must be idempotent or report 404, never 500')
+    assert.equal(await models.GardenEntry.count({ where: { id: entry.body.id } }), 0)
+    assert.equal(await models.GardenPhoto.count({ where: { id: photoId } }), 0)
+    assert.equal((await fetch(base + '/photos/' + photoId + '/original')).status, 404)
     const deleted = await request('/plants/' + id, { method: 'DELETE' })
     assert.equal(deleted.code, 200)
     assert.equal((await fetch(base + '/photos/' + photoId + '/original')).status, 404)

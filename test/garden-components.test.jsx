@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import PhotoViewer from '../src/garden/PhotoViewer'
 import GrowthTimeline from '../src/garden/GrowthTimeline'
+import EntryEditor from '../src/garden/EntryEditor'
 
 test('拆分后的 PhotoViewer 保留多照片切换、原图下载和关闭', async () => {
   global.IS_REACT_ACT_ENVIRONMENT = true
@@ -53,5 +54,41 @@ test('拆分后的成长时间线仍能编辑、删除和打开选中的照片',
   } finally {
     await act(async () => root.unmount())
     host.remove()
+  }
+})
+
+
+test('日记照片预览在已提交布局效果中创建，移除或关闭时释放 Object URL', async () => {
+  global.IS_REACT_ACT_ENVIRONMENT = true
+  const oldCreate = URL.createObjectURL
+  const oldRevoke = URL.revokeObjectURL
+  URL.createObjectURL = jest.fn(() => 'blob:test-preview')
+  URL.revokeObjectURL = jest.fn()
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  try {
+    await act(async () => root.render(<EntryEditor open plantId={1} editing={null}
+      onClose={() => {}} onSaved={() => {}} notify={() => {}} />))
+    const input = document.querySelector('input[type="file"][multiple]')
+    expect(input).not.toBeNull()
+    Object.defineProperty(input, 'files', {
+      configurable: true, value: [new File(['safe photo'], 'flower.jpg', { type: 'image/jpeg' })],
+    })
+    await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })))
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('.garden-draft-image')?.getAttribute('src')).toBe('blob:test-preview')
+    await act(async () => document.querySelector('[aria-label="移除照片"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test-preview')
+    expect(document.querySelector('.garden-draft-image')).toBeNull()
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1)
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
+    if (oldCreate === undefined) delete URL.createObjectURL
+    else URL.createObjectURL = oldCreate
+    if (oldRevoke === undefined) delete URL.revokeObjectURL
+    else URL.revokeObjectURL = oldRevoke
+    jest.restoreAllMocks()
   }
 })
