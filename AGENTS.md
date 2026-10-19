@@ -75,3 +75,10 @@
 - Browser checks must traverse the actual Express/Sequelize server, not mocked APIs: flower creation, file selection, note saving, original download, deleting entries, calendar/pindou navigation and mobile viewport checks.
 - GitLab browser-e2e is a manual release gate; ordinary Jest/MySQL checks remain automatic. Collect failure screenshots under test-results.
 - Linux desktop WebKit emulation does not certify actual iPhone Safari; iPhone/SSH staging checklist stays open.
+
+## SSH 发布与代码回滚
+- release_deploy.sh 必须先构建/校验备份，再把代码上传至隔离版本目录 .yl-releases/release-*；严禁从发布包直接 tar 覆盖现有 PM2 cwd 或复制 .env/uploads。
+- 使用 scripts/activate-staged-release.sh：安装依赖与语法检查在新目录完成；记录旧 PM2 cwd；切换后真实 HTTP 健康检查；失败自动恢复原 PM2 cwd。Nginx 仅在新应用健康后更新且要能恢复旧配置。
+- 发布失败注入至少覆盖前置目录检查、npm 失败、PM2 启动失败和 HTTP 健康检查失败，保证原有代码、.env/uploads 和进程状态不被破坏。
+- 代码回滚不等于 MySQL 数据回滚。服务端使用 schema sync 的情况下，升级前需先备份并验证恢复能力；需要手动、单独评估数据库兼容后才允许生产发布。
+- 发布及变更 Nginx 仍需 SSH staging 现场验收，不能以 mock pm2/curl 代替生产验收。

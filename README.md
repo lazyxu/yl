@@ -147,3 +147,8 @@ MARD 调色盘建立一次按色号索引的 Map（src/palette.js），供库存
 ### Real browser E2E (Chromium and WebKit)
 Run with a disposable MySQL 8.4 installation: npm ci --legacy-peer-deps; npm install --prefix server --omit=dev --package-lock=false; npm install --no-save --legacy-peer-deps --package-lock=false playwright@1.56.1; npx playwright install --with-deps chromium webkit; npm run build; E2E_MYSQL=1 BACKUP_TEST_HOST=127.0.0.1 BACKUP_TEST_PASSWORD=CI-only-password node test/browser-garden.e2e.mjs.
 The harness starts the real Express application with a randomly named disposable MySQL database, visits mobile Chromium/WebKit and desktop Chromium, and drops the database afterward. GitLab browser-e2e is a manual release validation job. Linux WebKit cannot substitute for actual iPhone Safari tests.
+
+### SSH 安全分阶段发布与失败恢复
+release_deploy.sh 的主流程：先本地构建并验证远端 MySQL/.env/uploads 备份，然后将版本文件传输到现网基础目录下的 .yl-releases/release-* 独立目录；旧代码和 node_modules 始终不覆盖。scripts/activate-staged-release.sh 在新版本目录安装依赖和检查语法，确认 PM2 中旧 yl 的运行目录，再切换服务到新目录，并验证 /api/garden/species HTTP 200。出现依赖安装错误、PM2 启动失败或健康检查失败，自动恢复旧实例；Nginx 只在新服务健康后应用，并保留旧配置用于失败恢复。
+运行 Node 故障注入测试：node --test test/deployment-rollback.test.cjs。测试使用临时本地目录及模拟 npm/pm2/curl，不连远程服务器。
+重要：这种回滚只恢复代码/进程/网关配置，不会自动回滚已经改变的 MySQL 数据或表结构。正式升级前必须留存可验证备份，并在 SSH staging 完成故障、Nginx 和数据恢复演练。旧代码仍可从上一 PM2 cwd 启动，别在验证前清理旧 .yl-releases。
