@@ -310,3 +310,12 @@
 @media (prefers-reduced-motion: reduce) {
   .garden-viewer-stage .garden-large-photo { transition: none; }
 }
+
+/* Defer costly painting for nonvirtualized, grouped diary/timeline sections.
+   Heights are refined when the browser renders the actual section. */
+.garden-species-group, .garden-timeline-entry {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+.garden-virtual-grid .garden-card-info { min-height: 90px; box-sizing: border-box; }
+.garden-virtual-grid .garden-card { height: 100%; }

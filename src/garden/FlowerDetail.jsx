@@ -25,6 +25,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     return () => clearTimeout(timer)
   }, [loading, plant])
   const [moreBusy, setMoreBusy] = useState(false)
+  const paging = useRef(false)
   const [plantEditor, setPlantEditor] = useState(false)
   const [entryEditor, setEntryEditor] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -45,6 +46,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     const controller = new AbortController()
     controllerRef.current = controller
     setMoreBusy(false)
+    paging.current = false
     try {
       const [p, list] = await Promise.all([
         gardenRequest('/plants/' + id, { signal: controller.signal }),
@@ -70,7 +72,8 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   }, [load])
 
   async function more() {
-    if (!hasMore || moreBusy) return
+    if (!hasMore || moreBusy || paging.current) return
+    paging.current = true
     const version = requestVersion.current
     const controller = new AbortController()
     moreController.current = controller
@@ -83,6 +86,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     } catch (err) {
       if (version === requestVersion.current && err.name !== 'AbortError') notify(err.message, true)
     } finally {
+      paging.current = false
       if (version === requestVersion.current) setMoreBusy(false)
     }
   }
@@ -161,7 +165,8 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
       onSpecies={onSpecies} notify={notify} />
     <EntryEditor open={entryEditor} plantId={id} editing={editing}
       onClose={() => setEntryEditor(false)} onSaved={() => { load(); onChange() }} notify={notify} />
-    {photoIndex !== null && <Viewer photos={photos} current={photoIndex} onClose={closePhoto} />}
+    {photoIndex !== null && <Viewer photos={photos} current={photoIndex} onClose={closePhoto}
+      hasMore={hasMore} loadingMore={moreBusy} onEndReached={more} />}
     <GardenConfirmDialog open={Boolean(pendingDelete)} title={pendingDelete?.kind === 'plant' ? '删除这株花卉？' : '删除这条成长日记？'}
       description={pendingDelete?.kind === 'plant'
         ? '「' + plant.name + '」和它的全部成长日记、照片将永久删除，无法撤销。'

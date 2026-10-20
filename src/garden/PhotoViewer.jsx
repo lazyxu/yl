@@ -8,7 +8,8 @@ const distance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clien
 const midpoint = (a, b) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 })
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
 
-export default function Viewer({ photos, current, onClose }) {
+export default function Viewer({ photos, current, onClose,
+  hasMore = false, loadingMore = false, onEndReached }) {
   const [index, setIndex] = useState(current)
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 })
   const [imageError, setImageError] = useState(false)
@@ -47,6 +48,11 @@ export default function Viewer({ photos, current, onClose }) {
   }
   useEffect(() => () => cancelAnimationFrame(frame.current), [])
   useEffect(() => setIndex(current), [current])
+  // A viewer opened from page one continues into later diary pages without
+  // forcing the user to close it and scroll to "load more".
+  useEffect(() => {
+    if (hasMore && !loadingMore && index >= photos.length - 2) onEndReached?.()
+  }, [hasMore, loadingMore, index, photos.length, onEndReached])
   useEffect(() => {
     const identity = { scale: 1, x: 0, y: 0 }
     pendingTransform.current = identity
@@ -209,7 +215,9 @@ export default function Viewer({ photos, current, onClose }) {
         <ChevronRight/>
       </IconButton>}
     </Box>
-    {controls && <div className="garden-viewer-footer">{selected.name}</div>}
+    {controls && <div className="garden-viewer-footer">{selected.name}
+      {loadingMore && <span role="status"> · 正在加载更多照片…</span>}
+    </div>}
     {!controls && <IconButton aria-label="显示照片工具栏" onClick={() => setControls(true)}
       sx={{ position: 'absolute', top: 'max(14px, env(safe-area-inset-top, 0px))', right: 12, color: '#fff', zIndex: 2 }}>
       <EyeOutlined/>

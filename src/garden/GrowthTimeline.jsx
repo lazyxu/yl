@@ -34,7 +34,7 @@ export default function GrowthTimeline({ entries, photos, onEdit, onDelete, onOp
             </IconButton>
           </Box>
           {entry.note && <p className="garden-timeline-note">{entry.note}</p>}
-          <Box display="grid" gridTemplateColumns={entry.photos.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))'}
+          <Box display="grid" gridTemplateColumns={(entry.photos || []).length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))'}
             gap={1} mt={entry.note ? 1 : 1.5}>
             {(entry.photos || []).map(photo => <button type="button" className="garden-picture-button" key={photo.id}
               aria-label={'查看照片：' + photo.name} onClick={() => onOpenPhoto(indices.get(photo.id))}>

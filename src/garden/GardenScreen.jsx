@@ -188,9 +188,10 @@ export default function Garden({ active = true }) {
                   <Typography variant="body2" color="text.secondary" my={1}>{search.trim() ? '尝试换个关键词' : '添加一株花，开始记录成长'}</Typography>
                   {search.trim() && <Button onClick={() => setSearch('')}>清除搜索</Button>}
                 </div>
-              : group ? <>{groups.map(([name, list]) => <section key={name} aria-label={name}>
+              : group ? <>{groups.map(([name, list]) => <section key={name} aria-label={name}
+                className="garden-species-group">
                 <h2 className="garden-group-heading">{name}<span className="garden-group-count">已加载 {list.length} 株</span></h2>
-                <PlantGrid items={list} onSelect={goPlant} />
+                <PlantGrid items={list} onSelect={goPlant} virtualize={false} />
               </section>)}</> : <PlantGrid items={plants} onSelect={goPlant} />}
           {loading && plants.length > 0 && <Box sx={{ height: 3, mt: 1 }}><CircularProgress size={18} aria-label="正在刷新花卉" /></Box>}
           {plants.length > 0 && <div className="garden-pagination">
