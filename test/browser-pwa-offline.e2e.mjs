@@ -84,6 +84,9 @@ async function verify(engine) {
     const snapshot = await idbValue(page, 'calendar')
     assert(snapshot && Number.isInteger(snapshot.rulesVersion), tag + ': confirmed calendar snapshot written')
 
+    const calendarResponse = await page.request.get(origin + '/api/settings/shifts')
+    assert.match(calendarResponse.headers()['cache-control'] || '', /no-store/,
+      tag + ': authoritative schedule JSON cannot be replayed from HTTP cache')
     const precaches = await page.evaluate(async () => {
       const names = await caches.keys()
       const cache = await caches.open(names.find(n => n.startsWith('yl-shell-')))
@@ -123,6 +126,7 @@ async function verify(engine) {
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
     await page.locator('.garden-detail-back').click()
     await page.getByText(name, { exact: true }).waitFor()
+    await page.getByText('离线浏览设置', { exact: true }).click()
     await page.getByLabel('开启花园离线浏览').check()
     await page.getByText(name, { exact: true }).click()
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
@@ -144,6 +148,7 @@ async function verify(engine) {
     await context.setOffline(false)
     await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
     await page.getByText(name, { exact: true }).waitFor()
+    await page.getByText('离线浏览设置', { exact: true }).click()
     await page.getByLabel('开启花园离线浏览').uncheck()
     await page.waitForFunction(() => localStorage.getItem('yl-garden-offline-optin-v1') !== 'yes')
     assert.equal(await idbValue(page, 'garden:index'), null, tag + ': revoke consent erases offline index')
