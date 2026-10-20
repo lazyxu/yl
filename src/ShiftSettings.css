@@ -172,3 +172,8 @@
 @media (prefers-color-scheme: dark) {
   .app-shell[data-module="日历"] ~ .MuiDialog-root .shift-date-error { color: #ffc0c0; }
 }
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .shift-settings-dialog .shift-settings-heading { min-height: 48px; padding-block: 6px; }
+  .shift-settings-dialog .shift-settings-content { padding-block: 12px; }
+}

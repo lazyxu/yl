@@ -299,3 +299,14 @@
 @media (min-width: 600px) {
   .garden-calendar-grid { grid-template-rows: 33px repeat(6, minmax(62px, 1fr)); }
 }
+
+.garden-draft-fallback {
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; font-size: 12px; line-height: 1.5;
+  padding: 10px; color: var(--garden-ink); border: 1px dashed var(--garden-border);
+  box-sizing: border-box;
+}
+.garden-viewer-stage .garden-large-photo { will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .garden-viewer-stage .garden-large-photo { transition: none; }
+}

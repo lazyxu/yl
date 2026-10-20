@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, useMediaQuery } from '@mui/material'
 import useKeyboardViewport from './useKeyboardViewport'
 
@@ -10,8 +10,11 @@ export default function ShiftEditDialog({
   const viewport = useKeyboardViewport()
   const keyboardOpen = fullScreen && viewport.keyboardOpen
   const [discardOpen, setDiscardOpen] = useState(false)
+  const pendingNavigation = useRef(null)
 
-  useEffect(() => { if (!open) setDiscardOpen(false) }, [open])
+  useEffect(() => {
+    if (!open) { setDiscardOpen(false); pendingNavigation.current = null }
+  }, [open]))
   useEffect(() => {
     if (!open || !dirty) return
     const warn = event => { event.preventDefault(); event.returnValue = '' }
@@ -19,6 +22,16 @@ export default function ShiftEditDialog({
     return () => window.removeEventListener('beforeunload', warn)
   }, [open, dirty])
 
+  useEffect(() => {
+    if (!open || !dirty || saving) return
+    const intercept = event => {
+      event.preventDefault()
+      pendingNavigation.current = event.detail?.proceed || null
+      setDiscardOpen(true)
+    }
+    window.addEventListener('yl:navigation-intent', intercept)
+    return () => window.removeEventListener('yl:navigation-intent', intercept)
+  }, [open, dirty, saving])
   function requestClose() {
     if (saving) return
     if (dirty) setDiscardOpen(true)
@@ -48,8 +61,12 @@ export default function ShiftEditDialog({
         <DialogContentText>当前编辑的排班尚未保存，放弃后不会修改原排班数据。</DialogContentText>
       </DialogContent>
       <DialogActions className="shift-confirm-actions">
-        <Button onClick={() => setDiscardOpen(false)}>继续编辑</Button>
-        <Button color="error" variant="contained" onClick={() => { setDiscardOpen(false); onCancel() }}>放弃更改</Button>
+        <Button onClick={() => { pendingNavigation.current = null; setDiscardOpen(false) }}>继续编辑</Button>
+        <Button color="error" variant="contained" onClick={() => {
+          const proceed = pendingNavigation.current
+          pendingNavigation.current = null
+          setDiscardOpen(false); onCancel(); proceed?.()
+        }}>放弃更改</Button>
       </DialogActions>
     </Dialog>
   </>
