@@ -121,6 +121,18 @@ async function verify(engine) {
       tag + ': Vite assets precached')
     assert(precaches.requests.every(x => !x.startsWith('/api/')),
       tag + ': no private API in app precache')
+    // Verify real Express responses, not just declarations in source code.
+    const bundledJS = precaches.requests.find(x => /^\/assets\/.+\.js$/.test(x))
+    const [assetHeaders, htmlHeaders, workerHeaders] = await Promise.all([
+      page.request.get(origin + bundledJS), page.request.get(origin + '/index.html'),
+      page.request.get(origin + '/sw.js'),
+    ])
+    assert.match(assetHeaders.headers()['cache-control'] || '', /max-age=31536000.*immutable/,
+      tag + ': Vite hashed assets receive long-lived immutable HTTP cache headers')
+    assert.match(htmlHeaders.headers()['cache-control'] || '', /no-cache/,
+      tag + ': index HTML must be revalidated')
+    assert.match(workerHeaders.headers()['cache-control'] || '', /no-store/,
+      tag + ': service worker updates must bypass HTTP cache')
 
     await disconnect(engine, context)
     await page.reload({ waitUntil: 'domcontentloaded' })
