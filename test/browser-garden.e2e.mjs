@@ -113,7 +113,7 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     // A still-closing MUI dialog can retain an editing textarea with the
     // same content as the saved timeline paragraph. Await actual close.
     await modal.waitFor({ state: 'hidden' })
-    await page.locator('.garden-timeline-note').getByText('浏览器端到端测试：开花', { exact: true }).waitFor()
+    await page.locator('.garden-timeline-note').filter({ hasText: '浏览器端到端测试：开花' }).waitFor()
     await page.getByRole('button', { name: '查看照片：garden.png' }).click()
     const downloadAnchor = page.locator('[aria-label="下载原图"]')
     await downloadAnchor.waitFor()
@@ -122,7 +122,7 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     check(downloadHref?.includes('/api/garden/photos/') && downloadHref.endsWith('/original?download=1'), tag + ': original download URL')
     await page.getByRole('button', { name: '关闭', exact: true }).click()
 
-    const record = page.locator('.garden-timeline-note').getByText('浏览器端到端测试：开花', { exact: true })
+    const record = page.locator('.garden-timeline-note').filter({ hasText: '浏览器端到端测试：开花' })
     await record.waitFor()
     await page.getByRole('button', { name: '日记操作' }).click()
     await page.getByRole('menuitem', { name: '删除日记' }).click()
