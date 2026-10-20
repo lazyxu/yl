@@ -13,6 +13,7 @@ import BottomNavigationAction from '@mui/material/BottomNavigationAction'
 import { UNSAFE_DataRouterContext, useSearchParams } from 'react-router-dom'
 import { createPindouDraft } from './pindouDraft'
 import useKeyboardViewport from './useKeyboardViewport'
+import PWAUpdatePrompt from './offline/PWAUpdatePrompt'
 
 const Calendar = React.lazy(() => import('./Calendar'))
 const Inventory = React.lazy(() => import('./Inventory'))
@@ -169,6 +170,7 @@ function App() {
             <BottomNavigationAction label="花园" value="花园" aria-current={primaryView === '花园' ? 'page' : undefined} icon={<LocalFloristOutlinedIcon />} disabled={formBusy} />
           </BottomNavigation>
         </footer>
+        <PWAUpdatePrompt currentView={view} />
       </div>
     </ThemeProvider>
   )

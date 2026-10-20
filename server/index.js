@@ -45,9 +45,21 @@ if (fs.existsSync(serverDist)) distPath = serverDist;
 else if (fs.existsSync(parentDist)) distPath = parentDist;
 
 if (distPath) {
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    setHeaders(res, filePath) {
+      const rel = path.relative(distPath, filePath).replace(/\\/g, '/');
+      if (/^assets\/.+\.[a-f0-9]{8,}\.(js|css|woff2?|svg|png)$/i.test(rel)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (rel === 'sw.js') {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else if (rel === 'index.html' || rel === 'manifest.webmanifest' || rel === 'pwa-theme-init.js') {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      }
+    },
+  }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
