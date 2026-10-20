@@ -186,7 +186,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     {!offlineReadOnly && navigator.onLine && <div className="garden-record-dock">
       <Button startIcon={<CameraAltOutlined/>} color="success" variant="contained"
         onClick={() => { setEditing(null); setEntryEditor(true) }}>记录成长</Button>
-    </div>
+    </div>}
     <PlantEditor open={plantEditor} plant={plant} species={species}
       onClose={() => setPlantEditor(false)} onSaved={() => { load(); onChange() }}
       onSpecies={onSpecies} notify={notify} />
