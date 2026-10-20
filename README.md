@@ -4,13 +4,13 @@
 
 2026-10 起，yl 在现有日历和拼豆之外，增加「花园」模块。**首页仍为日历**，底部切换「日历 / 拼豆 / 花园」，保留现有日历状态、拼豆库存/历史/补豆/消耗操作。
 
-花园主要功能：按株与品种管理花卉、种植日期与位置、拍照上传 1–8 张、记录时间和备注、可选记录者昵称、成长时间线（含日记照片查看）、成长日历、花卉归档、完整 ZIP 导出。Web 与手机浏览器复用同一个 React 前端和 Node API。
+花园主要功能：按株与品种管理花卉、种植日期与位置、拍照上传 1–8 张、记录时间和备注、可选记录者昵称、成长时间线（含日记照片查看）、成长日历；花园统一显示历史归档及当前花卉。Web 与手机浏览器复用同一个 React 前端和 Node API。
 
 - **技术选型不变**：React + JavaScript + MUI；Express + Sequelize + MySQL；SSH 发布、PM2/Nginx 和原 GitLab CI。
 - **手机 PWA**：在支持的浏览器中通过 HTTPS 打开后可以安装到主屏幕；本阶段不承诺离线记录，Service Worker 不缓存 API 或照片。普通 HTTP 局域网地址通常无法安装为 PWA（localhost 例外）。
 - **不做家庭登录**：本阶段不包含登录、成员注册和权限管理。所有可访问当前 yl 的用户也能操作花园，包括修改/删除照片，公网使用者须自行通过现有服务器访问控制限制访问。
 - **数据持久化**：新表为 `garden_species`、`garden_plants`、`garden_entries`、`garden_photos`。媒体保存在 `server/uploads/garden/{originals,thumbs,previews}`；yue/yl 现有 `uploads` 备份/恢复递归覆盖这些文件。
-- **上传约束**：JPEG、PNG、WEBP、HEIC；单张 20 MiB，最多 8 张，总计 90 MiB。前端提交带时区、精确到秒的 ISO 时间以兼容旧版服务器；后端仍兼容毫秒和时区偏移；花园首页提供下载完整 ZIP 原图与清单的入口。原图始终保留；Sharp 支持的格式生成 JPEG 缩略图和高分辨率预览。服务器环境缺少 HEIC 编码器时保留原图，在支持 HEIC 的客户端直接查看，其他客户端的 HEIC 预览可能不可用。
+- **上传约束**：JPEG、PNG、WEBP、HEIC；单张 20 MiB，最多 8 张，总计 90 MiB。前端提交带时区、精确到秒的 ISO 时间以兼容旧版服务器；后端仍兼容毫秒和时区偏移；花园不再提供独立 ZIP 导出，完整数据备份继续由系统级备份/恢复脚本负责。原图始终保留；Sharp 支持的格式生成 JPEG 缩略图和高分辨率预览。服务器环境缺少 HEIC 编码器时保留原图，在支持 HEIC 的客户端直接查看，其他客户端的 HEIC 预览可能不可用。
 - **备份/恢复和发布**：继续使用 `bash release_deploy.sh`（发布前 MySQL + uploads 备份）、`backup_data.sh`、`restore_data.sh`、PM2。发布前必须先通过 MySQL 新表集成测试；新版本不允许清空原日历或拼豆数据。
 - **本地验证**：`node --test test/garden-validation.test.cjs`；前端按原 `npm ci --legacy-peer-deps && npm run build`；MySQL 联调使用 `BACKUP_TEST_MYSQL=1 node --test test/garden.integration.cjs`（先安装 server 依赖并设置测试数据库环境）。
 
@@ -112,10 +112,10 @@ bash restore_data.sh 'backups/<备份目录>' --apply --restore-env
 
 ### 花园分页接口与查询成本
 
-- GET /api/garden/plants?status=active&limit=36&cursor=... -> { items, total, has_more, next_cursor }
+- GET /api/garden/plants?status=all&limit=36&cursor=... -> { items, total, has_more, next_cursor }；花园界面固定读取全部花卉（包括历史 archived 状态），保留原状态字段与旧接口参数以兼容既有数据，不迁移、不删除旧记录。
 - GET /api/garden/calendar/day?date=YYYY-MM-DD&limit=40&cursor=... -> 同结构；前端必须显示总数，并在 has_more=true 时提供继续加载。
 - GET /api/garden/entries?plant_id=ID&limit=40&order=asc&offset=... -> { items, has_more }；成长时间线按 observed_ts ASC、id ASC 正序逐页展示，新增记录在下方，加载更多追加后续日记。省略 order 时保留原 DESC 默认排序，供旧客户端使用。
-- 不传 limit/cursor 的旧 API 暂保留数组响应，供旧版客户端过渡（历史接口仍有 500 株/200 条上限，不能作为完整数据导出）。ZIP 导出始终使用数据库完整记录。
+- 不传 limit/cursor 的旧 API 暂保留数组响应，供旧版客户端过渡（历史接口仍有 500 株/200 条上限）。花园独立 ZIP 导出入口和 /api/garden/export 已删除；完整数据备份通过既有 MySQL + uploads 系统级备份/恢复脚本执行。
 - 游标基于排序时间和记录 ID，避免深 offset 分页；查询应按用户请求停止、忽略过期响应。列表照片统计统一通过一次 SQL 聚合完成，而不是对每株花独立查询。
 - MySQL 8.4 集成测试覆盖超过 500 株和单日 200 条记录，逐页验证无重复、无丢失，并核对 SQL 次数。运行前后性能 benchmark 时应使用相同数据量和环境，不能把 SQL 次数直接当作毫秒响应时间。
 
@@ -134,7 +134,7 @@ MARD 调色盘建立一次按色号索引的 Map（src/palette.js），供库存
 
 ### 照片处理与私有缓存
 
-花园照片处理限制并发解码任务最多 2 个，额外最多排队 8 个，拥塞时拒绝新任务并返回可重试提示。预览先从原图解码生成最大边 2048px 的 JPEG，再从有限尺寸预览生成最大边 560px 缩略图，避免对完整原图重复解码。原图/完整 ZIP 仍禁用浏览器缓存；不可变 UUID 命名的 thumb/preview 返回 private 一天缓存、ETag，允许私有浏览器复用而不触发重复传输。仅本机私有浏览器缓存，不能向共享 CDN 缓存用户媒体。
+花园照片处理限制并发解码任务最多 2 个，额外最多排队 8 个，拥塞时拒绝新任务并返回可重试提示。预览先从原图解码生成最大边 2048px 的 JPEG，再从有限尺寸预览生成最大边 560px 缩略图，避免对完整原图重复解码。原图仍禁用浏览器缓存；不可变 UUID 命名的 thumb/preview 返回 private 一天缓存、ETag，允许私有浏览器复用而不触发重复传输。仅本机私有浏览器缓存，不能向共享 CDN 缓存用户媒体。
 
 ### 日历滑动优化
 手机日历触摸移动使用 requestAnimationFrame 与 CSS translate3d，而不是每个 touchmove 更新 React state。识别纵向滚动和边缘手势，防止误切月份；长按调整排班行为保持。Jest 包含多次 move 合并到一个动画帧、纵向滚动和取消操作的回归测试。实际 iOS Safari 仍需真机确认。

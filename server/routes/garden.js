@@ -1,6 +1,5 @@
 'use strict'
 const express = require('express')
-const fs = require('node:fs')
 const sequelize = require('../sequelize')
 const { GardenSpecies, GardenPlant, GardenEntry, GardenPhoto } = require('../models/garden')
 const { badRequest, validDay, positiveId, text, normalizePlant, normalizeEntry } = require('../services/garden-validation')
@@ -169,8 +168,8 @@ router.get('/photos/:id/:variant', wrap(async (req, res) => {
   if (!photo) return reject(res, '照片不存在', 404)
   const location = photoLocation(photo, req.params.variant)
   const derived = req.params.variant === 'thumb' || req.params.variant === 'preview'
-  // Each derivative uses an immutable UUID filename; originals and ZIP exports
-  // remain non-cacheable. Private caches save bandwidth on repeated gallery visits.
+  // Each derivative uses an immutable UUID filename; originals remain
+  // non-cacheable. Private caches save bandwidth on repeated gallery visits.
   if (derived) {
     const tag = '"garden-' + photo.id + '-' + req.params.variant + '-' + photo.storage_name + '"'
     res.setHeader('Cache-Control', 'private, max-age=86400, immutable')
@@ -198,32 +197,6 @@ router.get('/calendar/day', wrap(async (req, res) => {
   if (!validDay(req.query.date)) throw badRequest('日历日期无效')
   res.json(await listDay(req.query.date, req.query))
 }))
-router.get('/export', wrap(async (_req, res) => {
-  const archiver = require('archiver')
-  const [species, plants, entries, photos] = await Promise.all([
-    GardenSpecies.findAll({ raw: true }), GardenPlant.findAll({ raw: true }),
-    GardenEntry.findAll({ raw: true }), GardenPhoto.findAll({ raw: true }),
-  ])
-  const manifest = {
-    format: 'yl-garden-export-v1', exported_at: new Date().toISOString(),
-    species, plants, entries, photos: photos.map(p => ({
-      id: p.id, entry_id: p.entry_id, filename: p.original_name,
-      archive_path: 'photos/' + p.id + '_' + p.storage_name, mime: p.mime,
-    })),
-  }
-  noCache(res)
-  res.attachment('yl-garden-' + new Date().toISOString().slice(0, 10) + '.zip')
-  const archive = archiver('zip', { zlib: { level: 6 } })
-  archive.on('error', err => { console.error('garden export:', err); res.destroy(err) })
-  archive.pipe(res)
-  archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' })
-  for (const p of photos) {
-    const location = photoLocation(p, 'original')
-    if (fs.existsSync(location.path)) archive.file(location.path, { name: 'photos/' + p.id + '_' + p.storage_name })
-  }
-  await archive.finalize()
-}))
-
 router.use((err, _req, res, next) => {
   if (res.headersSent) return next(err)
   const code = err.status || (err.name === 'SequelizeUniqueConstraintError' ? 409 : 500)

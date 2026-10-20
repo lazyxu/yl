@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Box, Button, CircularProgress, IconButton, Paper, Stack, Typography } from '@mui/material'
-import { ArrowBack, ArchiveOutlined, CameraAltOutlined, DeleteOutline, EditOutlined, UnarchiveOutlined } from '@mui/icons-material'
+import { ArrowBack, CameraAltOutlined, DeleteOutline, EditOutlined } from '@mui/icons-material'
 import { gardenRequest, gardenJSON, plantedDays } from '../gardenApi'
 import { Cover } from './Shared'
 import PlantEditor from './PlantEditor'
@@ -52,15 +52,6 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
       if (version === requestVersion.current) setMoreBusy(false)
     }
   }
-  async function updateArchive() {
-    const data = {
-      name: plant.name, species_id: plant.species_id || 0, planted_on: plant.planted_on || '',
-      location: plant.location || '', notes: plant.notes || '',
-      status: plant.status === 'active' ? 'archived' : 'active',
-    }
-    try { await gardenRequest('/plants/' + id, gardenJSON(data, 'PATCH')); await load(); onChange() }
-    catch (err) { notify(err.message, true) }
-  }
   async function deletePlant() {
     if (!window.confirm('确定删除「' + plant.name + '」？' + CONFIRM_DELETE)) return
     try {
@@ -92,7 +83,6 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
         <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap spacing={1} mt={1}>
           <Button startIcon={<CameraAltOutlined />} variant="contained" onClick={() => { setEditing(null); setEntryEditor(true) }}>记录成长</Button>
           <IconButton title="编辑花卉" aria-label="编辑花卉" onClick={() => setPlantEditor(true)}><EditOutlined /></IconButton>
-          <IconButton title={plant.status === 'active' ? '归档' : '恢复'} aria-label="归档或恢复" onClick={updateArchive}>{plant.status === 'active' ? <ArchiveOutlined /> : <UnarchiveOutlined />}</IconButton>
           <IconButton title="永久删除花卉" aria-label="删除花卉" color="error" onClick={deletePlant}><DeleteOutline /></IconButton>
         </Stack>
       </Stack>
