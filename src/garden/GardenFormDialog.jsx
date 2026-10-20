@@ -2,9 +2,12 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Box, Button, Dialog, DialogContent, DialogTitle, useMediaQuery } from '@mui/material'
 import GardenConfirmDialog from './GardenConfirmDialog'
+import useKeyboardViewport from '../useKeyboardViewport'
 
 export default function GardenFormDialog({ open, title, busy, dirty, onClose, onSave, children, saveLabel = '保存' }) {
   const phone = useMediaQuery('(max-width:599.95px), (max-height:480px) and (pointer:coarse)')
+  const viewport = useKeyboardViewport()
+  const keyboardOpen = phone && viewport.keyboardOpen
   const [discardConfirm, setDiscardConfirm] = useState(false)
   const pendingNavigation = useRef(null)
   useEffect(() => {
@@ -34,7 +37,9 @@ export default function GardenFormDialog({ open, title, busy, dirty, onClose, on
   return <>
     <Dialog open={open} onClose={requestClose} fullScreen={phone} fullWidth maxWidth="sm"
       scroll="paper" aria-label={title}
-      PaperProps={{ className: 'garden-editor-dialog', sx: { borderRadius: phone ? '0 !important' : 3 } }}>
+      PaperProps={{ className: 'garden-editor-dialog', sx: { borderRadius: phone ? '0 !important' : 3 },
+        style: keyboardOpen ? { height: viewport.height, maxHeight: viewport.height } : undefined }}
+      data-keyboard-open={keyboardOpen}>
       <DialogTitle component="div" sx={{ p: phone ? 'max(12px, env(safe-area-inset-top, 0px)) 12px 6px' : '8px 14px 4px' }}>
         <div className="garden-form-toolbar">
           <Button disabled={busy} onClick={requestClose}>取消</Button>

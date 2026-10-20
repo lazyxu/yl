@@ -170,7 +170,7 @@
 .shift-date-error { color: #bb3037; font-size: 13px; margin: 6px 0 12px; }
 .shift-settings-dialog .shift-current-eyebrow { color: var(--app-accent, #347c52); }
 @media (prefers-color-scheme: dark) {
-  .app-shell[data-module="日历"] ~ .MuiDialog-root .shift-date-error { color: #ffc0c0; }
+  :root[data-theme="dark"] .shift-date-error { color: #ffc0c0; }
 }
 
 @media (max-height: 480px) and (orientation: landscape) {
