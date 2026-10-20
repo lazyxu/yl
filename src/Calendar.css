@@ -30,7 +30,7 @@
 }
 .schedule-screen .header h2 {
   margin: 0; flex: 1; min-width: 0;
-  font-size: clamp(17px, 4.8vw, 23px);
+  font-size: clamp(21px, 6vw, 28px);
   font-weight: 720; line-height: 1.3; color: var(--schedule-ink); text-align: center;
 }
 .schedule-screen .header .MuiIconButton-root { width: 44px; height: 44px; flex-shrink: 0; }
@@ -130,7 +130,7 @@
   .schedule-screen { padding-inline: 7px; }
   .schedule-screen .calendar { margin-inline: -4px; padding-inline: 2px; gap: 0; border-radius: 13px; }
   .schedule-screen .calendar .shift { padding-inline: 1px; }
-  .schedule-screen .header h2 { font-size: 17px; }
+  .schedule-screen .header h2 { font-size: 19px; }
   .schedule-screen .selected-date-info { padding-inline: 12px; }
 }
 @media (min-width: 700px) {

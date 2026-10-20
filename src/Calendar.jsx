@@ -295,8 +295,7 @@ export default function Calendar({ active = true }) {
     <div className="calendar-container">
       <header className="schedule-topbar">
         <div className="schedule-heading">
-          <Typography component="p" className="schedule-eyebrow">排班日历</Typography>
-          <Typography component="h1" className="schedule-page-title">我的日历</Typography>
+          <Typography component="p" className="schedule-eyebrow">班次安排</Typography>
         </div>
         <Button startIcon={<SettingsOutlined />} onClick={() => setSettingsOpen(true)}
           disabled={loadingSettings || settings.version === null}
@@ -324,11 +323,11 @@ export default function Calendar({ active = true }) {
       {settingsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
       {dayShiftsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
 
-      <div className="calendar" role="grid" aria-label={currentMonth.format('YYYY年MM月') + '排班月历'}
+      <div className="calendar" role="group" aria-label={currentMonth.format('YYYY年MM月') + '排班月历，方向键可移动日期'}
         ref={calendarRef} onKeyDown={onCalendarKeyDown}
         onTouchStart={onTouchStart} onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}>
-        {['日', '一', '二', '三', '四', '五', '六'].map(day => <div key={day} className="weekday" role="columnheader">{day}</div>)}
+        {['日', '一', '二', '三', '四', '五', '六'].map(day => <div key={day} className="weekday" aria-hidden="true">{day}</div>)}
         {generateCalendar()}
       </div>
 
