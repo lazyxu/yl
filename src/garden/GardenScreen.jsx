@@ -28,12 +28,6 @@ export default function Garden({ active = true }) {
   const [notice, setNotice] = useState(null)
   const [installHint, setInstallHint] = useState(shouldShowInstallHint)
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
-  const [showLoadingPlaceholder, setShowLoadingPlaceholder] = useState(false)
-  useEffect(() => {
-    if (!loading) { setShowLoadingPlaceholder(false); return }
-    const timer = setTimeout(() => setShowLoadingPlaceholder(true), 180)
-    return () => clearTimeout(timer)
-  }, [loading])
   const [selectedDay, setSelectedDay] = useState('')
   const scrollSaved = useRef([0, 0])
   const sentinel = useRef(null)
@@ -42,6 +36,12 @@ export default function Garden({ active = true }) {
     plants, species, search, setSearch, loading, error,
     plantHasMore, plantTotal, plantLoadingMore, fetchSpecies, refresh, loadMorePlants,
   } = useGardenPlants(active, notify)
+  const [showLoadingPlaceholder, setShowLoadingPlaceholder] = useState(false)
+  useEffect(() => {
+    if (!loading) { setShowLoadingPlaceholder(false); return }
+    const timer = setTimeout(() => setShowLoadingPlaceholder(true), 180)
+    return () => clearTimeout(timer)
+  }, [loading])
 
   const scrollArea = () => document.querySelector('.app-page[data-view="花园"]')
   const rememberScroll = () => {
