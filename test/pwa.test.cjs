@@ -28,6 +28,7 @@ test('production PWA has manifest, SVG/PNG icons and service worker without offl
   const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8')
   assert.match(sw, /\byl-shell-/)
   assert.match(sw, /caches\.open/)
+  assert.match(sw, /caches\.delete\(CACHE_NAME\)/)
   assert.match(sw, /request\.method !== 'GET'/)
   assert.match(sw, /caches\.match\(url\.pathname\)/)
   assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/)

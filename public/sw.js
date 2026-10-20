@@ -10,12 +10,19 @@ self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME)
     // Install atomically. A failed precache leaves the previous SW running.
-    await Promise.all(PRE_CACHE.map(async item => {
-      const request = new Request(item.url, { cache: 'reload', credentials: 'same-origin' })
-      const response = await fetch(request)
-      if (!response.ok) throw new Error('Failed to precache ' + item.url)
-      await cache.put(item.url, response)
-    }))
+    try {
+      await Promise.all(PRE_CACHE.map(async item => {
+        const request = new Request(item.url, { cache: 'reload', credentials: 'same-origin' })
+        const response = await fetch(request)
+        if (!response.ok) throw new Error('Failed to precache ' + item.url)
+        await cache.put(item.url, response)
+      }))
+    } catch (error) {
+      // Keep the old worker active and do not strand a half-filled generation
+      // when quota, a transient 404 or an interrupted deployment fails.
+      await caches.delete(CACHE_NAME)
+      throw error
+    }
   })())
   // New versions do not skipWaiting until the user has completed editing.
 })
