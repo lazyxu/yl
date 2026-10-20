@@ -1,6 +1,6 @@
 
 .garden-root {
-  --garden-green: #347c52;
+  --garden-green: var(--app-accent, #347c52);
   --garden-ink: var(--app-ink, #203329);
   --garden-muted: var(--app-muted, #687970);
   --garden-card: var(--app-surface, #fff);
@@ -245,4 +245,18 @@
 @media (prefers-reduced-motion: reduce) {
   .garden-loading-card { animation: none; }
   .garden-viewer-stage img { transition: none; }
+}
+
+.garden-editor-dialog { background: var(--app-surface, #fff); }
+.garden-editor-dialog .MuiDialogContent-root {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+.garden-editor-dialog input[type="date"], .garden-editor-dialog input[type="datetime-local"] {
+  min-height: 44px;
+}
+@media (max-width: 599.95px) {
+  .garden-editor-dialog { height: 100dvh !important; max-height: 100dvh !important; }
+  .garden-editor-dialog .MuiDialogTitle-root { border-bottom: 1px solid var(--app-border, #e3eae4); }
 }

@@ -366,6 +366,8 @@ test('花园保留全部历史归档花卉，且不显示归档或 ZIP 导出入
   await act(async () => archivedCard.dispatchEvent(new MouseEvent('click', { bubbles: true })))
   expect(document.querySelector('[aria-label="归档或恢复"]')).toBeNull()
   // "删除" refers only to the export feature; never remove real deletion controls.
+  expect(document.querySelector('[aria-label="更多花卉操作"]')).not.toBeNull()
+  await click('更多花卉操作')
   expect(document.querySelector('[aria-label="删除花卉"]')).not.toBeNull()
   expect(document.querySelector('[aria-label="编辑花卉"]')).not.toBeNull()
 })

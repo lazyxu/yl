@@ -28,9 +28,14 @@ export default function Garden({ active = true }) {
   const [notice, setNotice] = useState(null)
   const [installHint, setInstallHint] = useState(shouldShowInstallHint)
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  const [showLoadingPlaceholder, setShowLoadingPlaceholder] = useState(false)
+  useEffect(() => {
+    if (!loading) { setShowLoadingPlaceholder(false); return }
+    const timer = setTimeout(() => setShowLoadingPlaceholder(true), 180)
+    return () => clearTimeout(timer)
+  }, [loading])
   const [selectedDay, setSelectedDay] = useState('')
   const scrollSaved = useRef([0, 0])
-  const scrollFrame = useRef(null)
   const sentinel = useRef(null)
   const notify = useCallback((message, error = false) => setNotice({ message, error }), [])
   const {
@@ -59,10 +64,8 @@ export default function Garden({ active = true }) {
   }
   useLayoutEffect(() => {
     if (!active) return
-    cancelAnimationFrame(scrollFrame.current)
     const node = scrollArea()
     if (node) node.scrollTop = selectedPlant ? 0 : scrollSaved.current[tab]
-    return () => cancelAnimationFrame(scrollFrame.current)
   }, [selectedPlant, tab, active])
 
   const groups = useMemo(() => {
@@ -113,7 +116,7 @@ export default function Garden({ active = true }) {
           <label className="garden-search">
             <SearchOutlined aria-hidden="true" sx={{ color: 'var(--garden-muted)' }} />
             <input type="search" aria-label="搜索花卉或位置" placeholder="搜索花卉、品种或位置"
-              value={search} onChange={e => setSearch(e.target.value)} autoComplete="off" />
+              value={search} onChange={e => { setSearch(e.target.value); scrollSaved.current[0] = 0; const node = scrollArea(); if (node) node.scrollTop = 0 }} autoComplete="off" />
             {search && <IconButton size="small" aria-label="清除搜索" onClick={() => setSearch('')}><Close fontSize="small" /></IconButton>}
           </label>
           <div className="garden-list-header">
@@ -121,10 +124,10 @@ export default function Garden({ active = true }) {
               <Typography variant="caption" color="text.secondary">{plantTotal} 株</Typography>
             </div>
             <div className="garden-view-switch" role="group" aria-label="花卉分组">
-              <button type="button" aria-pressed={!group} onClick={() => { setGroup(false); scrollSaved.current[0] = 0 }}>
+              <button type="button" aria-pressed={!group} onClick={() => { setGroup(false); scrollSaved.current[0] = 0; const node = scrollArea(); if (node) node.scrollTop = 0 }}>
                 <ListOutlined fontSize="small" aria-hidden="true" sx={{ verticalAlign: 'middle' }} /> 按单株
               </button>
-              <button type="button" aria-pressed={group} onClick={() => { setGroup(true); scrollSaved.current[0] = 0 }}>
+              <button type="button" aria-pressed={group} onClick={() => { setGroup(true); scrollSaved.current[0] = 0; const node = scrollArea(); if (node) node.scrollTop = 0 }}>
                 <GridViewOutlined fontSize="small" aria-hidden="true" sx={{ verticalAlign: 'middle' }} /> 按品种
               </button>
             </div>
@@ -133,7 +136,9 @@ export default function Garden({ active = true }) {
             {plants.length ? '刷新失败，以下仍是上次的结果：' : '花园加载失败：'}{error}
           </Alert>}
           {loading && plants.length === 0 && !error
-            ? <div className="garden-loading-grid" aria-label="正在获取花卉"><div className="garden-loading-card"/><div className="garden-loading-card"/><div className="garden-loading-card"/><div className="garden-loading-card"/></div>
+            ? <div style={{ minHeight: 320 }} aria-busy="true" aria-label="正在获取花卉">
+              {showLoadingPlaceholder && <div className="garden-loading-grid"><div className="garden-loading-card"/><div className="garden-loading-card"/><div className="garden-loading-card"/><div className="garden-loading-card"/></div>}
+            </div>
             : plants.length === 0 && !error
               ? <div className="garden-empty">
                   <LocalFloristOutlined sx={{ fontSize: 56, color: '#91b59b' }} />

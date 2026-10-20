@@ -71,10 +71,17 @@ async function listPlants(query) {
   const keyword = text(query.q || '', 100, '搜索关键字')
   const filter = {}
   if (status !== 'all') filter.status = status
-  if (keyword) filter[Op.or] = [
-    { name: { [Op.like]: '%' + keyword + '%' } },
-    { location: { [Op.like]: '%' + keyword + '%' } },
-  ]
+  if (keyword) {
+    // Species names are searchable without changing the legacy query contract.
+    const matches = await GardenSpecies.findAll({
+      attributes: ['id'], where: { name: { [Op.like]: '%' + keyword + '%' } },
+    })
+    filter[Op.or] = [
+      { name: { [Op.like]: '%' + keyword + '%' } },
+      { location: { [Op.like]: '%' + keyword + '%' } },
+      { species_id: { [Op.in]: matches.map(item => item.id) } },
+    ]
+  }
   if (query.species_id) {
     const speciesId = positiveId(query.species_id)
     if (!speciesId) throw badRequest('品种编号无效')

@@ -144,6 +144,10 @@ test('garden MySQL CRUD, photos, calendar and no ZIP export', { skip: !process.e
     assert.equal(withArchived.body.items[0].id, id)
     assert.equal(withArchived.body.items[0].status, 'archived', 'legacy archived state must be preserved')
     assert.equal((await request('/plants/' + id)).body.status, 'archived')
+    const speciesSearch = await request('/plants?status=all&limit=36&q=' + encodeURIComponent('月季'))
+    assert.equal(speciesSearch.code, 200)
+    assert.equal(speciesSearch.body.total, 1, 'species-name search includes archived plants')
+    assert.equal(speciesSearch.body.items[0].id, id)
     // The legacy endpoint stays an array; the paged endpoint must not truncate
     // plants or silently discard calendar-day entries.
     const models = require('../server/models/garden')

@@ -66,6 +66,10 @@ function App() {
     media.addEventListener?.('change', update)
     return () => media.removeEventListener?.('change', update)
   }, [])
+  useEffect(() => {
+    document.querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', dark ? '#101914' : '#f7faf7')
+  }, [dark])
   const requestedView = searchParams.get('view') || '日历'
   const view = views.includes(requestedView) ? requestedView : '日历'
   const [visited, setVisited] = useState(() => new Set([view]))
