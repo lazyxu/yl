@@ -136,7 +136,7 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.keyboard.press('ArrowLeft')
     check(await page.getByRole('tab', { name: '花卉', exact: true }).getAttribute('aria-selected') === 'true', tag + ': keyboard tabs navigate left')
     await page.getByRole('tab', { name: '成长日历' }).click()
-    await page.getByRole('button', { name: '今天' }).click()
+    await page.getByRole('button', { name: '今天', exact: true }).click()
     const dayCell = await page.locator('.garden-calendar-day:not([disabled])').first().boundingBox()
     check(dayCell && dayCell.width >= 44 && dayCell.height >= 44, tag + ': calendar cell must have 44px touch target')
     await page.getByRole('button', { name: '上个月' }).click()
