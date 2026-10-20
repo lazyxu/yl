@@ -235,6 +235,11 @@
   .garden-loading-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .garden-calendar-day { min-height: 62px; }
 }
+@media (min-width: 350px) and (max-width: 399px) {
+  /* Keep all seven dates at least 44 CSS pixels across 350–399px iPhones. */
+  .garden-calendar-panel { padding: 6px; margin-inline: -7px; }
+  .garden-calendar-grid { gap: 1px; }
+}
 @media (max-width: 349px) {
   .garden-root { padding-left: 10px; padding-right: 10px; }
   .garden-heading { font-size: 27px; }
