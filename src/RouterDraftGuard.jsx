@@ -1,16 +1,36 @@
-import React, { useContext, useEffect } from 'react'
-import { UNSAFE_DataRouterContext } from 'react-router-dom'
-import { unstable_useBlocker } from 'react-router'
+import React, { useCallback, useContext, useEffect, useState } from 'react'
+import { UNSAFE_DataRouterContext, UNSAFE_DataRouterStateContext } from 'react-router-dom'
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material'
 
-// The existing React Router 6.14 BrowserRouter cannot block POP history entries.
-// Mount this only under a data router. The nested editor remains the owner of
-// the unsaved draft and controls whether the user may discard it.
+// react-router-dom@6.14.1 npm runtime does not ship the unstable_useBlocker
+// named export, despite its source API. Reproduce its small upstream hook
+// against the pinned @remix-run/router@1.7.1 contract (getBlocker/deleteBlocker).
+// Only mounted under createBrowserRouter: MemoryRouter keeps legacy tests.
+let blockerSequence = 0
+const IDLE = { state: 'unblocked' }
+function useNativeDataRouterBlocker(when) {
+  const context = useContext(UNSAFE_DataRouterContext)
+  const state = useContext(UNSAFE_DataRouterStateContext)
+  const router = context?.router
+  const [key, setKey] = useState('')
+  const shouldBlock = useCallback(() => Boolean(when), [when])
+  useEffect(() => {
+    if (!router) return
+    const assigned = 'yl-pwa-draft-' + (++blockerSequence)
+    setKey(assigned)
+    return () => router.deleteBlocker(assigned)
+  }, [router])
+  useEffect(() => {
+    if (router && key) router.getBlocker(key, shouldBlock)
+  }, [router, key, shouldBlock])
+  return key ? (state?.blockers?.get(key) || IDLE) : IDLE
+}
+
 function ActiveDraftBlocker({ when, busy, onDiscard, title }) {
-  const blocker = unstable_useBlocker(Boolean(when))
+  const blocker = useNativeDataRouterBlocker(when)
   const blocked = blocker.state === 'blocked'
   useEffect(() => {
-    if (blocked && busy) blocker.reset()
+    if (blocked && busy) blocker.reset?.()
   }, [blocked, busy, blocker])
   return <Dialog open={blocked && !busy} fullWidth maxWidth="xs"
     aria-labelledby="yl-router-draft-title" aria-describedby="yl-router-draft-description">
@@ -21,10 +41,10 @@ function ActiveDraftBlocker({ when, busy, onDiscard, title }) {
       </DialogContentText>
     </DialogContent>
     <DialogActions sx={{ p: 2, gap: 1 }}>
-      <Button onClick={() => blocker.reset()}>继续编辑</Button>
+      <Button onClick={() => blocker.reset?.()}>继续编辑</Button>
       <Button color="error" variant="contained" onClick={() => {
         onDiscard()
-        blocker.proceed()
+        blocker.proceed?.()
       }}>放弃更改</Button>
     </DialogActions>
   </Dialog>
