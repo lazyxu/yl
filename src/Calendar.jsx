@@ -162,16 +162,21 @@ export default function Calendar({ active = true }) {
     try {
       const loaded = await loadShiftSettings(signal)
       if (signal?.aborted) return
-      liveRules.current = loaded
+      // A delayed response may arrive after a newer version from another
+      // foreground refresh. Keep both displayed state and cached pair monotonic.
+      const latest = liveRules.current && liveRules.current.version > loaded.version
+        ? liveRules.current : loaded
+      liveRules.current = latest
       setServerRulesReady(true)
-      setSettings(current => current.version === null || loaded.version >= current.version ? loaded : current)
+      setSettings(current => current.version === null || latest.version >= current.version ? latest : current)
       if (liveOverrides.current) {
-        saveCalendarSnapshot({ rules: loaded.rules, rulesVersion: loaded.version,
+        saveCalendarSnapshot({ rules: latest.rules, rulesVersion: latest.version,
           overrides: liveOverrides.current.overrides,
-          overridesVersion: liveOverrides.current.version }).catch(() => {})
-        setSnapshotAt(Date.now())
+          overridesVersion: liveOverrides.current.version })
+          .then(saved => { if (saved) setSnapshotAt(Date.now()) })
+          .catch(() => {})
       }
-      return loaded
+      return latest
     } catch (error) {
       if (error.name !== 'AbortError') setSettingsError('无法读取排班设置，当前显示上次已获取或内置规则。请重新加载后再修改。')
     } finally {
@@ -184,15 +189,18 @@ export default function Calendar({ active = true }) {
     try {
       const loaded = await loadDayShifts(signal)
       if (signal?.aborted) return
-      liveOverrides.current = loaded
+      const latest = liveOverrides.current && liveOverrides.current.version > loaded.version
+        ? liveOverrides.current : loaded
+      liveOverrides.current = latest
       setServerOverridesReady(true)
-      setDayShifts(current => current.version === null || loaded.version >= current.version ? loaded : current)
+      setDayShifts(current => current.version === null || latest.version >= current.version ? latest : current)
       if (liveRules.current) {
         saveCalendarSnapshot({ rules: liveRules.current.rules, rulesVersion: liveRules.current.version,
-          overrides: loaded.overrides, overridesVersion: loaded.version }).catch(() => {})
-        setSnapshotAt(Date.now())
+          overrides: latest.overrides, overridesVersion: latest.version })
+          .then(saved => { if (saved) setSnapshotAt(Date.now()) })
+          .catch(() => {})
       }
-      return loaded
+      return latest
     } catch (error) {
       if (error.name !== 'AbortError') setDayShiftsError('无法读取单日调整，请重新加载后再修改。')
     } finally {
