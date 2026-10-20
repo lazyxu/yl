@@ -124,3 +124,10 @@ body { overflow: hidden; }
 }
  
 .page-loading { display: flex; align-items: flex-start; justify-content: center; padding-top: 42px; }
+
+/* A waiting-version prompt must not overlap destructive confirmations,
+   unsaved-draft sheets, or any active MUI modal. It reappears afterward. */
+body:has(.MuiModal-root) .pwa-update-snackbar {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
