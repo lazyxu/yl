@@ -4,7 +4,7 @@
 
 2026-10 起，yl 在现有日历和拼豆之外，增加「花园」模块。**首页仍为日历**，底部切换「日历 / 拼豆 / 花园」，保留现有日历状态、拼豆库存/历史/补豆/消耗操作。
 
-花园主要功能：按株与品种管理花卉、种植日期与位置、拍照上传 1–8 张、记录时间和备注、可选记录者昵称、成长时间线、照片网格、成长前后对比、成长日历、花卉归档、完整 ZIP 导出。Web 与手机浏览器复用同一个 React 前端和 Node API。
+花园主要功能：按株与品种管理花卉、种植日期与位置、拍照上传 1–8 张、记录时间和备注、可选记录者昵称、成长时间线（含日记照片查看）、成长日历、花卉归档、完整 ZIP 导出。Web 与手机浏览器复用同一个 React 前端和 Node API。
 
 - **技术选型不变**：React + JavaScript + MUI；Express + Sequelize + MySQL；SSH 发布、PM2/Nginx 和原 GitLab CI。
 - **手机 PWA**：在支持的浏览器中通过 HTTPS 打开后可以安装到主屏幕；本阶段不承诺离线记录，Service Worker 不缓存 API 或照片。普通 HTTP 局域网地址通常无法安装为 PWA（localhost 例外）。
@@ -114,6 +114,7 @@ bash restore_data.sh 'backups/<备份目录>' --apply --restore-env
 
 - GET /api/garden/plants?status=active&limit=36&cursor=... -> { items, total, has_more, next_cursor }
 - GET /api/garden/calendar/day?date=YYYY-MM-DD&limit=40&cursor=... -> 同结构；前端必须显示总数，并在 has_more=true 时提供继续加载。
+- GET /api/garden/entries?plant_id=ID&limit=40&order=asc&offset=... -> { items, has_more }；成长时间线按 observed_ts ASC、id ASC 正序逐页展示，新增记录在下方，加载更多追加后续日记。省略 order 时保留原 DESC 默认排序，供旧客户端使用。
 - 不传 limit/cursor 的旧 API 暂保留数组响应，供旧版客户端过渡（历史接口仍有 500 株/200 条上限，不能作为完整数据导出）。ZIP 导出始终使用数据库完整记录。
 - 游标基于排序时间和记录 ID，避免深 offset 分页；查询应按用户请求停止、忽略过期响应。列表照片统计统一通过一次 SQL 聚合完成，而不是对每株花独立查询。
 - MySQL 8.4 集成测试覆盖超过 500 株和单日 200 条记录，逐页验证无重复、无丢失，并核对 SQL 次数。运行前后性能 benchmark 时应使用相同数据量和环境，不能把 SQL 次数直接当作毫秒响应时间。
@@ -139,7 +140,7 @@ MARD 调色盘建立一次按色号索引的 Map（src/palette.js），供库存
 手机日历触摸移动使用 requestAnimationFrame 与 CSS translate3d，而不是每个 touchmove 更新 React state。识别纵向滚动和边缘手势，防止误切月份；长按调整排班行为保持。Jest 包含多次 move 合并到一个动画帧、纵向滚动和取消操作的回归测试。实际 iOS Safari 仍需真机确认。
 
 ### 花园组件结构
-入口 src/Garden.jsx 只保留原有路由和 CSS 兼容。src/garden/GardenScreen.jsx 负责页面切换和汇总；useGardenPlants.js 负责花卉查询、分页、取消和过期结果处理；PlantGrid / PlantEditor / EntryEditor / FlowerDetail / GardenCalendar / GrowthTimeline / GrowthComparison / PhotoViewer / Shared 负责各自的 UI 与交互。拆分不改变 MySQL 表、API 或 SSH 发布。Jest 保留日历/拼豆/花园三模块导航，并增加 Viewer 与时间线回调测试。
+入口 src/Garden.jsx 只保留原有路由和 CSS 兼容。src/garden/GardenScreen.jsx 负责页面切换和汇总；useGardenPlants.js 负责花卉查询、分页、取消和过期结果处理；PlantGrid / PlantEditor / EntryEditor / FlowerDetail / GardenCalendar / GrowthTimeline / PhotoViewer / Shared 负责各自的 UI 与交互。拆分不改变 MySQL 表、API 或 SSH 发布。Jest 保留日历/拼豆/花园三模块导航，并增加 Viewer 与时间线回调测试。
 
 ### 花园异常图片验证
 花园图片上传校验真实签名，并对解码器无法读取的 HEIC 额外核对 ISO-BMFF ftyp/meta/mdat 容器结构，防止仅包含 HEIC 文件头的假图片落盘；有效 HEIC 在服务器解码器缺失时仍可保留原图。测试包括无文件、恶意或损坏内容、9 张超限、坏时区、上传第二张失败时清理第一张及并发删除。真实 HEVC/HEIC 编码测试仅在 CI 编码器可用时执行，真机 Safari 和服务器 HEIC 解码能力需进一步实测。

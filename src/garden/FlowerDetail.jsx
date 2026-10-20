@@ -1,15 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Box, Button, CircularProgress, Grid, IconButton, Paper, Stack, Tab, Tabs, Typography } from '@mui/material'
+import { Alert, Box, Button, CircularProgress, IconButton, Paper, Stack, Typography } from '@mui/material'
 import { ArrowBack, ArchiveOutlined, CameraAltOutlined, DeleteOutline, EditOutlined, UnarchiveOutlined } from '@mui/icons-material'
-import { gardenRequest, gardenJSON, gardenPhoto, plantedDays } from '../gardenApi'
+import { gardenRequest, gardenJSON, plantedDays } from '../gardenApi'
 import { Cover } from './Shared'
 import PlantEditor from './PlantEditor'
 import EntryEditor from './EntryEditor'
 import Viewer from './PhotoViewer'
 import GrowthTimeline from './GrowthTimeline'
-import GrowthComparison from './GrowthComparison'
 
 const CONFIRM_DELETE = '此操作无法撤销，照片和成长日记将一并永久删除。'
+const entryPagePath = (plantId, offset = 0) =>
+  '/entries?plant_id=' + plantId + '&limit=40&order=asc' + (offset ? '&offset=' + offset : '')
 
 export default function FlowerDetail({ id, active, species, onBack, onChange, onSpecies, notify }) {
   const [plant, setPlant] = useState(null)
@@ -17,20 +18,18 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [moreBusy, setMoreBusy] = useState(false)
-  const [tab, setTab] = useState(0)
   const [plantEditor, setPlantEditor] = useState(false)
   const [entryEditor, setEntryEditor] = useState(false)
   const [editing, setEditing] = useState(null)
   const [photoIndex, setPhotoIndex] = useState(null)
-  const [first, setFirst] = useState(-1)
-  const [second, setSecond] = useState(-1)
   const requestVersion = useRef(0)
   const load = useCallback(async () => {
     if (!active) return
     const version = ++requestVersion.current
+    setMoreBusy(false)
     try {
       const [p, list] = await Promise.all([
-        gardenRequest('/plants/' + id), gardenRequest('/entries?plant_id=' + id + '&limit=40'),
+        gardenRequest('/plants/' + id), gardenRequest(entryPagePath(id)),
       ])
       if (version !== requestVersion.current) return
       setPlant(p); setEntries(list.items); setHasMore(list.has_more)
@@ -39,12 +38,19 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   }, [id, active, notify])
   useEffect(() => { setLoading(true); load(); return () => { requestVersion.current++ } }, [load])
   async function more() {
+    if (!hasMore || moreBusy) return
+    const version = requestVersion.current
     setMoreBusy(true)
     try {
-      const res = await gardenRequest('/entries?plant_id=' + id + '&limit=40&offset=' + entries.length)
-      setEntries(current => [...current, ...res.items]); setHasMore(res.has_more)
-    } catch (err) { notify(err.message, true) }
-    finally { setMoreBusy(false) }
+      const res = await gardenRequest(entryPagePath(id, entries.length))
+      if (version !== requestVersion.current) return
+      setEntries(current => [...current, ...res.items])
+      setHasMore(res.has_more)
+    } catch (err) {
+      if (version === requestVersion.current) notify(err.message, true)
+    } finally {
+      if (version === requestVersion.current) setMoreBusy(false)
+    }
   }
   async function updateArchive() {
     const data = {
@@ -71,8 +77,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
       notify('记录已删除')
     } catch (err) { notify(err.message, true) }
   }
-  const shots = entries.flatMap(entry => (entry.photos || []).map(photo => ({ photo, at: entry.observed_at })))
-  const photos = shots.map(s => s.photo)
+  const photos = entries.flatMap(entry => entry.photos || [])
   if (loading && !plant) return <Stack alignItems="center" py={8}><CircularProgress /></Stack>
   if (!plant) return <Alert severity="warning">花卉不存在或已删除。<Button onClick={onBack}>返回花园</Button></Alert>
   return <Box className="garden-enter">
@@ -92,17 +97,9 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
         </Stack>
       </Stack>
     </Stack>
-    <Paper sx={{ mb: 2, borderRadius: 2 }}><Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto">
-      <Tab label="成长时间线" /><Tab label="照片" /><Tab label="成长对比" />
-    </Tabs></Paper>
-    {tab === 0 && <GrowthTimeline entries={entries} photos={photos} onEdit={entry => { setEditing(entry); setEntryEditor(true) }} onDelete={deleteEntry} onOpenPhoto={setPhotoIndex} />}
-    {tab === 1 && <Grid container spacing={1}>{photos.map((p, i) => <Grid key={p.id} item xs={4} sm={3} md={2}>
-      <button className="garden-picture-button garden-square" onClick={() => setPhotoIndex(i)} aria-label={'查看照片：' + p.name}>
-        <img src={gardenPhoto(p.id)} loading="lazy" alt={p.name} />
-      </button>
-    </Grid>)}</Grid>}
-    {tab === 2 && <GrowthComparison shots={shots} first={first} second={second} onFirst={setFirst} onSecond={setSecond} />}
-    {hasMore && <Stack alignItems="center" py={2}><Button variant="outlined" disabled={moreBusy} onClick={more}>{moreBusy ? '加载中…' : '查看更多早期记录'}</Button></Stack>}
+    <Typography variant="h6" fontWeight={700} mb={2}>成长时间线</Typography>
+    <GrowthTimeline entries={entries} photos={photos} onEdit={entry => { setEditing(entry); setEntryEditor(true) }} onDelete={deleteEntry} onOpenPhoto={setPhotoIndex} />
+    {hasMore && <Stack alignItems="center" py={2}><Button variant="outlined" disabled={moreBusy} onClick={more}>{moreBusy ? '加载中…' : '加载更多后续记录'}</Button></Stack>}
     <PlantEditor open={plantEditor} plant={plant} species={species} onClose={() => setPlantEditor(false)} onSaved={() => { load(); onChange() }} onSpecies={onSpecies} notify={notify} />
     <EntryEditor open={entryEditor} plantId={id} editing={editing} onClose={() => setEntryEditor(false)} onSaved={() => { load(); onChange() }} notify={notify} />
     {photoIndex !== null && <Viewer photos={photos} current={photoIndex} onClose={() => setPhotoIndex(null)} />}

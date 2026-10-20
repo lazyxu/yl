@@ -102,9 +102,13 @@ router.get('/entries', wrap(async (req, res) => {
   const plantId = positiveId(req.query.plant_id)
   if (!plantId) throw badRequest('缺少花卉编号')
   const { limit, offset } = validPagination(req.query)
+  // Preserve the default for legacy consumers; the growth timeline opts into ASC.
+  const direction = req.query.order === undefined ? 'DESC'
+    : typeof req.query.order === 'string' ? req.query.order.toUpperCase() : ''
+  if (!['ASC', 'DESC'].includes(direction)) throw badRequest('日记排序方式无效')
   const rows = await GardenEntry.findAll({
     where: { plant_id: plantId }, include: [{ model: GardenPhoto, as: 'photos' }],
-    order: [['observed_ts', 'DESC'], ['id', 'DESC']],
+    order: [['observed_ts', direction], ['id', direction]],
     limit: limit + 1, offset,
   })
   res.json({ items: rows.slice(0, limit).map(entryResponse), has_more: rows.length > limit })

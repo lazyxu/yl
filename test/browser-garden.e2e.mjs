@@ -83,6 +83,9 @@ async function runBrowser(engine, viewport) {
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText(name, { exact: true }).click()
     await page.getByRole('button', { name: '记录成长' }).waitFor()
+    await page.getByText('成长时间线', { exact: true }).waitFor()
+    check(await page.getByRole('tab', { name: '照片', exact: true }).count() === 0, tag + ': no photo-grid tab')
+    check(await page.getByRole('tab', { name: '成长对比', exact: true }).count() === 0, tag + ': no comparison tab')
     await page.getByRole('button', { name: '记录成长' }).click()
 
     const photo = await sharp({ create: { width: 48, height: 32, channels: 3, background: '#a4b38a' } }).png().toBuffer()

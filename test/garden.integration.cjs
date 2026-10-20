@@ -171,6 +171,23 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
       return { plant_id: id, observed_at: new Date(ts), observed_ts: ts,
         local_date: '2026-10-18', note: '连续观察' + index, author_name: '' }
     }))
+    // The timeline reads oldest first while the old API default remains newest first.
+    const entryUrl = '/entries?plant_id=' + id
+    const ascendingPages = []
+    for (let offset = 0; offset < 6; offset += 2) {
+      const page = await request(entryUrl + '&limit=2&offset=' + offset + '&order=asc')
+      assert.equal(page.code, 200)
+      assert.equal(page.body.has_more, offset < 4)
+      ascendingPages.push(...page.body.items)
+    }
+    assert.equal(ascendingPages.length, 5)
+    assert.equal(new Set(ascendingPages.map(row => row.id)).size, 5)
+    const descending = await request(entryUrl + '&limit=5')
+    assert.equal(descending.code, 200)
+    assert.deepEqual(ascendingPages.map(row => row.id),
+      descending.body.items.map(row => row.id).reverse(), 'ascending pages must reverse legacy DESC order')
+    assert.equal((await request(entryUrl + '&order=sideways')).code, 400)
+
     const dayPage = await request('/calendar/day?date=2026-10-18&limit=2')
     assert.equal(dayPage.code, 200)
     assert.equal(Number(dayPage.body.total), 5)
@@ -205,10 +222,36 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     assert.equal(new Set(plantIds).size, totalPlants, 'no plants can be lost or repeated across cursor pages')
 
     await models.GardenEntry.bulkCreate(Array.from({ length: 205 }, (_, index) => {
-      const ts = Date.UTC(2026, 9, 18, 15, index)
+      // Deliberate timestamp ties exercise the secondary id sort across pages.
+      const ts = Date.UTC(2026, 9, 18, 15, Math.floor(index / 2))
       return { plant_id: id, observed_at: new Date(ts), observed_ts: ts,
         local_date: '2026-10-18', note: '分页边界日记' + index, author_name: '' }
     }))
+    // More than five pages: verify stable ASC ordering by (observed_ts, id).
+    // Offset and the sort direction must remain unchanged between requests.
+    const chronological = []
+    let diaryPageCount = 0
+    let diaryHasMore = true
+    while (diaryHasMore) {
+      const offset = chronological.length
+      const page = await request('/entries?plant_id=' + id + '&limit=40&offset=' + offset + '&order=asc')
+      assert.equal(page.code, 200)
+      assert.ok(page.body.items.length > 0 && page.body.items.length <= 40)
+      chronological.push(...page.body.items)
+      diaryHasMore = page.body.has_more
+      diaryPageCount++
+      assert.ok(diaryPageCount <= 7, 'diary pagination must terminate')
+    }
+    assert.equal(chronological.length, 210)
+    assert.equal(new Set(chronological.map(row => row.id)).size, 210)
+    for (let index = 1; index < chronological.length; index++) {
+      const previous = chronological[index - 1]
+      const current = chronological[index]
+      const timestampDelta = Number(current.observed_ts) - Number(previous.observed_ts)
+      assert.ok(timestampDelta > 0 || (timestampDelta === 0 && current.id > previous.id),
+        'ascending diary pages must be ordered by time then ID')
+    }
+
     const firstLongDay = await request('/calendar/day?date=2026-10-18&limit=40')
     assert.equal(firstLongDay.code, 200)
     assert.equal(Number(firstLongDay.body.total), 210)
