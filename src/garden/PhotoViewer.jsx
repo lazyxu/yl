@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Box, Dialog, IconButton, Stack, Typography } from '@mui/material'
+import { Box, Button, Dialog, IconButton, Stack, Typography } from '@mui/material'
 import { ChevronLeft, ChevronRight, Close, DownloadOutlined, IosShareOutlined, ZoomInOutlined, ZoomOutOutlined } from '@mui/icons-material'
 import { gardenPhoto } from '../gardenApi'
 
