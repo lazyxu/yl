@@ -178,7 +178,12 @@ export default function Calendar({ active = true }) {
       }
       return latest
     } catch (error) {
-      if (error.name !== 'AbortError') setSettingsError('无法读取排班设置，当前显示上次已获取或内置规则。请重新加载后再修改。')
+      if (error.name !== 'AbortError') {
+        // A connected iPhone can still lose its origin. Never keep a previous
+        // edit authorization after a failed foreground/online revalidation.
+        setServerRulesReady(false)
+        setSettingsError('无法读取排班设置，当前显示上次已获取或内置规则。请重新加载后再修改。')
+      }
     } finally {
       if (!signal?.aborted) setLoadingSettings(false)
     }
@@ -202,7 +207,10 @@ export default function Calendar({ active = true }) {
       }
       return latest
     } catch (error) {
-      if (error.name !== 'AbortError') setDayShiftsError('无法读取单日调整，请重新加载后再修改。')
+      if (error.name !== 'AbortError') {
+        setServerOverridesReady(false)
+        setDayShiftsError('无法读取单日调整，请重新加载后再修改。')
+      }
     } finally {
       if (!signal?.aborted) setLoadingDayShifts(false)
     }
@@ -246,7 +254,7 @@ export default function Calendar({ active = true }) {
 
   const confirmed = settings.version !== null && dayShifts.version !== null
   const canAdjust = active && online && serverRulesReady && serverOverridesReady &&
-    !loadingSettings && !loadingDayShifts && confirmed
+    !settingsError && !dayShiftsError && !loadingSettings && !loadingDayShifts && confirmed
   const shiftFor = day => {
     const override = dayShifts.overrides[dateKey(day)]
     return override?.shift || getShift(day, settings.rules)

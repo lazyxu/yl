@@ -154,6 +154,24 @@ async function verify(engine) {
     assert.equal(previousChunk.status, 200, tag + ': previous lazy chunk remains available')
     assert.equal(previousChunk.body, 'export const previousChunk = true;',
       tag + ': older Vite dash-hashed chunk served from previous SW cache')
+    // P1 fail closed even when iOS reports navigator.onLine=true but the
+    // application's origin cannot be reached. A failed revalidation must
+    // revoke edit permission without erasing the last verified snapshot.
+    assert.equal(await day.getByRole('button', { name: '调整当天排班' }).isEnabled(), true,
+      tag + ': connected confirmed schedule permits editing')
+    await stopServer()
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await day.getByText('无法读取排班设置', { exact: false }).waitFor()
+    assert.equal(await day.getByRole('button', { name: '调整当天排班' }).isDisabled(), true,
+      tag + ': disconnected origin never leaves previously authorized editing enabled')
+    assert.equal(await day.getByRole('button', { name: '排班设置' }).isDisabled(), true,
+      tag + ': failed revalidation revokes settings mutations')
+    await startServer()
+    await page.evaluate(() => window.dispatchEvent(new Event('online')))
+    await page.waitForFunction(() => {
+      const button = document.querySelector('.selected-date-footer button')
+      return Boolean(button && !button.disabled)
+    }, { timeout: 15000 })
     await disconnect(engine, context)
     await page.reload({ waitUntil: 'domcontentloaded' })
     // With network emulation Chromium reports offline; a WebKit origin outage
