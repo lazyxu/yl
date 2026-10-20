@@ -9,6 +9,7 @@ import EntryEditor from './EntryEditor'
 import Viewer from './PhotoViewer'
 import GrowthTimeline from './GrowthTimeline'
 import GardenConfirmDialog from './GardenConfirmDialog'
+import { clearGardenOffline, readGardenDetail, saveGardenDetail } from '../offline/data'
 
 const entryPagePath = (plantId, offset = 0) =>
   '/entries?plant_id=' + plantId + '&limit=40&order=asc' + (offset ? '&offset=' + offset : '')
@@ -17,6 +18,8 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   const [plant, setPlant] = useState(null)
   const [entries, setEntries] = useState([])
   const [hasMore, setHasMore] = useState(false)
+  const [offlineReadOnly, setOfflineReadOnly] = useState(false)
+  const [offlineSavedAt, setOfflineSavedAt] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showSkeleton, setShowSkeleton] = useState(false)
   useEffect(() => {
@@ -54,8 +57,19 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
       ])
       if (version !== requestVersion.current || controller.signal.aborted) return
       setPlant(p); setEntries(list.items); setHasMore(list.has_more)
+      setOfflineReadOnly(false); setOfflineSavedAt(null)
+      saveGardenDetail(p, list.items).catch(() => {})
     } catch (err) {
-      if (version === requestVersion.current && err.name !== 'AbortError') notify(err.message, true)
+      if (version === requestVersion.current && err.name !== 'AbortError') {
+        const cached = await readGardenDetail(id)
+        if (cached && version === requestVersion.current && !controller.signal.aborted) {
+          setPlant(cached.plant)
+          setEntries(cached.entries)
+          setHasMore(false)
+          setOfflineReadOnly(true)
+          setOfflineSavedAt(cached.savedAt)
+        } else notify(err.message, true)
+      }
     } finally {
       if (version === requestVersion.current) setLoading(false)
     }
@@ -81,8 +95,10 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     try {
       const res = await gardenRequest(entryPagePath(id, entries.length), { signal: controller.signal })
       if (version !== requestVersion.current || controller.signal.aborted) return
-      setEntries(current => [...current, ...res.items])
+      const merged = [...entries, ...res.items]
+      setEntries(merged)
       setHasMore(res.has_more)
+      if (plant) saveGardenDetail(plant, merged).catch(() => {})
     } catch (err) {
       if (version === requestVersion.current && err.name !== 'AbortError') notify(err.message, true)
     } finally {
@@ -97,10 +113,12 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     try {
       if (intent.kind === 'plant') {
         await gardenRequest('/plants/' + id, { method: 'DELETE' })
+        await clearGardenOffline(false)
         notify('已删除花卉')
         onBack(); onChange()
       } else {
         await gardenRequest('/entries/' + intent.entry.id, { method: 'DELETE' })
+        await clearGardenOffline(false)
         await load()
         onChange(); notify('记录已删除')
       }
@@ -121,13 +139,17 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     aria-label="正在加载花卉档案">
     {showSkeleton && <div className="garden-loading-card" style={{ aspectRatio: '16/10' }} />}
   </div>
-  if (!plant) return <Alert severity="warning">花卉不存在或已删除。<Button onClick={onBack}>返回花园</Button></Alert>
+  if (!plant) return <Alert severity="warning">
+    花卉不存在、已删除，或没有保存过这株花的离线详情。
+    <Button onClick={onBack}>返回花园</Button>
+  </Alert>
 
   return <div className="garden-detail">
     <header className="garden-detail-header">
       <Button className="garden-detail-back" startIcon={<ArrowBackIosNew fontSize="small" />} onClick={onBack}>花园</Button>
       <Typography fontWeight={680} fontSize={15} component="h1">花卉档案</Typography>
-      <IconButton aria-label="更多花卉操作" onClick={event => setMenuAnchor(event.currentTarget)}><MoreHoriz/></IconButton>
+      <IconButton aria-label="更多花卉操作" disabled={offlineReadOnly || !navigator.onLine}
+        onClick={event => setMenuAnchor(event.currentTarget)}><MoreHoriz/></IconButton>
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
         <MenuItem aria-label="编辑花卉" onClick={() => { setMenuAnchor(null); setPlantEditor(true) }}>
           <EditOutlined sx={{ mr: 1 }} fontSize="small"/>编辑花卉
@@ -148,15 +170,20 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
         {plant.notes && <Typography sx={{ whiteSpace: 'pre-wrap', mt: 1.5, overflowWrap: 'anywhere' }}>{plant.notes}</Typography>}
       </div>
     </section>
+    {offlineReadOnly && <Alert severity="warning" sx={{ my: 1.5 }}>
+      本地只读快照：{new Date(offlineSavedAt).toLocaleString('zh-CN')}。
+      仅含此前访问并保存的部分记录；可能已在其他设备上更改或删除。
+    </Alert>}
     <Typography component="h2" className="garden-timeline-heading">成长时间线</Typography>
     <GrowthTimeline entries={entries} photos={photos}
-      onEdit={entry => { setEditing(entry); setEntryEditor(true) }}
-      onDelete={entry => setPendingDelete({ kind: 'entry', entry })}
+      onEdit={entry => { if (!offlineReadOnly && navigator.onLine) { setEditing(entry); setEntryEditor(true) } }}
+      onDelete={entry => { if (!offlineReadOnly && navigator.onLine) setPendingDelete({ kind: 'entry', entry }) }}
+      readOnly={offlineReadOnly || !navigator.onLine}
       onOpenPhoto={openPhoto} />
     {hasMore && <Stack alignItems="center" py={2}>
       <Button variant="outlined" disabled={moreBusy} onClick={more}>{moreBusy ? '加载中…' : '加载更多后续记录'}</Button>
     </Stack>}
-    <div className="garden-record-dock">
+    {!offlineReadOnly && navigator.onLine && <div className="garden-record-dock">
       <Button startIcon={<CameraAltOutlined/>} color="success" variant="contained"
         onClick={() => { setEditing(null); setEntryEditor(true) }}>记录成长</Button>
     </div>
