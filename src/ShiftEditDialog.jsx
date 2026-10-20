@@ -14,7 +14,7 @@ export default function ShiftEditDialog({
 
   useEffect(() => {
     if (!open) { setDiscardOpen(false); pendingNavigation.current = null }
-  }, [open]))
+  }, [open])
   useEffect(() => {
     if (!open || !dirty) return
     const warn = event => { event.preventDefault(); event.returnValue = '' }
