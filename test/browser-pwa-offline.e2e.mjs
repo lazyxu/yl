@@ -155,9 +155,25 @@ async function verify(engine) {
     await page.getByText('离线浏览设置', { exact: true }).click()
     await page.getByLabel('开启花园离线浏览').check()
     await page.getByText(name, { exact: true }).click()
+    const plantId = await page.evaluate(() => Number(new URLSearchParams(location.search).get('plant')))
+    assert(Number.isSafeInteger(plantId) && plantId > 0,
+      tag + ': detail URL identifies the actual newly created flower')
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
     assert(await idbValue(page, 'garden:index'), tag + ': opt-in index persisted')
-    assert(await idbValue(page, 'garden:detail:1'), tag + ': opted-in visited detail persisted')
+    // Chromium and WebKit use the same disposable MySQL instance, and its
+    // auto-increment IDs naturally differ across runs. Never hardcode id=1.
+    await page.waitForFunction(id => new Promise(resolve => {
+      const dbRequest = indexedDB.open('yl-offline-readonly', 1)
+      dbRequest.onerror = () => resolve(false)
+      dbRequest.onsuccess = () => {
+        const item = dbRequest.result.transaction('snapshots')
+          .objectStore('snapshots').get('garden:detail:' + id)
+        item.onsuccess = () => resolve(item.result?.plant?.id === id)
+        item.onerror = () => resolve(false)
+      }
+    }), plantId, { timeout: 15000 })
+    assert(await idbValue(page, 'garden:detail:' + plantId),
+      tag + ': opted-in visited detail persisted under its real plant id')
     await page.waitForFunction(async () => {
       const cache = await caches.open('yl-garden-thumbs-v1')
       return (await cache.keys()).length > 0
