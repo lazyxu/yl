@@ -238,7 +238,8 @@ export default function Garden({ active = true }) {
       onSaved={refresh} onSpecies={fetchSpecies} notify={notify} />
     <Snackbar open={!!notice} autoHideDuration={4100} onClose={() => setNotice(null)}
       anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      sx={{ top: 'max(12px, env(safe-area-inset-top, 0px)) !important' }}>
+      sx={{ top: 'max(12px, env(safe-area-inset-top, 0px)) !important',
+        pointerEvents: 'none', '& .MuiAlert-action button': { pointerEvents: 'auto' } }}>
       <Alert onClose={() => setNotice(null)} severity={notice?.error ? 'error' : 'success'} variant="filled">{notice?.message}</Alert>
     </Snackbar>
   </Box>

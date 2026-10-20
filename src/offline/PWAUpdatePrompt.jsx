@@ -22,7 +22,8 @@ export default function PWAUpdatePrompt({ currentView }) {
   }
   return <>
     <Snackbar open={ready && !deferred} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      sx={{ bottom: 'max(72px, env(safe-area-inset-bottom, 0px) + 68px) !important' }}>
+      sx={{ bottom: 'max(72px, env(safe-area-inset-bottom, 0px) + 68px) !important',
+        pointerEvents: 'none', '& .MuiAlert-action button': { pointerEvents: 'auto' } }}>
       <Alert severity="info" variant="filled" sx={{ alignItems: 'center' }}
         action={<>
           <Button color="inherit" onClick={() => setDeferred(true)}>稍后</Button>
@@ -32,7 +33,8 @@ export default function PWAUpdatePrompt({ currentView }) {
       </Alert>
     </Snackbar>
     <Snackbar open={Boolean(message)} autoHideDuration={4300}
-      onClose={() => setMessage('')} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+      onClose={() => setMessage('')} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      sx={{ pointerEvents: 'none', '& .MuiAlert-action button': { pointerEvents: 'auto' } }}>
       <Alert severity="warning" onClose={() => setMessage('')}>{message}</Alert>
     </Snackbar>
   </>
