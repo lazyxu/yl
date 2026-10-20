@@ -1,5 +1,6 @@
 import React, { useContext, useEffect } from 'react'
-import { UNSAFE_DataRouterContext, unstable_useBlocker } from 'react-router-dom'
+import { UNSAFE_DataRouterContext } from 'react-router-dom'
+import { unstable_useBlocker } from 'react-router'
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material'
 
 // The existing React Router 6.14 BrowserRouter cannot block POP history entries.
