@@ -473,7 +473,7 @@ export default function Calendar({ active = true }) {
         if (liveOverrides.current) saveCalendarSnapshot({
           rules: saved.rules, rulesVersion: saved.version,
           overrides: liveOverrides.current.overrides, overridesVersion: liveOverrides.current.version,
-        }).catch(() => {})
+        }).then(wrote => { if (wrote) setSnapshotAt(Date.now()) }).catch(() => {})
       }} />
     {dayEditor && <DayShiftEditor key={dayEditor.date} {...dayEditor} open={active}
       onCancel={() => setDayEditor(null)} onReload={reloadDayShifts}
@@ -483,7 +483,7 @@ export default function Calendar({ active = true }) {
         if (liveRules.current) saveCalendarSnapshot({
           rules: liveRules.current.rules, rulesVersion: liveRules.current.version,
           overrides: saved.overrides, overridesVersion: saved.version,
-        }).catch(() => {})
+        }).then(wrote => { if (wrote) setSnapshotAt(Date.now()) }).catch(() => {})
         setDayEditor(null)
       }} />}
   </Box>
