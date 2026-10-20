@@ -23,15 +23,21 @@ export default function ShiftEditDialog({
   }, [open, dirty])
 
   useEffect(() => {
-    if (!open || !dirty || saving) return
+    if (!open) return
     const intercept = event => {
       event.preventDefault()
-      pendingNavigation.current = event.detail?.proceed || null
-      setDiscardOpen(true)
+      if (saving) return
+      if (dirty) {
+        pendingNavigation.current = event.detail?.proceed || null
+        setDiscardOpen(true)
+      } else {
+        onCancel()
+        event.detail?.proceed?.()
+      }
     }
     window.addEventListener('yl:navigation-intent', intercept)
     return () => window.removeEventListener('yl:navigation-intent', intercept)
-  }, [open, dirty, saving])
+  }, [open, dirty, saving, onCancel])
   function requestClose() {
     if (saving) return
     if (dirty) setDiscardOpen(true)

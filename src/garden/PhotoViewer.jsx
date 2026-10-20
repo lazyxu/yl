@@ -24,6 +24,7 @@ export default function Viewer({ photos, current, onClose,
   const pendingTransform = useRef({ scale: 1, x: 0, y: 0 })
   const frame = useRef(0)
   const lastTap = useRef(0)
+  const pageAttempts = useRef(new Set())
   const selected = photos[index]
 
   function bounded(view) {
@@ -51,7 +52,14 @@ export default function Viewer({ photos, current, onClose,
   // A viewer opened from page one continues into later diary pages without
   // forcing the user to close it and scroll to "load more".
   useEffect(() => {
-    if (hasMore && !loadingMore && index >= photos.length - 2) onEndReached?.()
+    const pageKey = photos.length + ':' + index
+    // Retrying automatically on every rerender after a failed page request
+    // would otherwise trigger an infinite network loop.
+    if (hasMore && !loadingMore && index >= photos.length - 2 &&
+      !pageAttempts.current.has(pageKey)) {
+      pageAttempts.current.add(pageKey)
+      onEndReached?.()
+    }
   }, [hasMore, loadingMore, index, photos.length, onEndReached])
   useEffect(() => {
     const identity = { scale: 1, x: 0, y: 0 }

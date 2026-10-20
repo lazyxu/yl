@@ -20,15 +20,22 @@ export default function GardenFormDialog({ open, title, busy, dirty, onClose, on
     return () => window.removeEventListener('beforeunload', warn)
   }, [open, dirty])
   useEffect(() => {
-    if (!open || !dirty || busy) return
+    if (!open) return
     const guard = event => {
       event.preventDefault()
-      pendingNavigation.current = event.detail?.proceed || null
-      setDiscardConfirm(true)
+      // Never abandon a request that may already be saving data.
+      if (busy) return
+      if (dirty) {
+        pendingNavigation.current = event.detail?.proceed || null
+        setDiscardConfirm(true)
+      } else {
+        onClose()
+        event.detail?.proceed?.()
+      }
     }
     window.addEventListener('yl:navigation-intent', guard)
     return () => window.removeEventListener('yl:navigation-intent', guard)
-  }, [open, dirty, busy])
+  }, [open, dirty, busy, onClose])
   const requestClose = () => {
     if (busy) return
     if (dirty) setDiscardConfirm(true)
