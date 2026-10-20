@@ -47,6 +47,30 @@ async function startServer() {
   }
   throw new Error('Server not ready: ' + tail)
 }
+async function stopServer() {
+  if (!server || server.exitCode !== null || server.signalCode) { server = null; return }
+  const previous = server
+  const exited = new Promise(resolve => previous.once('exit', resolve))
+  previous.kill('SIGTERM')
+  await Promise.race([exited, delay(5000)])
+  if (previous.exitCode == null && !previous.signalCode) {
+    previous.kill('SIGKILL')
+    await Promise.race([exited, delay(2000)])
+  }
+  server = null
+}
+async function disconnect(engine, context) {
+  if (engine.name() === 'webkit') {
+    // Playwright/WebKit offline emulation can fail SW-served navigations even
+    // for a literal cached Response. An actual origin outage verifies the
+    // fallback without that emulator bug (microsoft/playwright#42775).
+    await stopServer()
+  } else await context.setOffline(true)
+}
+async function reconnect(engine, context) {
+  if (engine.name() === 'webkit') await startServer()
+  else await context.setOffline(false)
+}
 async function idbValue(page, key) {
   return page.evaluate(key => new Promise(resolve => {
     const request = indexedDB.open('yl-offline-readonly', 1)
@@ -98,12 +122,14 @@ async function verify(engine) {
     assert(precaches.requests.every(x => !x.startsWith('/api/')),
       tag + ': no private API in app precache')
 
-    await context.setOffline(true)
+    await disconnect(engine, context)
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await day.getByText('离线只读', { exact: false }).waitFor()
+    // With network emulation Chromium reports offline; a WebKit origin outage
+    // still yields the explicitly stale last-confirmed snapshot.
+    await day.getByText('上次确认的排班快照', { exact: false }).waitFor()
     assert.equal(await day.getByRole('button', { name: '调整当天排班' }).isDisabled(), true)
     assert.equal(await day.locator('.calendar .day .shift').count(), 42)
-    await context.setOffline(false)
+    await reconnect(engine, context)
     await page.reload({ waitUntil: 'domcontentloaded' })
     await day.getByRole('button', { name: '调整当天排班' }).waitFor({ state: 'visible' })
     await page.waitForFunction(() => !document.querySelector('.schedule-unverified'))
@@ -136,7 +162,7 @@ async function verify(engine) {
       const cache = await caches.open('yl-garden-thumbs-v1')
       return (await cache.keys()).length > 0
     }, { timeout: 10000 })
-    await context.setOffline(true)
+    await disconnect(engine, context)
     await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('仅显示上次离线保存的部分花园数据', { exact: false }).waitFor()
@@ -145,7 +171,7 @@ async function verify(engine) {
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
     assert.equal(await page.getByRole('button', { name: '记录成长' }).count(), 0,
       tag + ': offline detail is read-only')
-    await context.setOffline(false)
+    await reconnect(engine, context)
     await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('离线浏览设置', { exact: true }).click()
@@ -168,7 +194,8 @@ async function verify(engine) {
     assert(await idbValue(page, 'calendar'), tag + ': garden erasure preserves schedule snapshot')
     assert(!(await page.evaluate(() => caches.keys())).includes('yl-garden-thumbs-v1'),
       tag + ': revoke consent erases offline thumbnails')
-    console.log('PASS PWA offline/read-only: ' + tag)
+    console.log('PASS PWA offline/read-only: ' + tag +
+      (tag === 'webkit' ? ' (origin outage, not Playwright setOffline)' : ' (network offline emulation)'))
   } catch (error) {
     const file = 'test-results/offline-' + tag + '.png'
     await page.screenshot({ path: file, fullPage: true }).catch(() => {})
@@ -184,11 +211,7 @@ try {
   await verify(chromium)
   await verify(webkit)
 } finally {
-  if (server?.exitCode == null) {
-    server.kill('SIGTERM')
-    await Promise.race([new Promise(resolve => server.once('exit', resolve)), delay(5000)])
-    if (server.exitCode == null) server.kill('SIGKILL')
-  }
+  await stopServer()
   try { await db.query('DROP DATABASE IF EXISTS `' + env.DB_NAME + '`') }
   finally { await db.end() }
 }
