@@ -406,7 +406,7 @@ export default function Calendar({ active = true }) {
       {confirmed && showPending && (loadingSettings || loadingDayShifts) && !settingsError && !dayShiftsError &&
         <Typography variant="caption" color="text.secondary" className="schedule-loading">正在核对最新排班…</Typography>}
       {settingsError && online && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
-      {dayShiftsError && online && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>
+      {dayShiftsError && online && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
 
       <div className="calendar" role="group" aria-label={currentMonth.format('YYYY年MM月') + '排班月历，方向键可移动日期'}
         ref={calendarRef} onKeyDown={onCalendarKeyDown}

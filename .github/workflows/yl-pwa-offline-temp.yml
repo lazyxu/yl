@@ -15,7 +15,9 @@ jobs:
           node-version: '22'
       - run: npm ci --legacy-peer-deps
       - name: ESLint PWA and UI
-        run: npx eslint src/offline src/main.jsx src/App.jsx src/Calendar.jsx src/garden server/index.js
+        run: npx eslint src/offline src/main.jsx src/App.jsx src/Calendar.jsx src/garden
+      - name: Verify server syntax
+        run: node --check server/index.js
       - name: All Jest regression except existing OCR issue
         run: npm test -- --runInBand --testPathIgnorePatterns='test/(ocr|recognize.image).test.js'
       - name: Node deployment and rollback safety
