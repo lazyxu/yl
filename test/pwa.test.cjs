@@ -29,6 +29,7 @@ test('production PWA has manifest, SVG/PNG icons and service worker without offl
   assert.match(sw, /\byl-shell-/)
   assert.match(sw, /caches\.open/)
   assert.match(sw, /request\.method !== 'GET'/)
+  assert.match(sw, /caches\.match\(url\.pathname\)/)
   assert.match(sw, /url\.pathname\.startsWith\('\/api\/'\)/)
   assert.match(sw, /SKIP_WAITING/)
   assert.doesNotMatch(sw, /__YL_MANIFEST__|__YL_VERSION__/)

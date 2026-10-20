@@ -27,6 +27,12 @@ const corsOptions = {
   credentials: true,
 };
 app.use(cors(corsOptions));
+// Business JSON and mutations are authoritative: never let browser HTTP caches
+// replay stale rows or an old change. Photo derivatives override this below.
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  next();
+});
 app.use('/api/settings/shifts/overrides', dayShiftsRouter);
 app.use('/api/settings/shifts', settingsRouter);
 app.use(express.json());
