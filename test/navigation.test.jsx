@@ -457,3 +457,24 @@ test('花园列表通过游标加载全部记录且保留总数，不显示固�
   expect([...document.querySelectorAll('.garden-card-title')].some(n => n.textContent === '花卉45')).toBe(true)
   expect(button('加载更多花卉')).toBeUndefined()
 })
+
+
+test('花园编辑草稿可拦截跨模块导航，确认放弃后才真正离开', async () => {
+  await mount('花园')
+  await click('添加花卉')
+  const field = document.querySelector('input[maxlength="100"]')
+  expect(field).not.toBeNull()
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, '尚未保存的花卉')
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  await click('日历')
+  expect(button('花园').getAttribute('aria-current')).toBe('page')
+  const confirm = document.querySelector('[role="dialog"][aria-labelledby="garden-confirm-title"]')
+  expect(confirm).not.toBeNull()
+  expect(confirm.textContent).toContain('放弃未保存的更改')
+  const abandon = [...confirm.querySelectorAll('button')].find(el => el.textContent === '放弃更改')
+  expect(abandon).toBeDefined()
+  await act(async () => abandon.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(button('日历').getAttribute('aria-current')).toBe('page')
+})
