@@ -324,3 +324,7 @@
 @media (prefers-reduced-motion: reduce) {
   .garden-loading-grid, .garden-loading-card { animation: none !important; }
 }
+ 
+/* Two-line flower names reduce truncation without changing image aspect. */
+.garden-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  white-space: normal; overflow-wrap: anywhere; min-height: 2.7em; }

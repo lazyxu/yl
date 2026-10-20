@@ -122,3 +122,5 @@ body { overflow: hidden; }
     scroll-behavior: auto !important;
   }
 }
+ 
+.page-loading { display: flex; align-items: flex-start; justify-content: center; padding-top: 42px; }

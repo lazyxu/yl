@@ -42,6 +42,17 @@ function systemPrefersDark() {
   return Boolean(typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
 }
 
+function DeferredPageFallback() {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setShow(true), 180)
+    return () => clearTimeout(timer)
+  }, [])
+  return <div className="page-loading" role={show ? 'status' : undefined} aria-live="polite">
+    {show && <Typography variant="caption" color="text.secondary">正在打开页面…</Typography>}
+  </div>
+}
+
 function Page({ name, active, positions, children }) {
   const element = useRef(null)
   useLayoutEffect(() => {
@@ -50,7 +61,7 @@ function Page({ name, active, positions, children }) {
   return (
     <section ref={element} className="app-page" data-view={name} aria-label={name} hidden={!active}
       onScroll={event => { if (active) positions.current[name] = event.currentTarget.scrollTop }}>
-      <Suspense fallback={<div className="page-loading" aria-hidden="true" />}>{children}</Suspense>
+      <Suspense fallback={<DeferredPageFallback />}>{children}</Suspense>
     </section>
   )
 }
