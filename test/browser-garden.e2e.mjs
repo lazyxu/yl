@@ -135,7 +135,7 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.getByRole('tab', { name: '成长日历' }).click()
     await page.getByRole('button', { name: '今天' }).click()
     const dayCell = await page.locator('.garden-calendar-day:not([disabled])').first().boundingBox()
-    check(dayCell && dayCell.width >= 43.5 && dayCell.height >= 43.5, tag + ': calendar cell must have 44px touch target')
+    check(dayCell && dayCell.width >= 44 && dayCell.height >= 44, tag + ': calendar cell must have 44px touch target')
     await page.getByRole('button', { name: '上个月' }).click()
     await page.getByRole('tab', { name: '花卉', exact: true }).click()
     await page.getByText(name, { exact: true }).waitFor()

@@ -245,7 +245,7 @@
   .garden-heading { font-size: 27px; }
   .garden-card-info { padding: 10px 9px 12px; }
   /* 320px screens: seven 44px touch targets still fit edge-to-edge. */
-  .garden-calendar-panel { padding: 4px; margin-inline: -8px; }
+  .garden-calendar-panel { padding: 2px; margin-inline: -9px; }
   .garden-calendar-grid { gap: 0; }
   .garden-calendar-day { min-height: 44px; border-radius: 8px; }
 }
