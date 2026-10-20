@@ -21,7 +21,8 @@ export default function PWAUpdatePrompt({ currentView }) {
     if (!applyPWAUpdate()) setMessage('尚未检测到可安装的新版本，请联网后重试')
   }
   return <>
-    <Snackbar open={ready && !deferred} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    <Snackbar className="pwa-update-snackbar" open={ready && !deferred}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       sx={{ bottom: 'max(72px, env(safe-area-inset-bottom, 0px) + 68px) !important',
         pointerEvents: 'none', '& .MuiAlert-action button': { pointerEvents: 'auto' } }}>
       <Alert severity="info" variant="filled" sx={{ alignItems: 'center' }}
