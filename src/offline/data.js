@@ -99,6 +99,9 @@ export async function saveGardenIndex({ items, total, species = [] }) {
     items: items.slice(0, GARDEN_INDEX_MAX),
     species: species.slice(0, 500),
   })
+  // If consent was revoked while the IDB write was pending, do not leave a
+  // late snapshot behind after the explicit Clear Data operation.
+  if (!gardenOfflineEnabled()) await remove('garden:index')
 }
 export async function readGardenIndex() {
   if (!gardenOfflineEnabled()) return null
@@ -111,6 +114,7 @@ export async function saveGardenDetail(plant, entries) {
   await write('garden:detail:' + plant.id, { schema: 1, savedAt: Date.now(),
     plant, entries: entries.slice(0, GARDEN_DETAIL_ENTRIES_MAX),
   })
+  if (!gardenOfflineEnabled()) { await remove('garden:detail:' + plant.id); return }
   const keys = (await allKeys() || []).filter(key => typeof key === 'string' && key.startsWith('garden:detail:'))
   if (keys.length <= GARDEN_DETAIL_MAX) return
   const records = (await allRecords() || []).filter(item => item?.schema === 1 && item.plant && item.entries)
@@ -143,11 +147,13 @@ export async function rememberThumbnail(url) {
     // Browser HTTP cache may already have the resource. No originals/previews
     // or authenticated/private JSON requests ever enter Cache Storage.
     const response = await fetch(url, { cache: 'force-cache', credentials: 'same-origin' })
-    if (!response.ok || !response.headers.get('Content-Type')?.startsWith('image/')) return
+    if (!gardenOfflineEnabled() || !response.ok ||
+      !response.headers.get('Content-Type')?.startsWith('image/')) return
     if (Number(response.headers.get('Content-Length')) > THUMB_SINGLE_MAX) return
     const blob = await response.blob()
-    if (blob.size > THUMB_SINGLE_MAX) return
+    if (!gardenOfflineEnabled() || blob.size > THUMB_SINGLE_MAX) return
     await cache.put(url, new Response(blob, { headers: { 'Content-Type': blob.type } }))
+    if (!gardenOfflineEnabled()) { await cache.delete(url); return }
     const entries = await cache.keys()
     let bytes = 0
     for (let i = entries.length - 1; i >= 0; i--) {

@@ -45,6 +45,7 @@ export default function OfflineOptions({ items, total, species, query, notify })
       <Typography color="text.secondary" fontSize={13}>
         仅限只读：最多 200 株花卉摘要、30 个已浏览详情、每株 100 条成长日记，以及
         最多 60 张、总计 12 MiB 缩略图；不保存原图、不允许离线修改。
+        此处清除的是花园专用离线数据，浏览器普通 HTTP 图片缓存仍由 Safari 自行管理。
       </Typography>
       <Alert severity="warning" sx={{ my: 1 }}>
         本地离线内容可能被使用此设备的其他人查看；请只在个人设备上开启。清除浏览器数据也可能清除快照。
