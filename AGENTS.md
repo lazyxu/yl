@@ -26,7 +26,7 @@
 - iPhone Safari 首选，底栏安全区、键盘、照片拍摄、时区日期以及返回状态都要验证；未完成实机检查时明确标注。
 - 功能开发使用 master 的独立分支和 MR/PR；最少运行 Jest、Node 参数测试、MySQL 集成测试与 Vite 构建；不要自动部署生产环境。
 
-- PWA 只提供安装入口和独立窗口；不缓存花园 API、原图、登录信息，也不支持离线写入。发布构建必须检查 manifest 与 192/512px PNG 图标。
+- PWA 支持安装、静态界面离线启动及用户主动许可的只读数据快照；绝不将花园 JSON API、原图、登录信息或写请求存入 Service Worker 缓存。仅用户明确同意后允许在本设备 Cache Storage 存储有限 /thumb 衍生图及 IndexedDB 已访问元数据；离线写入仍禁止。发布构建需验证 Manifest、192/512px 图标、版本化 SW 和缓存清单。
 
 - **花园拍照回归保障**：实际 UI 用 `observedPayload()` 生成带 `Z` 时区标识、无毫秒的 ISO 8601 时间（兼容旧版与新版后端）；服务端还应兼容毫秒和显式时区偏移，并保持用户选择的本地日期。任何上传/编辑 API 改动必须用同一 payload helper 的真实请求完成 MySQL 集成测试，不能只写手工无毫秒时间字符串。
 
@@ -133,3 +133,13 @@
 - The pre-React theme initializer matches Calendar/Garden system dark appearance before the application mounts; Pindou stays light. The external script is local and deliberately contains no network calls, telemetry or inline CSP exceptions.
 - Dates, weekdays and non-shift Garden controls respect larger root text sizing with flexible layouts. **Never change the daily 白班/夜班/休息/备班 label 10px font size, colors or default padding.**
 - Manifest background/theme values are static fallbacks for initial load and cannot represent every module's active system appearance. Real iPhone standalone status bar and Dynamic Island remain separate physical checks.
+
+## PWA P0/P1/P2 本地化与安全更新（PR #22）
+
+- **P0 组件离线本地化**：Vite 构建完成后执行 `scripts/build-pwa-shell.mjs`，生成 `dist/pwa-precache.json` 和带内容哈希的 `dist/sw.js`；缓存 HTML、构建后的 JS/CSS 和必要图标，不缓存 API/原图/上传、WASM/OCR 模型。每项预缓存资源最大 6 MiB，整体最大 18 MiB，超限应使构建失败。当前使用自己维护的 Workbox 风格清单注入，而非引入/冒用 Workbox npm 包。
+- 服务端 `/index.html`、`/sw.js` 和 Manifest 必须校验或禁用 HTTP 缓存；Vite 带哈希 assets 可以 `immutable` 长期缓存；`/api/*` 默认 `private, no-store`，花园 UUID 缩略图/预览的现有 private 缓存/ETag 策略例外，原图继续无缓存。
+- Service Worker 安装过程中预缓存任一项目失败必须删除不完整的缓存版本并维持旧工作线程；完成新版本预下载后，必须由用户在安全时机主动激活，禁止安装阶段强制 `skipWaiting` 刷新正在编辑或上传的页面。保留至少一代旧哈希 JS 兼容原页面的动态导入。
+- **P1 日历离线快照**：IndexedDB `yl-offline-readonly/snapshots/calendar` 只在当前联网轮次分别取得已确认的 `shift-rules` 和 `shift-day-overrides` 版本后写入；用户断网或版本未核验时可查看上次快照，但必须显示同步时间和非实时提示。任何离线/未确认状态禁止排班编辑、删除或上传，重新联网及从后台恢复时节流重检服务器版本。
+- **P2 花园可选离线浏览**：默认关闭，`花园 → 离线浏览设置` 中明确用户同意；仅存储已浏览的前 200 株摘要、最多 30 个详情、每株前 100 条成长记录及最多 60 张、12 MiB 的 /thumb 照片。仅用于只读；不可在离线编辑/删除；显示“部分记录、可能已过期”标识。用户关闭/清除需撤销同意、删除花园 IndexedDB 元数据及专用 Cache Storage，不得删除已确认的日历快照。避免关闭期间的异步保存继续回写离线数据；普通浏览器 HTTP 图片缓存独立管理。
+- 所有用户数据仍以 Express/MySQL 为真实来源；没有离线排班编辑队列、花园上传队列或静默批量预下载。换设备/清理 Safari 数据后可以丢失离线快照，绝不能作为唯一数据源。
+- CI 应覆盖离线冷启动/恢复联网、排班版本与禁用编辑、花园主动许可/清除、缩略图容量约束、缓存头、等待更新与旧 JS 回退。Chrome 用真正的 Playwright 网络离线模拟；Playwright WebKit 在 `setOffline(true)` + SW 页面导航有已知模拟缺陷时可改用**停止隔离源站**的故障测试，须如实标注两种测试范围，不得将此标注为 iPhone 真机验收。
