@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Box, Button, Dialog, DialogContent, DialogTitle, useMediaQuery } from '@mui/material'
 import GardenConfirmDialog from './GardenConfirmDialog'
 import useKeyboardViewport from '../useKeyboardViewport'
+import RouterDraftGuard from '../RouterDraftGuard'
 
 export default function GardenFormDialog({ open, title, busy, dirty, onClose, onSave, children, saveLabel = '保存' }) {
   const phone = useMediaQuery('(max-width:599.95px), (max-height:480px) and (pointer:coarse)')
@@ -42,6 +43,8 @@ export default function GardenFormDialog({ open, title, busy, dirty, onClose, on
     else onClose()
   }
   return <>
+    <RouterDraftGuard open={open} when={dirty || busy} busy={busy}
+      onDiscard={onClose} title="放弃未保存的花园草稿？" />
     <Dialog open={open} onClose={requestClose} fullScreen={phone} fullWidth maxWidth="sm"
       scroll="paper" aria-label={title}
       PaperProps={{ className: 'garden-editor-dialog', sx: { borderRadius: phone ? '0 !important' : 3 },
