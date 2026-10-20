@@ -8,6 +8,8 @@ import PlantGrid from './PlantGrid'
 import PlantEditor from './PlantEditor'
 import FlowerDetail from './FlowerDetail'
 import GardenCalendar from './GardenCalendar'
+import OfflineOptions from './OfflineOptions'
+import { gardenOfflineEnabled } from '../offline/data'
 
 function shouldShowInstallHint() {
   if (typeof navigator === 'undefined') return false
@@ -29,6 +31,13 @@ export default function Garden({ active = true }) {
   const [creating, setCreating] = useState(false)
   const [notice, setNotice] = useState(null)
   const [installHint, setInstallHint] = useState(shouldShowInstallHint)
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
+  }, [])
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDay, setSelectedDay] = useState('')
   const scrollSaved = useRef([0, 0])
@@ -36,7 +45,7 @@ export default function Garden({ active = true }) {
   const sentinel = useRef(null)
   const notify = useCallback((message, error = false) => setNotice({ message, error }), [])
   const {
-    plants, species, search, query, setSearch, loading, error,
+    plants, species, search, query, setSearch, loading, error, offlineSnapshotAt,
     plantHasMore, plantTotal, plantLoadingMore, fetchSpecies, refresh, loadMorePlants,
   } = useGardenPlants(active, notify)
   const [showLoadingPlaceholder, setShowLoadingPlaceholder] = useState(false)
@@ -137,7 +146,8 @@ export default function Garden({ active = true }) {
         <div className="garden-subtitle">记录每一株花的成长</div>
       </Box>
       <Button aria-label="添加花卉" className="garden-add-btn" variant="contained" color="success"
-        startIcon={<Add />} onClick={() => setCreating(true)}>添加花卉</Button>
+        startIcon={<Add />} disabled={!online || Boolean(offlineSnapshotAt)}
+        onClick={() => setCreating(true)}>添加花卉</Button>
     </Stack>
   </div>
 
@@ -147,6 +157,13 @@ export default function Garden({ active = true }) {
           onBack={() => goPlant(null)} onChange={refresh} onSpecies={fetchSpecies} notify={notify} />
       : <Box>
         {heading}
+        {(offlineSnapshotAt || !online && gardenOfflineEnabled()) &&
+          <Alert severity="warning" sx={{ mb: 1.5 }}>
+            {offlineSnapshotAt
+              ? '仅显示上次离线保存的部分花园数据（' + new Date(offlineSnapshotAt).toLocaleString('zh-CN') + '），不能编辑或删除。'
+              : '已离线。仅此前允许保存并浏览过的花园数据可能可见。'}
+            联网后自动刷新获取最新状态。
+          </Alert>}
         <div className="garden-segments" role="tablist" aria-label="花园视图">
           <button type="button" id="garden-plants-tab" className="garden-segment" role="tab"
             aria-selected={tab === 0} aria-controls="garden-plants-panel" tabIndex={tab === 0 ? 0 : -1}
@@ -204,6 +221,8 @@ export default function Garden({ active = true }) {
             </Button>}
             <div ref={sentinel} aria-hidden="true" style={{ height: 2, width: '100%' }} />
           </div>}
+          <OfflineOptions items={plants} total={plantTotal} species={species}
+            query={query} notify={notify} />
           {installHint && <div className="garden-install-hint">
             <ShareOutlined aria-hidden="true" color="success"/>
             <p>在 Safari 点「分享」→「添加到主屏幕」，即可像 App 一样打开花园。</p>
@@ -219,7 +238,8 @@ export default function Garden({ active = true }) {
       onSaved={refresh} onSpecies={fetchSpecies} notify={notify} />
     <Snackbar open={!!notice} autoHideDuration={4100} onClose={() => setNotice(null)}
       anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      sx={{ top: 'max(12px, env(safe-area-inset-top, 0px)) !important' }}>
+      sx={{ top: 'max(12px, env(safe-area-inset-top, 0px)) !important',
+        pointerEvents: 'none', '& .MuiAlert-action button': { pointerEvents: 'auto' } }}>
       <Alert onClose={() => setNotice(null)} severity={notice?.error ? 'error' : 'success'} variant="filled">{notice?.message}</Alert>
     </Snackbar>
   </Box>

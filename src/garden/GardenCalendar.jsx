@@ -5,6 +5,7 @@ import { Alert, Box, Button, Card, CardActionArea, Dialog, DialogActions, Dialog
 import { ChevronLeft, ChevronRight, TodayOutlined } from '@mui/icons-material'
 import { gardenRequest, displayDate } from '../gardenApi'
 import { Cover } from './Shared'
+import { readGardenDay } from '../offline/data'
 
 const firstOfMonth = date => new Date(date.getFullYear(), date.getMonth(), 1)
 const dateKey = date => date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') +
@@ -51,6 +52,7 @@ export default function GardenCalendar({ active, selectPlant, notify,
   const [dayLoading, setDayLoading] = useState(false)
   const [showDayLoading, setShowDayLoading] = useState(false)
   const [dayLoadingMore, setDayLoadingMore] = useState(false)
+  const [partialOffline, setPartialOffline] = useState(false)
   const [error, setError] = useState('')
   const [retryToken, setRetryToken] = useState(0)
   const dayRequestGeneration = useRef(0)
@@ -75,7 +77,8 @@ export default function GardenCalendar({ active, selectPlant, notify,
     gardenRequest('/calendar', { signal: controller.signal }).then(data => {
       if (!controller.signal.aborted) setCounts(data)
     }).catch(err => {
-      if (err.name !== 'AbortError' && !controller.signal.aborted) setCountsError(err.message)
+      if (err.name !== 'AbortError' && !controller.signal.aborted)
+        setCountsError('成长日历的在线统计不可用；离线时仅能查看之前保存过的部分记录')
     })
     return () => controller.abort()
   }, [active, countsRetry])
@@ -92,12 +95,23 @@ export default function GardenCalendar({ active, selectPlant, notify,
     gardenRequest('/calendar/day?date=' + selected + '&limit=40', { signal: controller.signal }).then(page => {
       if (controller.signal.aborted || generation !== dayRequestGeneration.current) return
       setItems(page.items)
+      setPartialOffline(false)
       setDayTotal(page.total)
       setDayHasMore(page.has_more)
       setDayCursor(page.next_cursor)
       setLoadedDay(selected)
-    }).catch(err => {
-      if (err.name !== 'AbortError' && generation === dayRequestGeneration.current) setError(err.message)
+    }).catch(async err => {
+      if (err.name === 'AbortError' || generation !== dayRequestGeneration.current) return
+      const cached = await readGardenDay(selected)
+      if (cached && generation === dayRequestGeneration.current && !controller.signal.aborted) {
+        setItems(cached)
+        setDayTotal(cached.length)
+        setDayHasMore(false)
+        setDayCursor(null)
+        setLoadedDay(selected)
+        setPartialOffline(true)
+        setError('')
+      } else setError(err.message)
     }).finally(() => {
       if (generation === dayRequestGeneration.current && !controller.signal.aborted) setDayLoading(false)
     })
@@ -249,6 +263,9 @@ export default function GardenCalendar({ active, selectPlant, notify,
     </div>
     <Divider sx={{ my: 2 }}/>
     {displayingSelected ? <div aria-live="polite">
+      {partialOffline && <Alert severity="warning" sx={{ mb: 1 }}>
+        离线只读：仅包含已保存过的花卉成长记录，不代表当天全部记录数。
+      </Alert>}
       <Typography fontWeight={720} mb={1}>{selected} · {ready ? dayTotal : (countsMap.get(selected) || 0)} 条记录</Typography>
       {dayLoading && <Box sx={{ py: 2, minHeight: 50 }} role="status" aria-busy="true">
         {showDayLoading && <Typography variant="body2" color="text.secondary">正在读取当天记录…</Typography>}

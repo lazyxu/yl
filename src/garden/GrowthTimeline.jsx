@@ -3,8 +3,9 @@ import React, { useMemo, useState } from 'react'
 import { Box, IconButton, Menu, MenuItem, Typography } from '@mui/material'
 import { DeleteOutline, EditOutlined, MoreHoriz, YardOutlined } from '@mui/icons-material'
 import { gardenPhoto, displayDate } from '../gardenApi'
+import OfflinePhoto from '../offline/OfflinePhoto'
 
-export default function GrowthTimeline({ entries, photos, onEdit, onDelete, onOpenPhoto }) {
+export default function GrowthTimeline({ entries, photos, onEdit, onDelete, onOpenPhoto, readOnly = false }) {
   const [menuState, setMenuState] = useState(null)
   const indices = useMemo(() => new Map(photos.map((photo, index) => [photo.id, index])), [photos])
   let previousMonth = ''
@@ -29,16 +30,17 @@ export default function GrowthTimeline({ entries, photos, onEdit, onDelete, onOp
               <div className="garden-timeline-date">{displayDate(entry.observed_at)}</div>
               {entry.author_name && <Typography variant="caption" color="text.secondary">记录者：{entry.author_name}</Typography>}
             </Box>
-            <IconButton aria-label="日记操作" onClick={event => setMenuState({ anchor: event.currentTarget, entry })}>
+            {!readOnly && <IconButton aria-label="日记操作"
+              onClick={event => setMenuState({ anchor: event.currentTarget, entry })}>
               <MoreHoriz/>
-            </IconButton>
+            </IconButton>}
           </Box>
           {entry.note && <p className="garden-timeline-note">{entry.note}</p>}
           <Box display="grid" gridTemplateColumns={(entry.photos || []).length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))'}
             gap={1} mt={entry.note ? 1 : 1.5}>
             {(entry.photos || []).map(photo => <button type="button" className="garden-picture-button" key={photo.id}
               aria-label={'查看照片：' + photo.name} onClick={() => onOpenPhoto(indices.get(photo.id))}>
-              <img src={gardenPhoto(photo.id)} alt={photo.name} loading="lazy" />
+              <OfflinePhoto src={gardenPhoto(photo.id)} alt={photo.name} loading="lazy" />
             </button>)}
           </Box>
         </article>

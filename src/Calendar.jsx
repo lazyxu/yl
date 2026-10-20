@@ -11,6 +11,7 @@ import { loadShiftSettings, loadDayShifts } from './shiftSettingsApi'
 import { shiftStyle } from './shifts'
 import CalendarDay from './CalendarDay'
 import DayShiftEditor from './DayShiftEditor'
+import { readCalendarSnapshot, saveCalendarSnapshot } from './offline/data'
 
 // Keep shift labels visible in every date cell, including standby. The palette
 // remains the single shared source for Calendar, Settings and Editors.
@@ -70,12 +71,44 @@ export default function Calendar({ active = true }) {
   const [dayEditor, setDayEditor] = useState(null)
   const [showPending, setShowPending] = useState(false)
   const [monthPickerOpen, setMonthPickerOpen] = useState(false)
+  const [snapshotAt, setSnapshotAt] = useState(null)
+  const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
+  const [serverRulesReady, setServerRulesReady] = useState(false)
+  const [serverOverridesReady, setServerOverridesReady] = useState(false)
+  const liveRules = useRef(null)
+  const liveOverrides = useRef(null)
+  const lastOnlineSync = useRef(0)
 
   const calendarRef = useRef(null)
   const swipeStart = useRef(null)
   const swipeFrame = useRef(null)
   const swipeDelta = useRef(0)
   const gestureBlocked = useRef(false)
+
+  // Read only previously confirmed pairs of rule/override versions. They
+  // never authorize editing and cannot overwrite a newer network response.
+  useEffect(() => {
+    if (!active) return
+    let cancelled = false
+    readCalendarSnapshot().then(snapshot => {
+      if (!snapshot || cancelled) return
+      setSnapshotAt(snapshot.savedAt)
+      setSettings(current => current.version === null
+        ? { rules: snapshot.rules, version: snapshot.rulesVersion } : current)
+      setDayShifts(current => current.version === null
+        ? { overrides: snapshot.overrides, version: snapshot.overridesVersion } : current)
+    })
+    return () => { cancelled = true }
+  }, [active])
+
+  useEffect(() => {
+    if (!active) return
+    const update = () => setOnline(navigator.onLine)
+    update()
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update) }
+  }, [active])
 
   // Refresh "today" on foreground activation and at the next local midnight;
   // never reset the month or selected date while doing so.
@@ -128,10 +161,29 @@ export default function Calendar({ active = true }) {
     setSettingsError('')
     try {
       const loaded = await loadShiftSettings(signal)
-      setSettings(current => current.version === null || loaded.version >= current.version ? loaded : current)
-      return loaded
+      if (signal?.aborted) return
+      // A delayed response may arrive after a newer version from another
+      // foreground refresh. Keep both displayed state and cached pair monotonic.
+      const latest = liveRules.current && liveRules.current.version > loaded.version
+        ? liveRules.current : loaded
+      liveRules.current = latest
+      setServerRulesReady(true)
+      setSettings(current => current.version === null || latest.version >= current.version ? latest : current)
+      if (liveOverrides.current) {
+        saveCalendarSnapshot({ rules: latest.rules, rulesVersion: latest.version,
+          overrides: liveOverrides.current.overrides,
+          overridesVersion: liveOverrides.current.version })
+          .then(saved => { if (saved) setSnapshotAt(Date.now()) })
+          .catch(() => {})
+      }
+      return latest
     } catch (error) {
-      if (error.name !== 'AbortError') setSettingsError('无法读取排班设置，当前显示上次已获取或内置规则。请重新加载后再修改。')
+      if (error.name !== 'AbortError') {
+        // A connected iPhone can still lose its origin. Never keep a previous
+        // edit authorization after a failed foreground/online revalidation.
+        setServerRulesReady(false)
+        setSettingsError('无法读取排班设置，当前显示上次已获取或内置规则。请重新加载后再修改。')
+      }
     } finally {
       if (!signal?.aborted) setLoadingSettings(false)
     }
@@ -141,10 +193,24 @@ export default function Calendar({ active = true }) {
     setDayShiftsError('')
     try {
       const loaded = await loadDayShifts(signal)
-      setDayShifts(current => current.version === null || loaded.version >= current.version ? loaded : current)
-      return loaded
+      if (signal?.aborted) return
+      const latest = liveOverrides.current && liveOverrides.current.version > loaded.version
+        ? liveOverrides.current : loaded
+      liveOverrides.current = latest
+      setServerOverridesReady(true)
+      setDayShifts(current => current.version === null || latest.version >= current.version ? latest : current)
+      if (liveRules.current) {
+        saveCalendarSnapshot({ rules: liveRules.current.rules, rulesVersion: liveRules.current.version,
+          overrides: latest.overrides, overridesVersion: latest.version })
+          .then(saved => { if (saved) setSnapshotAt(Date.now()) })
+          .catch(() => {})
+      }
+      return latest
     } catch (error) {
-      if (error.name !== 'AbortError') setDayShiftsError('无法读取单日调整，请重新加载后再修改。')
+      if (error.name !== 'AbortError') {
+        setServerOverridesReady(false)
+        setDayShiftsError('无法读取单日调整，请重新加载后再修改。')
+      }
     } finally {
       if (!signal?.aborted) setLoadingDayShifts(false)
     }
@@ -152,9 +218,33 @@ export default function Calendar({ active = true }) {
   useEffect(() => {
     if (!active) { setSettingsOpen(false); return }
     const controller = new AbortController()
+    // Versions loaded from IDB are only a display snapshot; require both
+    // responses from the current network cycle before enabling any mutation.
+    setServerRulesReady(false)
+    setServerOverridesReady(false)
+    liveRules.current = null
+    liveOverrides.current = null
+    lastOnlineSync.current = Date.now()
     reloadSettings(controller.signal)
     reloadDayShifts(controller.signal)
-    return () => controller.abort()
+    const refresh = event => {
+      if (document.visibilityState === 'hidden' || !navigator.onLine) return
+      // Network recovery refreshes immediately. Foreground/focus refresh is
+      // throttled because iPhone frequently changes app visibility.
+      if (event?.type !== 'online' && Date.now() - lastOnlineSync.current < 60_000) return
+      lastOnlineSync.current = Date.now()
+      reloadSettings(controller.signal)
+      reloadDayShifts(controller.signal)
+    }
+    window.addEventListener('online', refresh)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      controller.abort()
+      window.removeEventListener('online', refresh)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
   }, [active, reloadSettings, reloadDayShifts])
   useEffect(() => {
     if (!loadingSettings && !loadingDayShifts) { setShowPending(false); return }
@@ -163,7 +253,8 @@ export default function Calendar({ active = true }) {
   }, [loadingSettings, loadingDayShifts])
 
   const confirmed = settings.version !== null && dayShifts.version !== null
-  const canAdjust = active && !loadingSettings && !loadingDayShifts && confirmed
+  const canAdjust = active && online && serverRulesReady && serverOverridesReady &&
+    !settingsError && !dayShiftsError && !loadingSettings && !loadingDayShifts && confirmed
   const shiftFor = day => {
     const override = dayShifts.overrides[dateKey(day)]
     return override?.shift || getShift(day, settings.rules)
@@ -311,7 +402,7 @@ export default function Calendar({ active = true }) {
           <Typography component="p" className="schedule-eyebrow">班次安排</Typography>
         </div>
         <Button startIcon={<SettingsOutlined />} onClick={() => setSettingsOpen(true)}
-          disabled={loadingSettings || settings.version === null}
+          disabled={!online || loadingSettings || !serverRulesReady}
           aria-label="排班设置">排班设置</Button>
       </header>
 
@@ -331,13 +422,20 @@ export default function Calendar({ active = true }) {
         </span>)}
       </div>
 
-      {!confirmed && showPending && <Alert severity="info" className="schedule-unverified" role="status">
-        当前显示内置或上次获取的排班预览，尚未核对服务器数据；确认完成前不能修改排班。
-      </Alert>}
+      {snapshotAt && (!serverRulesReady || !serverOverridesReady || !online) &&
+        <Alert severity="warning" className="schedule-unverified" role="status">
+          {online ? '正在核对服务器，暂时显示' : '离线只读：当前显示'}上次确认的排班快照
+          （{new Date(snapshotAt).toLocaleString('zh-CN')}）。
+          可能不是最新排班，联网核实前不允许修改。
+        </Alert>}
+      {!snapshotAt && !confirmed && showPending &&
+        <Alert severity="info" className="schedule-unverified" role="status">
+          {online ? '尚未核对服务器排班' : '尚无已保存的排班快照'}；当前仅显示内置示例，不能修改。
+        </Alert>}
       {confirmed && showPending && (loadingSettings || loadingDayShifts) && !settingsError && !dayShiftsError &&
         <Typography variant="caption" color="text.secondary" className="schedule-loading">正在核对最新排班…</Typography>}
-      {settingsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
-      {dayShiftsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
+      {settingsError && online && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
+      {dayShiftsError && online && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
 
       <div className="calendar" role="group" aria-label={currentMonth.format('YYYY年MM月') + '排班月历，方向键可移动日期'}
         ref={calendarRef} onKeyDown={onCalendarKeyDown}
@@ -377,11 +475,23 @@ export default function Calendar({ active = true }) {
         setSelectedDate(target.clone().date(Math.min(selectedDate.date(), target.daysInMonth())))
       }} />
     <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)}
-      onReload={() => reloadSettings()} onSaved={setSettings} />
+      onReload={() => reloadSettings()} onSaved={saved => {
+        setSettings(saved)
+        liveRules.current = saved
+        if (liveOverrides.current) saveCalendarSnapshot({
+          rules: saved.rules, rulesVersion: saved.version,
+          overrides: liveOverrides.current.overrides, overridesVersion: liveOverrides.current.version,
+        }).then(wrote => { if (wrote) setSnapshotAt(Date.now()) }).catch(() => {})
+      }} />
     {dayEditor && <DayShiftEditor key={dayEditor.date} {...dayEditor} open={active}
       onCancel={() => setDayEditor(null)} onReload={reloadDayShifts}
       onSaved={saved => {
         setDayShifts(current => current.version === null || saved.version >= current.version ? saved : current)
+        liveOverrides.current = saved
+        if (liveRules.current) saveCalendarSnapshot({
+          rules: liveRules.current.rules, rulesVersion: liveRules.current.version,
+          overrides: saved.overrides, overridesVersion: saved.version,
+        }).then(wrote => { if (wrote) setSnapshotAt(Date.now()) }).catch(() => {})
         setDayEditor(null)
       }} />}
   </Box>

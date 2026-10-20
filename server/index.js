@@ -27,6 +27,12 @@ const corsOptions = {
   credentials: true,
 };
 app.use(cors(corsOptions));
+// Business JSON and mutations are authoritative: never let browser HTTP caches
+// replay stale rows or an old change. Photo derivatives override this below.
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  next();
+});
 app.use('/api/settings/shifts/overrides', dayShiftsRouter);
 app.use('/api/settings/shifts', settingsRouter);
 app.use(express.json());
@@ -45,9 +51,22 @@ if (fs.existsSync(serverDist)) distPath = serverDist;
 else if (fs.existsSync(parentDist)) distPath = parentDist;
 
 if (distPath) {
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    setHeaders(res, filePath) {
+      const rel = path.relative(distPath, filePath).replace(/\\/g, '/');
+      // Vite defaults to e.g. assets/Calendar-ABC12345.js, not Calendar.ABC12345.js.
+      if (/^assets\/.+[-.][A-Za-z0-9_-]{8,}\.(js|css|woff2?|svg|png)$/i.test(rel)) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      } else if (rel === 'sw.js') {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      } else if (rel === 'index.html' || rel === 'manifest.webmanifest' || rel === 'pwa-theme-init.js') {
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+      }
+    },
+  }));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
