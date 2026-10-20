@@ -134,6 +134,26 @@ async function verify(engine) {
     assert.match(workerHeaders.headers()['cache-control'] || '', /no-store/,
       tag + ': service worker updates must bypass HTTP cache')
 
+    // Real Service Worker fetch contract: an older open tab may request a
+    // lazy chunk from the previous deployment. No network fallback may turn
+    // that hashed JavaScript path into index.html or a 404.
+    const previousChunk = await page.evaluate(async () => {
+      const url = '/assets/previous-pWA12345.js'
+      const name = 'yl-shell-old-chunk-probe'
+      const oldCache = await caches.open(name)
+      try {
+        await oldCache.put(url, new Response('export const previousChunk = true;', {
+          headers: { 'Content-Type': 'text/javascript' },
+        }))
+        const response = await fetch(url, { cache: 'no-store' })
+        return { status: response.status, body: await response.text() }
+      } finally {
+        await caches.delete(name)
+      }
+    })
+    assert.equal(previousChunk.status, 200, tag + ': previous lazy chunk remains available')
+    assert.equal(previousChunk.body, 'export const previousChunk = true;',
+      tag + ': older Vite dash-hashed chunk served from previous SW cache')
     await disconnect(engine, context)
     await page.reload({ waitUntil: 'domcontentloaded' })
     // With network emulation Chromium reports offline; a WebKit origin outage

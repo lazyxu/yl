@@ -56,7 +56,7 @@ self.addEventListener('fetch', event => {
   // During a new release older open tabs may still request lazy chunks
   // from the previous manifest. Only trusted hashed Vite assets are eligible
   // for fallback to the previous (already cached) generation.
-  const hashedAsset = /^\/assets\/.+\.[A-Za-z0-9_-]{8,}\.(js|css|svg|png)$/.test(url.pathname)
+  const hashedAsset = /^\/assets\/.+[-.][A-Za-z0-9_-]{8,}\.(js|css|woff2?|svg|png)$/.test(url.pathname)
   if (!precached.has(url.pathname) && !hashedAsset) return
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME)
