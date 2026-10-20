@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Box, Button, CircularProgress, Dialog, IconButton, Stack, Typography } from '@mui/material'
 import { ChevronLeft, ChevronRight, Close, DownloadOutlined, IosShareOutlined,
-  ZoomInOutlined, ZoomOutOutlined, EyeOutlined } from '@mui/icons-material'
+  ZoomInOutlined, ZoomOutOutlined, VisibilityOutlined } from '@mui/icons-material'
 import { gardenPhoto } from '../gardenApi'
 
 const distance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
@@ -220,7 +220,7 @@ export default function Viewer({ photos, current, onClose,
     </div>}
     {!controls && <IconButton aria-label="显示照片工具栏" onClick={() => setControls(true)}
       sx={{ position: 'absolute', top: 'max(14px, env(safe-area-inset-top, 0px))', right: 12, color: '#fff', zIndex: 2 }}>
-      <EyeOutlined/>
+      <VisibilityOutlined/>
     </IconButton>}
   </Dialog>
 }
