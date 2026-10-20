@@ -1,26 +1,36 @@
-html, body, #root {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-}
 
+html, body, #root { width: 100%; height: 100%; margin: 0; }
 body { overflow: hidden; }
-
 .app-shell {
+  --app-ink: #203329;
+  --app-muted: #687970;
+  --app-canvas: #f7faf7;
+  --app-surface: #fff;
+  --app-border: #e3eae4;
+  --app-accent: #347c52;
+  --app-pressed: #e8f4ec;
+  color-scheme: light;
   display: flex;
   flex-direction: column;
   width: 100%;
   height: 100vh;
+  min-height: 0;
   overflow: hidden;
-  background: #fff;
+  background: var(--app-canvas);
+  color: var(--app-ink);
 }
-
-@supports (height: 100dvh) {
-  .app-shell { height: 100dvh; }
+@supports (height: 100dvh) { .app-shell { height: 100dvh; } }
+.app-shell[data-theme="dark"] {
+  --app-ink: #ebf5ed;
+  --app-muted: #acbfb3;
+  --app-canvas: #101914;
+  --app-surface: #1b2921;
+  --app-border: #34503c;
+  --app-accent: #9cdeb1;
+  --app-pressed: #2c4935;
+  color-scheme: dark;
 }
-
 .app-shell[data-keyboard-open="true"] { height: var(--keyboard-height); }
-
 .app-header {
   display: flex;
   align-items: center;
@@ -28,49 +38,56 @@ body { overflow: hidden; }
   gap: 4px;
   min-height: calc(48px + env(safe-area-inset-top, 0px));
   padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
-  border-bottom: 1px solid #eceef2;
-  background: #fff;
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-surface);
 }
-
-.app-header .app-title {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.app-content {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-}
+.app-header .app-title { font-size: 18px; font-weight: 650; line-height: 1.4; }
+.app-content { position: relative; flex: 1; min-height: 0; min-width: 0; }
 .app-shell[data-module-page="true"] .app-content { margin-top: env(safe-area-inset-top, 0px); }
-
 .app-page {
   position: absolute;
   inset: 0;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
-  padding: 0 env(safe-area-inset-right, 0px) 16px env(safe-area-inset-left, 0px);
+  padding: 0 env(safe-area-inset-right, 0px) 12px env(safe-area-inset-left, 0px);
+  overflow-anchor: none;
 }
-
 .app-page[hidden], .app-footer[hidden] { display: none; }
-
 .app-footer {
+  position: relative;
+  z-index: 9;
   flex: none;
-  border-top: 1px solid #e5e8ef;
+  border-top: 1px solid var(--app-border);
   padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
-  background: #fff;
+  background: var(--app-surface);
 }
-
-.app-footer .MuiBottomNavigation-root { height: 60px; }
-.app-footer .MuiBottomNavigationAction-root { max-width: none; min-height: 44px; color: #667085; gap: 2px; }
-.app-footer .MuiBottomNavigationAction-root.Mui-selected { color: #1976d2; background: #f0f6ff; }
+.app-footer .MuiBottomNavigation-root { height: 58px; background: transparent; }
+.app-footer .MuiBottomNavigationAction-root {
+  max-width: none;
+  min-height: 44px;
+  padding: 5px 4px;
+  color: var(--app-muted);
+  gap: 2px;
+}
+.app-footer .MuiBottomNavigationAction-root.Mui-selected {
+  color: var(--app-accent);
+  background: var(--app-pressed);
+}
 .app-footer .MuiBottomNavigationAction-label,
-.app-footer .MuiBottomNavigationAction-label.Mui-selected { font-size: 13px; font-weight: 600; }
-
+.app-footer .MuiBottomNavigationAction-label.Mui-selected { font-size: 12px; font-weight: 650; }
 .app-shell input, .app-shell textarea, .app-shell select { font-size: 16px; }
 .app-shell .header button { min-height: 44px; min-width: 44px; }
-.page-loading { padding: 24px 16px; color: #667085; }
+.page-loading { min-height: 140px; }
+@media (min-width: 700px) {
+  .app-footer .MuiBottomNavigation-root { height: 62px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *, .app-shell *::before, .app-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

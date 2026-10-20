@@ -1,19 +1,14 @@
-import React from 'react'
-import { Box, Stack, Typography } from '@mui/material'
+
+import React, { useEffect, useState } from 'react'
+import { Box } from '@mui/material'
 import { LocalFloristOutlined } from '@mui/icons-material'
 import { gardenPhoto } from '../gardenApi'
 
-
-export function Cover({ id, height = 178, label = '花卉照片' }) {
-  return <Box className="garden-cover" sx={{ height }}>
-    {id ? <img src={gardenPhoto(id)} alt={label} loading="lazy" /> :
-      <LocalFloristOutlined sx={{ fontSize: 58, color: '#9bbc96' }} />}
+export function Cover({ id, height = 178, label = '花卉照片', className = '' }) {
+  const [failed, setFailed] = useState(false)
+  useEffect(() => setFailed(false), [id])
+  return <Box className={'garden-cover ' + className} sx={height == null ? undefined : { height }}>
+    {id && !failed ? <img src={gardenPhoto(id)} alt={label} loading="lazy" onError={() => setFailed(true)} /> :
+      <LocalFloristOutlined aria-hidden="true" sx={{ fontSize: 54, color: '#83a68c' }} />}
   </Box>
-}
-export function SectionTitle({ title, detail, action }) {
-  return <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} mb={2}>
-    <Box><Typography variant="h5" sx={{ fontWeight: 750, color: '#335d43' }}>{title}</Typography>
-      {detail && <Typography variant="body2" color="text.secondary">{detail}</Typography>}
-    </Box>{action}
-  </Stack>
 }

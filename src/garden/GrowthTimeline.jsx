@@ -1,27 +1,57 @@
-import React from 'react'
-import { Box, Card, CardContent, Grid, IconButton, Paper, Stack, Typography } from '@mui/material'
-import { EditOutlined, DeleteOutline, YardOutlined } from '@mui/icons-material'
+
+import React, { useMemo, useState } from 'react'
+import { Box, IconButton, Menu, MenuItem, Typography } from '@mui/material'
+import { DeleteOutline, EditOutlined, MoreHoriz, YardOutlined } from '@mui/icons-material'
 import { gardenPhoto, displayDate } from '../gardenApi'
 
 export default function GrowthTimeline({ entries, photos, onEdit, onDelete, onOpenPhoto }) {
-  return (<Stack spacing={2.5}>
-      {entries.length === 0 && <Paper sx={{ textAlign: 'center', py: 8, borderRadius: 3 }}><YardOutlined sx={{ fontSize: 56, color: '#9bbc96' }} /><Typography>还没有成长日记，拍下第一张照片吧。</Typography></Paper>}
-      {entries.map(entry => <Box key={entry.id} sx={{ borderLeft: '3px solid #b5ceb3', pl: 2, position: 'relative' }}>
-        <Card variant="outlined"><CardContent sx={{ p: 2 }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="start" gap={1}>
-            <Box flex={1}><Typography fontWeight={750}>{displayDate(entry.observed_at)}</Typography>
-              {entry.author_name && <Typography color="text.secondary" variant="caption">记录者：{entry.author_name}</Typography>}
+  const [menuState, setMenuState] = useState(null)
+  const indices = useMemo(() => new Map(photos.map((photo, index) => [photo.id, index])), [photos])
+  let previousMonth = ''
+  if (!entries.length) return <div className="garden-empty">
+    <YardOutlined sx={{ fontSize: 46, color: '#91b59b' }}/>
+    <Typography fontWeight={750}>还没有成长日记</Typography>
+    <Typography variant="body2" color="text.secondary">记录第一次发芽或开花的瞬间吧。</Typography>
+  </div>
+  return <div aria-label="成长日记列表">
+    {entries.map(entry => {
+      const date = new Date(entry.observed_at)
+      const month = Number.isFinite(date.getTime())
+        ? date.getFullYear() + ' 年 ' + (date.getMonth() + 1) + ' 月'
+        : '未知日期'
+      const showMonth = month !== previousMonth
+      previousMonth = month
+      return <React.Fragment key={entry.id}>
+        {showMonth && <div className="garden-timeline-month">{month}</div>}
+        <article className="garden-timeline-entry" aria-label={displayDate(entry.observed_at)}>
+          <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+            <Box minWidth={0}>
+              <div className="garden-timeline-date">{displayDate(entry.observed_at)}</div>
+              {entry.author_name && <Typography variant="caption" color="text.secondary">记录者：{entry.author_name}</Typography>}
             </Box>
-            <IconButton size="small" aria-label="编辑日记" onClick={() => onEdit(entry)}><EditOutlined fontSize="small" /></IconButton>
-            <IconButton size="small" color="error" aria-label="删除日记" onClick={() => onDelete(entry)}><DeleteOutline fontSize="small" /></IconButton>
-          </Stack>
-          {entry.note && <Typography sx={{ whiteSpace: 'pre-wrap', my: 1.5 }}>{entry.note}</Typography>}
-          <Grid container spacing={1} mt={.1}>{entry.photos.map(photo => <Grid key={photo.id} item xs={entry.photos.length === 1 ? 12 : 6} sm={4}>
-            <button className="garden-picture-button" onClick={() => onOpenPhoto(photos.findIndex(p => p.id === photo.id))} aria-label={'查看照片：' + photo.name}>
-              <img src={gardenPhoto(photo.id)} loading="lazy" alt={photo.name} />
-            </button>
-          </Grid>)}</Grid>
-        </CardContent></Card>
-      </Box>)}
-    </Stack>)
+            <IconButton aria-label="日记操作" onClick={event => setMenuState({ anchor: event.currentTarget, entry })}>
+              <MoreHoriz/>
+            </IconButton>
+          </Box>
+          {entry.note && <p className="garden-timeline-note">{entry.note}</p>}
+          <Box display="grid" gridTemplateColumns={entry.photos.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))'}
+            gap={1} mt={entry.note ? 1 : 1.5}>
+            {(entry.photos || []).map(photo => <button type="button" className="garden-picture-button" key={photo.id}
+              aria-label={'查看照片：' + photo.name} onClick={() => onOpenPhoto(indices.get(photo.id))}>
+              <img src={gardenPhoto(photo.id)} alt={photo.name} loading="lazy" />
+            </button>)}
+          </Box>
+        </article>
+      </React.Fragment>
+    })}
+    <Menu open={Boolean(menuState)} anchorEl={menuState?.anchor} onClose={() => setMenuState(null)}>
+      <MenuItem aria-label="编辑日记" onClick={() => { onEdit(menuState.entry); setMenuState(null) }}>
+        <EditOutlined fontSize="small" sx={{ mr: 1 }}/>编辑日记
+      </MenuItem>
+      <MenuItem aria-label="删除日记" sx={{ color: 'error.main' }}
+        onClick={() => { onDelete(menuState.entry); setMenuState(null) }}>
+        <DeleteOutline fontSize="small" sx={{ mr: 1 }}/>删除日记
+      </MenuItem>
+    </Menu>
+  </div>
 }
