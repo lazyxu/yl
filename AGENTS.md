@@ -113,3 +113,17 @@
 
 - 一级「日历」底部 Tab 已标明模块名称，顶部不再重复显示「我的日历」；以可直接选年月的月份标题作为主要信息，保留快速返回今天和排班设置入口。
 - 日历 ARIA 采用有名称的日期按钮组，并通过每个日期按钮的完整中文日期、星期、班次、今天/选中状态供 VoiceOver 阅读；禁止发布无完整 row/gridcell 关系的假 ARIA grid。
+
+
+## Calendar + Garden PWA audit closure (PR #20)
+
+- Calendar and Garden share exactly one horizontal safe-area application: the .app-page wrapper has no extra horizontal padding for these two modules. Sheet/Modal portals still receive their own safe-area insets independently.
+- Calendar continues to render 42 dates with the complete original 白班/夜班/休息/备班 text labels and shared palette. Never replace labels with only color. An unconfirmed shift settings snapshot must be identified visibly as a preview.
+- Both Calendar and GardenCalendar use Sunday-first 42-cell months; today and selection have independent visible states. Input-driven month selection must keep the selected day in the target month.
+- All modal editors preserve unsaved drafts. BrowserRouter alone cannot safely block SPA Back/Forward on React Router 6.14; production entry uses createBrowserRouter and native unstable_useBlocker while MemoryRouter tests use the existing custom navigation guard. When saving, do not permit navigation until the request completes.
+- Garden search must not scrollTop=0 on every keystroke; only settled search query changes may reset the list position. Returning from detail must restore previously saved scroll positions; closing a detail replaces its history entry to prevent reopening via Safari Back.
+- Large ungrouped flower lists render only a viewport-sized DOM window and photos use content-visibility or paged loading where appropriate. Any further optimization must not change photo order or silently omit cards.
+- Garden photo Viewer needs accessible previous/next controls even on narrow phones, pinch zoom and drag-to-pan, clear loading/retry feedback, and original-file Web Share when supported. A fallback URL is private to an authenticated session; never imply it is a public shared link.
+- On photo upload, 100% means request-body bytes completed; after this show server processing until success. Photo previews preserve stable Object URLs and display a readable fallback for unsupported HEIC images.
+- Preserve backend CRUD and system backup; no garden ZIP export, archive buttons, independent photo tab or growth comparison tab. Protect genuine delete actions with explicit confirmation.
+- Test updates must cover Safari-style history POP in real Chromium/WebKit through actual createBrowserRouter, as well as 320/375/390/430px, landscape, dark/light, iOS-style keyboard, upload errors, original-photo sharing and large lists. Playwright desktop WebKit does not certify real iPhone Safari; real-device and SSH staging remain separate gates.
