@@ -239,15 +239,17 @@
   .garden-root { padding-left: 10px; padding-right: 10px; }
   .garden-heading { font-size: 27px; }
   .garden-card-info { padding: 10px 9px 12px; }
-  .garden-calendar-panel { padding: 8px; }
-  .garden-calendar-day { min-height: 44px; border-radius: 9px; }
+  /* 320px screens: seven 44px touch targets still fit edge-to-edge. */
+  .garden-calendar-panel { padding: 4px; margin-inline: -8px; }
+  .garden-calendar-grid { gap: 0; }
+  .garden-calendar-day { min-height: 44px; border-radius: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .garden-loading-card { animation: none; }
   .garden-viewer-stage img { transition: none; }
 }
 
-.garden-editor-dialog { background: var(--app-surface, #fff); }
+.garden-editor-dialog { background: var(--app-surface, #fff); color: var(--app-ink, #203329); }
 .garden-editor-dialog .MuiDialogContent-root {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;

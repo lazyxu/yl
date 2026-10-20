@@ -144,8 +144,7 @@ export default function Garden({ active = true }) {
                   <LocalFloristOutlined sx={{ fontSize: 56, color: '#91b59b' }} />
                   <Typography fontWeight={750}>{search.trim() ? '没有找到符合条件的花卉' : '花园等待第一株花'}</Typography>
                   <Typography variant="body2" color="text.secondary" my={1}>{search.trim() ? '尝试换个关键词' : '添加一株花，开始记录成长'}</Typography>
-                  {search.trim() ? <Button onClick={() => setSearch('')}>清除搜索</Button> :
-                    <Button color="success" variant="contained" onClick={() => setCreating(true)}>添加花卉</Button>}
+                  {search.trim() && <Button onClick={() => setSearch('')}>清除搜索</Button>}
                 </div>
               : group ? <>{groups.map(([name, list]) => <section key={name} aria-label={name}>
                 <h2 className="garden-group-heading">{name}<span className="garden-group-count">已加载 {list.length} 株</span></h2>

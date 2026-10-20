@@ -67,6 +67,7 @@ function App() {
     return () => media.removeEventListener?.('change', update)
   }, [])
   useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light'
     document.querySelector('meta[name="theme-color"]')
       ?.setAttribute('content', dark ? '#101914' : '#f7faf7')
   }, [dark])
