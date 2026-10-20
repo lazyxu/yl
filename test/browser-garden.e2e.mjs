@@ -119,7 +119,7 @@ async function runBrowser(engine, viewport) {
     await page.getByRole('menuitem', { name: '删除日记' }).click()
     await page.getByRole('button', { name: '永久删除' }).click()
     await record.waitFor({ state: 'detached' })
-    await page.getByRole('button', { name: '花园', exact: true }).last().click()
+    await page.locator('.garden-detail-back').click()
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByRole('tab', { name: '成长日历' }).click()
     await page.getByRole('button', { name: '今天' }).click()
