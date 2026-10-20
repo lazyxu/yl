@@ -373,7 +373,7 @@ export default function Calendar({ active = true }) {
           <Typography component="p" className="schedule-eyebrow">班次安排</Typography>
         </div>
         <Button startIcon={<SettingsOutlined />} onClick={() => setSettingsOpen(true)}
-          disabled={!canAdjust}
+          disabled={!online || loadingSettings || !serverRulesReady}
           aria-label="排班设置">排班设置</Button>
       </header>
 
