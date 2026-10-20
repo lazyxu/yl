@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Box } from '@mui/material'
 import { LocalFloristOutlined, BrokenImageOutlined } from '@mui/icons-material'
 import { gardenPhoto } from '../gardenApi'
+import OfflinePhoto from '../offline/OfflinePhoto'
 
 // No photo and a failed photo are different states. A failed request can be
 // retried without reopening a plant, keeping the cover's aspect ratio stable.
@@ -22,7 +23,7 @@ export function Cover({ id, height = 178, label = '花卉照片', className = ''
     title={retryable ? '照片加载失败，轻触重试' : undefined}
     onClick={onRetry}
     sx={height == null ? undefined : { height }}>
-    {id && !failed ? <img src={gardenPhoto(id) + (retry ? '?retry=' + retry : '')}
+    {id && !failed ? <OfflinePhoto src={gardenPhoto(id) + (retry ? '?retry=' + retry : '')}
       alt={label} loading="lazy" onError={() => setFailed(true)} /> :
       <Box display="flex" alignItems="center" justifyContent="center" flexDirection="column">
         {retryable

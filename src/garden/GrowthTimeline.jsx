@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react'
 import { Box, IconButton, Menu, MenuItem, Typography } from '@mui/material'
 import { DeleteOutline, EditOutlined, MoreHoriz, YardOutlined } from '@mui/icons-material'
 import { gardenPhoto, displayDate } from '../gardenApi'
+import OfflinePhoto from '../offline/OfflinePhoto'
 
 export default function GrowthTimeline({ entries, photos, onEdit, onDelete, onOpenPhoto }) {
   const [menuState, setMenuState] = useState(null)
@@ -38,7 +39,7 @@ export default function GrowthTimeline({ entries, photos, onEdit, onDelete, onOp
             gap={1} mt={entry.note ? 1 : 1.5}>
             {(entry.photos || []).map(photo => <button type="button" className="garden-picture-button" key={photo.id}
               aria-label={'查看照片：' + photo.name} onClick={() => onOpenPhoto(indices.get(photo.id))}>
-              <img src={gardenPhoto(photo.id)} alt={photo.name} loading="lazy" />
+              <OfflinePhoto src={gardenPhoto(photo.id)} alt={photo.name} loading="lazy" />
             </button>)}
           </Box>
         </article>
