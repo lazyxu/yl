@@ -110,7 +110,10 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.getByText('已选择 1 / 8 张').waitFor()
     await page.getByRole('textbox', { name: '备注（选填）' }).fill('浏览器端到端测试：开花')
     await modal.getByRole('button', { name: '保存记录' }).click()
-    await page.getByText('浏览器端到端测试：开花', { exact: true }).waitFor()
+    // A still-closing MUI dialog can retain an editing textarea with the
+    // same content as the saved timeline paragraph. Await actual close.
+    await modal.waitFor({ state: 'hidden' })
+    await page.locator('.garden-timeline-note').getByText('浏览器端到端测试：开花', { exact: true }).waitFor()
     await page.getByRole('button', { name: '查看照片：garden.png' }).click()
     const downloadAnchor = page.locator('[aria-label="下载原图"]')
     await downloadAnchor.waitFor()
@@ -119,7 +122,7 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     check(downloadHref?.includes('/api/garden/photos/') && downloadHref.endsWith('/original?download=1'), tag + ': original download URL')
     await page.getByRole('button', { name: '关闭', exact: true }).click()
 
-    const record = page.getByText('浏览器端到端测试：开花', { exact: true })
+    const record = page.locator('.garden-timeline-note').getByText('浏览器端到端测试：开花', { exact: true })
     await record.waitFor()
     await page.getByRole('button', { name: '日记操作' }).click()
     await page.getByRole('menuitem', { name: '删除日记' }).click()
@@ -144,9 +147,18 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await calendarRoot.locator('.header h2').waitFor()
     check(await page.locator('.app-shell').getAttribute('data-theme') === colorScheme,
       tag + ': first-level calendar follows the system theme')
-    const shiftText = await calendarRoot.locator('.calendar .day .shift').allTextContents()
+    const shiftLabels = calendarRoot.locator('.calendar .day .shift')
+    const shiftText = await shiftLabels.allTextContents()
     check(shiftText.length === 42 && shiftText.every(s => ['白班', '夜班', '休息', '备班'].includes(s)),
       tag + ': every date still displays the full original shift label')
+    const tagStyles = await shiftLabels.evaluateAll(nodes => nodes.map(node => {
+      const css = getComputedStyle(node), box = node.getBoundingClientRect()
+      return { text: node.textContent.trim(), font: css.fontSize, visible: css.visibility !== 'hidden',
+        display: css.display, width: box.width, height: box.height, scrollWidth: node.scrollWidth }
+    }))
+    check(tagStyles.every(s => s.visible && s.display !== 'none' && s.font === '10px' &&
+      s.width > 0 && s.height > 0 && s.scrollWidth <= s.width + 1),
+      tag + ': shift text keeps 10px font, remains visible and is never truncated')
     check((await calendarRoot.locator('.schedule-legend').textContent()).includes('备班'),
       tag + ': standby is in the four-shift legend')
     const scheduleCell = await calendarRoot.locator('.calendar .day').first().boundingBox()
