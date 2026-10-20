@@ -308,7 +308,7 @@ export default function Calendar({ active = true }) {
           <span className="selected-shift" style={shiftStyle(currentShift)}>{currentShift}</span>
         </div>
         {selectedOverride?.kind && <div className="selected-adjustment">
-          <Typography variant="body2">原排班：{baseShift}　·　当天调整：{selectedOverride.kind === 'swap' ? '换班' : '备班'}</Typography>
+          <Typography variant="body2">原排班：{baseShift} · 当天调整：{selectedOverride.kind === 'swap' ? '换班' : '备班'}</Typography>
           {selectedOverride.kind === 'swap' &&
             <Typography variant="body2">{selectedOverride.partner ? '与 ' + selectedOverride.partner + ' 换班' : '已换班'}</Typography>}
           {selectedOverride.note && <p className="day-adjustment-note">{selectedOverride.note}</p>}

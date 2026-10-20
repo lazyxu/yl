@@ -50,7 +50,7 @@ export default function DayShiftEditor({ open = true, date, baseShift, snapshot,
       <option value="standby">备班</option>
       <option value="swap">换班</option>
     </select></label>
-    {kind === 'normal' && existing && <p className="shift-edit-hint">确认后仅移除当天的临时调整，恢复循环规则计算的班次。</p>
+    {kind === 'normal' && existing && <p className="shift-edit-hint">确认后仅移除当天的临时调整，恢复循环规则计算的班次。</p>}
     {kind === 'swap' && <><label className="shift-date-field">换班对象（可选）<input aria-label="换班对象" value={partner} maxLength={80} disabled={saving || locked} placeholder="可不填写对方姓名" onChange={event => change(setPartner, event.target.value)} /></label>
       <label className="shift-date-field">换后的班次<select aria-label="换后的班次" value={shift} disabled={saving || locked} style={shiftStyle(shift)} onChange={event => change(setShift, event.target.value)}>{shiftNames.map(value => <option key={value}>{value}</option>)}</select></label></>}
     {kind !== 'normal' && <label className="shift-date-field">备注（可选）<textarea aria-label="备注（可选）" rows={3} value={note} maxLength={500} disabled={saving || locked} placeholder="可填写换班原因或其他说明" onChange={event => change(setNote, event.target.value)} /></label>}
