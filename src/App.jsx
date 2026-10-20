@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react'
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react'
 import './App.css'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
@@ -10,7 +10,7 @@ import LocalFloristOutlinedIcon from '@mui/icons-material/LocalFloristOutlined'
 import Typography from '@mui/material/Typography'
 import BottomNavigation from '@mui/material/BottomNavigation'
 import BottomNavigationAction from '@mui/material/BottomNavigationAction'
-import { useSearchParams } from 'react-router-dom'
+import { UNSAFE_DataRouterContext, useSearchParams } from 'react-router-dom'
 import { createPindouDraft } from './pindouDraft'
 import useKeyboardViewport from './useKeyboardViewport'
 
@@ -68,6 +68,7 @@ function Page({ name, active, positions, children }) {
 
 function App() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const dataRouter = useContext(UNSAFE_DataRouterContext)
   const [dark, setDark] = useState(systemPrefersDark)
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-color-scheme: dark)')
@@ -114,10 +115,13 @@ function App() {
     }
     // Editors may veto in-app navigation and continue it only after the user
     // explicitly discards a dirty form. Leave browser unload protection intact.
+    // Production routes have native navigation blockers, including Safari
+    // history POPs. MemoryRouter tests retain the original narrow event guard.
+    if (dataRouter) { commit(); return }
     const intent = new CustomEvent('yl:navigation-intent', { cancelable: true,
       detail: { proceed: commit, target: nextView } })
     if (window.dispatchEvent(intent)) commit()
-  }, [searchParams, setSearchParams, view])
+  }, [searchParams, setSearchParams, view, dataRouter])
 
   function openPindouWith(operation, initialRows = null) {
     if (initialRows?.length) setDrafts(previous => ({ ...previous, [operation]: createPindouDraft(initialRows) }))
