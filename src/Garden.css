@@ -36,9 +36,9 @@
   border-radius: 11px;
   color: var(--garden-muted);
   background: transparent;
-  font-size: 14px;
+  font-size: max(14px, .875rem);
   font-weight: 640;
-  min-height: 42px;
+  min-height: 44px;
   cursor: pointer;
 }
 .garden-segment[aria-selected="true"] {
@@ -202,7 +202,7 @@
   position: relative;
   background: none;
   color: var(--garden-ink);
-  font-size: 15px;
+  font-size: max(15px, .9375rem);
   cursor: pointer;
 }
 .garden-calendar-day:disabled { cursor: default; }
@@ -328,3 +328,8 @@
 /* Two-line flower names reduce truncation without changing image aspect. */
 .garden-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
   white-space: normal; overflow-wrap: anywhere; min-height: 2.7em; }
+
+/* Let large iOS text wrap header actions; shift labels remain user-locked. */
+@media (max-width: 599px) {
+  .garden-header > .MuiStack-root { flex-wrap: wrap; }
+}

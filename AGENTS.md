@@ -127,3 +127,9 @@
 - On photo upload, 100% means request-body bytes completed; after this show server processing until success. Photo previews preserve stable Object URLs and display a readable fallback for unsupported HEIC images.
 - Preserve backend CRUD and system backup; no garden ZIP export, archive buttons, independent photo tab or growth comparison tab. Protect genuine delete actions with explicit confirmation.
 - Test updates must cover Safari-style history POP in real Chromium/WebKit through actual createBrowserRouter, as well as 320/375/390/430px, landscape, dark/light, iOS-style keyboard, upload errors, original-photo sharing and large lists. Playwright desktop WebKit does not certify real iPhone Safari; real-device and SSH staging remain separate gates.
+
+## PWA first-paint and accessible typography acceptance
+
+- The pre-React theme initializer matches Calendar/Garden system dark appearance before the application mounts; Pindou stays light. The external script is local and deliberately contains no network calls, telemetry or inline CSP exceptions.
+- Dates, weekdays and non-shift Garden controls respect larger root text sizing with flexible layouts. **Never change the daily 白班/夜班/休息/备班 label 10px font size, colors or default padding.**
+- Manifest background/theme values are static fallbacks for initial load and cannot represent every module's active system appearance. Real iPhone standalone status bar and Dynamic Island remain separate physical checks.
