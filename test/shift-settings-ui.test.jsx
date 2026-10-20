@@ -40,7 +40,16 @@ const editor = () => document.querySelector('[role="dialog"][aria-labelledby="sh
 const rows = () => [...timeline().querySelectorAll('[data-start-date]')]
 const row = date => rows().find(item => item.dataset.startDate === date)
 function button(text, scope = document) { return [...scope.querySelectorAll('button')].find(el => el.textContent.trim() === text || el.getAttribute('aria-label') === text) }
-async function click(text, scope) { const target = button(text, scope); expect(target).toBeTruthy(); await act(async () => target.dispatchEvent(new MouseEvent('click', { bubbles: true }))) }
+async function click(text, scope) {
+  const target = button(text, scope)
+  expect(target).toBeTruthy()
+  await act(async () => target.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  if (text === '取消') {
+    const prompt = document.querySelector('[role="dialog"][aria-labelledby="shift-discard-title"]')
+    const discard = prompt && button('放弃更改', prompt)
+    if (discard) await act(async () => discard.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  }
+}
 async function change(element, value) {
   expect(element).toBeTruthy()
   await act(async () => {
@@ -149,4 +158,18 @@ test('编辑弹窗在键盘压缩视口时跟随可见高度', async () => {
     await act(async () => { editor().querySelector('input').focus(); visual.height = 430; visual.dispatchEvent(new Event('resize')) })
     expect(editor().style.height).toBe('430px')
   } finally { window.matchMedia = originalMatch; Object.defineProperty(window, 'visualViewport', { configurable: true, value: originalViewport }) }
+})
+
+test('排班规则页突出当前规则，保留四种班次的文字图例与键盘排序入口', async () => {
+  await mount()
+  expect(timeline().querySelector('.shift-current-summary').textContent).toContain('当前生效')
+  expect(timeline().querySelector('.shift-legend').textContent).toContain('备班')
+  await edit('2026-10-05')
+  expect(button('下移第1天', editor())).toBeTruthy()
+  expect(button('上移第2天', editor())).toBeTruthy()
+  await click('下移第1天', editor())
+  expect([...editor().querySelectorAll('select')].map(el => el.value)).toEqual(['夜班','白班','休息'])
+  expect(writes).toHaveLength(0)
+  await click('取消', editor())
+  expect(writes).toHaveLength(0)
 })

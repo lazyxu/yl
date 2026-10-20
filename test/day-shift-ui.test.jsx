@@ -33,7 +33,18 @@ function pointer(type, target, x = 10, y = 10) { const event = new Event(type, {
 async function longPress(date) { await act(async () => { pointer('pointerdown', day(date)); jest.advanceTimersByTime(650); pointer('pointerup', day(date)); day(date).dispatchEvent(new MouseEvent('click', { bubbles: true })) }) }
 const field = label => editor()?.querySelector(`[aria-label="${label}"]`)
 async function change(element, value) { expect(element).toBeTruthy(); await act(async () => { const type = element.tagName === 'SELECT' ? HTMLSelectElement : element.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement; Object.getOwnPropertyDescriptor(type.prototype, 'value').set.call(element, value); element.dispatchEvent(new Event(element.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })) }) }
-async function click(text) { const button = [...editor().querySelectorAll('button')].find(el => el.textContent.trim() === text); expect(button).toBeTruthy(); await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true }))) }
+async function click(text) {
+  const button = [...editor().querySelectorAll('button')].find(el => el.textContent.trim() === text)
+  expect(button).toBeTruthy()
+  await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  // Existing cancellation tests intentionally discard drafts. A separate test
+  // verifies that the new confirmation is shown before discarding anything.
+  if (text === '取消') {
+    const dialog = document.querySelector('[role="dialog"][aria-labelledby="shift-discard-title"]')
+    const discard = [...(dialog?.querySelectorAll('button') || [])].find(el => el.textContent.trim() === '放弃更改')
+    if (discard) await act(async () => discard.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  }
+}
 
 test('长按日期打开弹窗，普通点击或滚动不触发改单日排班', async () => {
   await mount()
@@ -186,4 +197,51 @@ test('日历纵向滚动、Safari 边缘手势以及取消不会误切月份', a
   })
   expect(host.querySelector('.header h2').textContent).toBe(initialMonth)
   expect(grid.style.transform).toBe('')
+})
+
+test('日历重设计保留每天的完整班次文字标签、固定六周和今天入口', async () => {
+  database.overrides['2026-10-13'] = { kind: 'standby', shift: '备班', partner: '', note: '' }
+  await mount()
+  expect(host.querySelectorAll('.calendar .day')).toHaveLength(42)
+  expect(day('2026-10-13').querySelector('.shift').textContent).toBe('备班')
+  expect([...host.querySelectorAll('.calendar .shift')].map(el => el.textContent)).toEqual(
+    expect.arrayContaining(['白班', '夜班', '休息', '备班']))
+  expect(host.querySelector('.schedule-legend').textContent).toContain('备班')
+  expect(host.querySelector('.selected-date-info').textContent).toContain('在一起第')
+  expect([...host.querySelectorAll('button')].some(el => el.textContent.trim() === '今天')).toBe(true)
+  const month = host.querySelector('.header h2')
+  await act(async () => host.querySelector('[aria-label="下个月"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(month.textContent).not.toContain('2026年10月')
+  await act(async () => [...host.querySelectorAll('button')].find(el => el.textContent.trim() === '今天')
+    .dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(host.querySelector('.header h2').textContent).toBe('2026年10月')
+  expect(day('2026-10-13').getAttribute('aria-current')).toBe('date')
+})
+
+test('日期支持键盘方向键并保持选中态，不修改后端排班', async () => {
+  await mount()
+  const start = day('2026-10-13')
+  await act(async () => start.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })))
+  expect(day('2026-10-14').getAttribute('aria-pressed')).toBe('true')
+  expect(day('2026-10-14').querySelector('.shift').textContent).toBe('白班')
+  expect(writes).toHaveLength(0)
+})
+
+test('单日编辑器退出有未保存确认，保留草稿直到明确放弃', async () => {
+  await mount(); await longPress('2026-10-13')
+  await change(field('调整类型'), 'swap')
+  await change(field('换班对象'), '同事乙')
+  const cancel = [...editor().querySelectorAll('button')].find(el => el.textContent.trim() === '取消')
+  await act(async () => cancel.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(editor()).not.toBeNull()
+  expect(document.querySelector('[role="dialog"][aria-labelledby="shift-discard-title"]').textContent).toContain('放弃未保存')
+  expect(writes).toHaveLength(0)
+  const continueEdit = [...document.querySelectorAll('button')].find(el => el.textContent.trim() === '继续编辑')
+  await act(async () => continueEdit.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(field('换班对象').value).toBe('同事乙')
+  await act(async () => cancel.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  const discard = [...document.querySelectorAll('button')].find(el => el.textContent.trim() === '放弃更改')
+  await act(async () => discard.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(editor()).toBeNull()
+  expect(writes).toHaveLength(0)
 })
