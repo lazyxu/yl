@@ -15,6 +15,24 @@ const weekHeads = ['日', '一', '二', '三', '四', '五', '六']
 export default function GardenCalendar({ active, selectPlant, notify,
   month: outerMonth, onMonthChange, selected: outerSelected, onSelectedChange }) {
   const [innerMonth, setInnerMonth] = useState(() => firstOfMonth(new Date()))
+  const [todayDate, setTodayDate] = useState(() => new Date())
+  useEffect(() => {
+    if (!active) return
+    let timer
+    const refreshToday = () => {
+      const now = new Date()
+      setTodayDate(previous => dateKey(previous) === dateKey(now) ? previous : now)
+      clearTimeout(timer)
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      timer = setTimeout(refreshToday, Math.max(500, midnight.getTime() - now.getTime() + 70))
+    }
+    const onVisible = () => { if (document.visibilityState !== 'hidden') refreshToday() }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    refreshToday()
+    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible) }
+  }, [active])
   const [innerSelected, setInnerSelected] = useState('')
   const month = outerMonth || innerMonth
   const selected = outerSelected ?? innerSelected
@@ -104,7 +122,7 @@ export default function GardenCalendar({ active, selectPlant, notify,
   }
 
   const countsMap = useMemo(() => new Map(counts.map(d => [d.day, Number(d.count)])), [counts])
-  const today = new Date()
+  const today = todayDate
   const todayKey = dateKey(today)
   // Six steady weeks, matching the first-level schedule calendar.
   const cells = useMemo(() => Array.from({ length: 42 }, (_, i) =>

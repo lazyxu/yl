@@ -49,7 +49,10 @@ export default function Garden({ active = true }) {
   const scrollArea = () => document.querySelector('.app-page[data-view="花园"]')
   // Apply the search-position reset only after the debounce has settled, not
   // on every keystroke (especially disruptive with iOS's virtual keyboard).
+  const previousQuery = useRef(query)
   useEffect(() => {
+    if (previousQuery.current === query) return
+    previousQuery.current = query
     if (!active || selectedPlant || tab !== 0) return
     scrollSaved.current[0] = 0
     const node = scrollArea()

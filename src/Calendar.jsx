@@ -331,7 +331,7 @@ export default function Calendar({ active = true }) {
         </span>)}
       </div>
 
-      {!confirmed && <Alert severity="info" className="schedule-unverified" role="status">
+      {!confirmed && showPending && <Alert severity="info" className="schedule-unverified" role="status">
         当前显示内置或上次获取的排班预览，尚未核对服务器数据；确认完成前不能修改排班。
       </Alert>}
       {confirmed && showPending && (loadingSettings || loadingDayShifts) && !settingsError && !dayShiftsError &&
