@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Box, Button, CircularProgress, IconButton, Paper, Stack, Typography } from '@mui/material'
 import { ArrowBack, CameraAltOutlined, DeleteOutline, EditOutlined } from '@mui/icons-material'
-import { gardenRequest, gardenJSON, plantedDays } from '../gardenApi'
+import { gardenRequest, plantedDays } from '../gardenApi'
 import { Cover } from './Shared'
 import PlantEditor from './PlantEditor'
 import EntryEditor from './EntryEditor'
