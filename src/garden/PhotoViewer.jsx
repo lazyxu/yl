@@ -14,7 +14,18 @@ export default function Viewer({ photos, current, onClose }) {
   const [retryCount, setRetryCount] = useState(0)
   const [controls, setControls] = useState(true)
   const gesture = useRef(null)
+  const pendingZoom = useRef(1)
+  const frame = useRef(0)
   const lastTap = useRef(0)
+  useEffect(() => () => cancelAnimationFrame(frame.current), [])
+  const queueZoom = value => {
+    pendingZoom.current = value
+    if (frame.current) return
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0
+      setZoom(pendingZoom.current)
+    })
+  }
   const selected = photos[index]
   useEffect(() => setIndex(current), [current])
   useEffect(() => { setZoom(1); setImageError(false); setVariant('preview'); setRetryCount(0); setControls(true) }, [index])
@@ -41,7 +52,7 @@ export default function Viewer({ photos, current, onClose }) {
     const start = gesture.current
     if (start?.pinch && event.touches.length === 2) {
       const next = start.zoom * distance(event.touches[0], event.touches[1]) / Math.max(1, start.initial)
-      setZoom(Math.min(4, Math.max(1, next)))
+      queueZoom(Math.min(4, Math.max(1, next)))
     }
   }
   function touchEnd(event) {

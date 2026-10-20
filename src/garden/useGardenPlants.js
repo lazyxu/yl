@@ -7,7 +7,7 @@ export default function useGardenPlants(active, notify) {
   const [species, setSpecies] = useState([])
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(Boolean(active))
   const [error, setError] = useState('')
   const [plantCursor, setPlantCursor] = useState(null)
   const [plantHasMore, setPlantHasMore] = useState(false)

@@ -20,10 +20,10 @@ const PindouConsume = React.lazy(() => import('./PindouConsume'))
 const History = React.lazy(() => import('./History'))
 const Garden = React.lazy(() => import('./Garden'))
 const views = ['日历', '拼豆', '历史', '补豆', '消耗', '花园']
-const createAppTheme = mode => createTheme({
+const createAppTheme = (mode, garden) => createTheme({
   palette: {
     mode,
-    primary: { main: '#347c52' },
+    primary: { main: garden ? '#347c52' : '#1976d2' },
     success: { main: '#347c52' },
     background: mode === 'dark' ? { default: '#101914', paper: '#1b2921' } : { default: '#f7faf7', paper: '#ffffff' },
   },
@@ -58,7 +58,6 @@ function Page({ name, active, positions, children }) {
 function App() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [dark, setDark] = useState(systemPrefersDark)
-  const theme = useMemo(() => createAppTheme(dark ? 'dark' : 'light'), [dark])
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-color-scheme: dark)')
     if (!media) return
@@ -66,13 +65,17 @@ function App() {
     media.addEventListener?.('change', update)
     return () => media.removeEventListener?.('change', update)
   }, [])
-  useEffect(() => {
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-    document.querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', dark ? '#101914' : '#f7faf7')
-  }, [dark])
   const requestedView = searchParams.get('view') || '日历'
   const view = views.includes(requestedView) ? requestedView : '日历'
+  // Keep Calendar and Pindou's existing light appearance unchanged.
+  const gardenMode = view === '花园'
+  const appearance = gardenMode && dark ? 'dark' : 'light'
+  const theme = useMemo(() => createAppTheme(appearance, gardenMode), [appearance, gardenMode])
+  useEffect(() => {
+    document.documentElement.dataset.theme = appearance
+    document.querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', appearance === 'dark' ? '#101914' : '#f7faf7')
+  }, [appearance])
   const [visited, setVisited] = useState(() => new Set([view]))
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0)
   const [drafts, setDrafts] = useState(() => ({ 补豆: createPindouDraft(), 消耗: createPindouDraft() }))
@@ -117,7 +120,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <div className="app-shell" data-module-page={isModulePage} data-module={primaryView} data-theme={dark ? 'dark' : 'light'} data-keyboard-open={keyboardOpen} style={keyboardOpen ? { '--keyboard-height': `${height}px` } : undefined}>
+      <div className="app-shell" data-module-page={isModulePage} data-module={primaryView} data-theme={appearance} data-keyboard-open={keyboardOpen} style={keyboardOpen ? { '--keyboard-height': `${height}px` } : undefined}>
         {!isModulePage && <header className="app-header">
           <IconButton aria-label="返回库存" disabled={formBusy} onClick={() => navigateToView('拼豆')}><ArrowBackIcon /></IconButton>
           <Typography component="h1" className="app-title">{view}</Typography>

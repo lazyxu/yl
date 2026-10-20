@@ -30,6 +30,7 @@ export default function Garden({ active = true }) {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const [selectedDay, setSelectedDay] = useState('')
   const scrollSaved = useRef([0, 0])
+  const detailScroll = useRef(new Map())
   const sentinel = useRef(null)
   const notify = useCallback((message, error = false) => setNotice({ message, error }), [])
   const {
@@ -49,7 +50,12 @@ export default function Garden({ active = true }) {
     if (node && !selectedPlant) scrollSaved.current[tab] = node.scrollTop
   }
   const goPlant = id => {
-    if (id) rememberScroll()
+    if (id) {
+      rememberScroll()
+      // A fresh card activation starts at the top, while returning from
+      // another main module restores scroll for the currently open detail.
+      detailScroll.current.delete(id)
+    }
     setSearchParams(current => {
       const next = new URLSearchParams(current)
       if (id) next.set('plant', String(id))
@@ -73,8 +79,21 @@ export default function Garden({ active = true }) {
   useLayoutEffect(() => {
     if (!active) return
     const node = scrollArea()
-    if (node) node.scrollTop = selectedPlant ? 0 : scrollSaved.current[tab]
+    if (node) node.scrollTop = selectedPlant
+      ? (detailScroll.current.get(selectedPlant) || 0)
+      : scrollSaved.current[tab]
   }, [selectedPlant, tab, active])
+  useEffect(() => {
+    if (!active || !selectedPlant) return
+    const node = scrollArea()
+    if (!node) return
+    const save = () => detailScroll.current.set(selectedPlant, node.scrollTop)
+    node.addEventListener('scroll', save, { passive: true })
+    return () => {
+      save()
+      node.removeEventListener('scroll', save)
+    }
+  }, [active, selectedPlant])
 
   const groups = useMemo(() => {
     const result = new Map()

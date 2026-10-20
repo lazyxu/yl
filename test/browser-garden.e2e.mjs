@@ -140,10 +140,12 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.getByRole('tab', { name: '花卉', exact: true }).click()
     await page.getByText(name, { exact: true }).waitFor()
     await page.locator('footer button').filter({ hasText: '日历' }).click()
+    check(await page.locator('.app-shell').getAttribute('data-theme') === 'light', tag + ': calendar keeps existing light theme')
     await page.locator('section[data-view="日历"]:not([hidden]) .header h2').waitFor()
     await page.locator('footer button').filter({ hasText: '拼豆' }).click()
     await page.getByText('库存总览').waitFor()
     await page.locator('footer button').filter({ hasText: '花园' }).click()
+    check(await page.locator('.app-shell').getAttribute('data-theme') === colorScheme, tag + ': garden restores preferred theme')
     await page.getByText(name, { exact: true }).waitFor()
     console.log('PASS browser garden: ' + tag)
   } catch (e) {

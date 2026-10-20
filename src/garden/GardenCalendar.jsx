@@ -25,6 +25,12 @@ export default function GardenCalendar({ active, selectPlant, notify,
   const [dayHasMore, setDayHasMore] = useState(false)
   const [dayCursor, setDayCursor] = useState(null)
   const [dayLoading, setDayLoading] = useState(false)
+  const [showDayLoading, setShowDayLoading] = useState(false)
+  useEffect(() => {
+    if (!dayLoading) { setShowDayLoading(false); return }
+    const timer = setTimeout(() => setShowDayLoading(true), 170)
+    return () => clearTimeout(timer)
+  }, [dayLoading])
   const [dayLoadingMore, setDayLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const [retryToken, setRetryToken] = useState(0)
@@ -139,7 +145,9 @@ export default function GardenCalendar({ active, selectPlant, notify,
     <Divider sx={{ my: 2 }}/>
     {displayingSelected ? <div aria-live="polite">
       <Typography fontWeight={720} mb={1}>{selected} · {ready ? dayTotal : (countsMap.get(selected) || 0)} 条记录</Typography>
-      {dayLoading && <Box sx={{ py: 2 }} role="status"><Typography variant="body2" color="text.secondary">正在读取当天记录…</Typography></Box>}
+      {dayLoading && <Box sx={{ py: 2, minHeight: 50 }} role="status" aria-busy="true">
+        {showDayLoading && <Typography variant="body2" color="text.secondary">正在读取当天记录…</Typography>}
+      </Box>}
       {error && <Alert severity="error" action={<Button onClick={() => setRetryToken(i => i + 1)}>重试</Button>}>{error}</Alert>}
       {ready && <>
         <Stack spacing={1}>
