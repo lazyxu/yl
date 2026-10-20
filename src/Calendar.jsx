@@ -77,6 +77,7 @@ export default function Calendar({ active = true }) {
   const [serverOverridesReady, setServerOverridesReady] = useState(false)
   const liveRules = useRef(null)
   const liveOverrides = useRef(null)
+  const lastOnlineSync = useRef(0)
 
   const calendarRef = useRef(null)
   const swipeStart = useRef(null)
@@ -207,15 +208,27 @@ export default function Calendar({ active = true }) {
     setServerOverridesReady(false)
     liveRules.current = null
     liveOverrides.current = null
+    lastOnlineSync.current = Date.now()
     reloadSettings(controller.signal)
     reloadDayShifts(controller.signal)
-    const refresh = () => {
+    const refresh = event => {
       if (document.visibilityState === 'hidden' || !navigator.onLine) return
+      // Network recovery refreshes immediately. Foreground/focus refresh is
+      // throttled because iPhone frequently changes app visibility.
+      if (event?.type !== 'online' && Date.now() - lastOnlineSync.current < 60_000) return
+      lastOnlineSync.current = Date.now()
       reloadSettings(controller.signal)
       reloadDayShifts(controller.signal)
     }
     window.addEventListener('online', refresh)
-    return () => { controller.abort(); window.removeEventListener('online', refresh) }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      controller.abort()
+      window.removeEventListener('online', refresh)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
   }, [active, reloadSettings, reloadDayShifts])
   useEffect(() => {
     if (!loadingSettings && !loadingDayShifts) { setShowPending(false); return }
