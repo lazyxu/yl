@@ -2,6 +2,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
+const { execFileSync } = require('node:child_process')
 const root = path.resolve(__dirname, '..')
 const dist = path.join(root, 'dist')
 
@@ -40,4 +41,34 @@ test('production PWA has manifest, SVG/PNG icons and service worker without offl
   assert.ok(manifestData.manifest.some(item => item.url === '/index.html'))
   assert.ok(manifestData.manifest.some(item => item.url.endsWith('.js')))
   assert.ok(manifestData.manifest.every(item => !item.url.startsWith('/api/') && !/\.(wasm|heic)$/i.test(item.url)))
+})
+
+
+test('Morning Garden brand icons and standalone cache builder recover missing PNG on Windows paths', () => {
+  const svg = fs.readFileSync(path.join(root, 'public', 'app-icon.svg'), 'utf8')
+  assert.match(svg, /晨光花园/)
+  assert.match(svg, /id="red"/)
+  assert.match(svg, /id="pink"/)
+  assert.match(svg, /id="leaf"/)
+  const icon192 = path.join(dist, 'icon-192.png')
+  const icon512 = path.join(dist, 'icon-512.png')
+  const first192 = fs.readFileSync(icon192)
+  const first512 = fs.readFileSync(icon512)
+  try {
+    fs.rmSync(icon192)
+    fs.rmSync(icon512)
+    // Reproduces the reported ENOENT when invoked without npm prebuild.
+    execFileSync(process.execPath, ['scripts/build-pwa-shell.mjs'], {
+      cwd: root, encoding: 'utf8', stdio: 'pipe',
+    })
+    assert.deepEqual(fs.readFileSync(icon192), first192)
+    assert.deepEqual(fs.readFileSync(icon512), first512)
+    const precache = JSON.parse(fs.readFileSync(path.join(dist, 'pwa-precache.json'), 'utf8'))
+    assert.ok(precache.manifest.some(entry => entry.url === '/icon-192.png'))
+    assert.ok(precache.manifest.some(entry => entry.url === '/icon-512.png'))
+    assert.ok(precache.manifest.some(entry => entry.url === '/app-icon.svg'))
+  } finally {
+    if (!fs.existsSync(icon192)) fs.writeFileSync(icon192, first192)
+    if (!fs.existsSync(icon512)) fs.writeFileSync(icon512, first512)
+  }
 })

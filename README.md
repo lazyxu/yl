@@ -184,3 +184,10 @@ release_deploy.sh 的主流程：先本地构建并验证远端 MySQL/.env/uploa
 **P2 花园：** 默认关闭。进入「我的花园 → 花卉」底部「离线浏览设置」可主动开启/关闭；仅已访问花卉的有限元数据（最多 200 株摘要、30 个详情、每株 100 条记录）与最多 60 张、总计 12 MiB 的缩略图可供部分离线浏览；不缓存原图，离线不可编辑、删除或上传。请只在个人设备开启，提供清除离线数据按钮；普通浏览器 HTTP 图片缓存由 Safari 自己管理。花园删除操作会清理专用离线缓存。手机清理浏览数据或系统存储回收也可能删除快照。
 
 **验收：** `npm test`、Node 部署/回滚、MySQL 8.4 集成、`npm run build` 与 `node --test test/pwa.test.cjs`；真实浏览器使用 `E2E_MYSQL=1 node test/browser-garden.e2e.mjs` 和 `E2E_MYSQL=1 node test/browser-pwa-offline.e2e.mjs`。后者使用一次性 MySQL 数据库，验证 Chromium 离线、WebKit 源站中断缓存回退、只读快照、恢复联网及本地数据清除。Linux WebKit 与 Playwright 模拟不能代替真实 iPhone Safari/Home Screen PWA 验收。严禁以测试通过为由直接部署生产。
+
+
+### PWA 晨光花园图标与缺失图标修复
+
+图标统一使用「晨光花园」（红色日历、粉色花朵、绿叶、奶油色背景）。源图标位于 `public/app-icon.svg`；`scripts/generate-pwa-icons.mjs` 使用内置 Node PNG 编码器生成 `icon-192.png`、`icon-512.png`，不下载外部资源。通常运行 `npm run build` 即可自动执行 `prebuild` 并生成 PNG。单独执行 `node scripts/build-pwa-shell.mjs` 时，如 dist/ 中缺少图标，则从本地设计自动补齐，不再报 Windows `ENOENT stat dist/icon-192.png`。
+
+可单独生成：`node scripts/generate-pwa-icons.mjs`（默认 public/）；或 `node scripts/generate-pwa-icons.mjs dist`；构建后执行 `node --test test/pwa.test.cjs` 校验 SVG/PNG、缺图恢复与预缓存清单。不要仅修改 SVG 却遗漏 PNG；既有 Vite 静态组件缓存及安全更新策略保留。
