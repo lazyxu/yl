@@ -18,6 +18,12 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   const [entries, setEntries] = useState([])
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(false)
+  useEffect(() => {
+    if (!loading || plant) { setShowSkeleton(false); return }
+    const timer = setTimeout(() => setShowSkeleton(true), 180)
+    return () => clearTimeout(timer)
+  }, [loading, plant])
   const [moreBusy, setMoreBusy] = useState(false)
   const [plantEditor, setPlantEditor] = useState(false)
   const [entryEditor, setEntryEditor] = useState(false)
@@ -107,8 +113,9 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     setPhotoIndex(null)
     requestAnimationFrame(() => photoButton.current?.focus?.())
   }
-  if (loading && !plant) return <div className="garden-detail-skeleton" aria-label="正在加载花卉档案">
-    <div className="garden-loading-card" style={{ aspectRatio: '16/10' }} />
+  if (loading && !plant) return <div className="garden-detail-skeleton" aria-busy="true"
+    aria-label="正在加载花卉档案">
+    {showSkeleton && <div className="garden-loading-card" style={{ aspectRatio: '16/10' }} />}
   </div>
   if (!plant) return <Alert severity="warning">花卉不存在或已删除。<Button onClick={onBack}>返回花园</Button></Alert>
 

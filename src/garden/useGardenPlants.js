@@ -85,7 +85,7 @@ export default function useGardenPlants(active, notify) {
   }, [plantHasMore, plantCursor, loadPlants])
 
   return {
-    plants, species, search, setSearch, loading, error,
+    plants, species, search, query, setSearch, loading, error,
     plantHasMore, plantTotal, plantLoadingMore, fetchSpecies, refresh, loadMorePlants,
   }
 }

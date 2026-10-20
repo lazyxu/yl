@@ -11,7 +11,9 @@ import GardenCalendar from './GardenCalendar'
 
 function shouldShowInstallHint() {
   if (typeof navigator === 'undefined') return false
-  const iosSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent)
+  const iosDevice = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const iosSafari = iosDevice && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent)
   const standalone = navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches
   try { return iosSafari && !standalone && localStorage.getItem('garden-install-hint-dismissed') !== '1' }
   catch { return false }
@@ -34,7 +36,7 @@ export default function Garden({ active = true }) {
   const sentinel = useRef(null)
   const notify = useCallback((message, error = false) => setNotice({ message, error }), [])
   const {
-    plants, species, search, setSearch, loading, error,
+    plants, species, search, query, setSearch, loading, error,
     plantHasMore, plantTotal, plantLoadingMore, fetchSpecies, refresh, loadMorePlants,
   } = useGardenPlants(active, notify)
   const [showLoadingPlaceholder, setShowLoadingPlaceholder] = useState(false)
@@ -45,6 +47,14 @@ export default function Garden({ active = true }) {
   }, [loading])
 
   const scrollArea = () => document.querySelector('.app-page[data-view="花园"]')
+  // Apply the search-position reset only after the debounce has settled, not
+  // on every keystroke (especially disruptive with iOS's virtual keyboard).
+  useEffect(() => {
+    if (!active || selectedPlant || tab !== 0) return
+    scrollSaved.current[0] = 0
+    const node = scrollArea()
+    if (node) node.scrollTop = 0
+  }, [query, active, selectedPlant, tab])
   const rememberScroll = () => {
     const node = scrollArea()
     if (node && !selectedPlant) scrollSaved.current[tab] = node.scrollTop
@@ -61,7 +71,7 @@ export default function Garden({ active = true }) {
       if (id) next.set('plant', String(id))
       else next.delete('plant')
       return next
-    })
+    }, { replace: !id })
   }
   const chooseTab = nextTab => {
     if (tab === nextTab) return
@@ -99,7 +109,8 @@ export default function Garden({ active = true }) {
     const result = new Map()
     for (const plant of plants) {
       const label = plant.species_name || '未分类'
-      result.set(label, [...(result.get(label) || []), plant])
+      if (!result.has(label)) result.set(label, [])
+      result.get(label).push(plant)
     }
     return [...result].sort((a, b) => a[0].localeCompare(b[0], 'zh-CN'))
   }, [plants])
@@ -147,7 +158,7 @@ export default function Garden({ active = true }) {
           <label className="garden-search">
             <SearchOutlined aria-hidden="true" sx={{ color: 'var(--garden-muted)' }} />
             <input type="search" aria-label="搜索花卉或位置" placeholder="搜索花卉、品种或位置"
-              value={search} onChange={e => { setSearch(e.target.value); scrollSaved.current[0] = 0; const node = scrollArea(); if (node) node.scrollTop = 0 }} autoComplete="off" />
+              value={search} onChange={e => setSearch(e.target.value)} autoComplete="off" />
             {search && <IconButton size="small" aria-label="清除搜索" onClick={() => setSearch('')}><Close fontSize="small" /></IconButton>}
           </label>
           <div className="garden-list-header">
@@ -203,7 +214,8 @@ export default function Garden({ active = true }) {
     <PlantEditor open={creating} plant={null} species={species} onClose={() => setCreating(false)}
       onSaved={refresh} onSpecies={fetchSpecies} notify={notify} />
     <Snackbar open={!!notice} autoHideDuration={4100} onClose={() => setNotice(null)}
-      anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+      anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      sx={{ top: 'max(12px, env(safe-area-inset-top, 0px)) !important' }}>
       <Alert onClose={() => setNotice(null)} severity={notice?.error ? 'error' : 'success'} variant="filled">{notice?.message}</Alert>
     </Snackbar>
   </Box>
