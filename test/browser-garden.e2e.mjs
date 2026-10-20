@@ -81,6 +81,24 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     check(await page.locator('.app-shell').getAttribute('data-theme') === colorScheme, tag + ': app follows system appearance')
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     check(overflow <= 1, tag + ': no page-level horizontal overflow')
+    const initialColor = await page.evaluate(() => ({
+      theme: document.documentElement.dataset.theme,
+      statusBarColor: document.querySelector('meta[name="theme-color"]')?.content,
+    }))
+    check(initialColor.theme === colorScheme && initialColor.statusBarColor ===
+      (colorScheme === 'dark' ? '#101914' : '#f7faf7'),
+      tag + ': initial PWA theme matches its visible module')
+    const gardenLargeText = await page.evaluate(() => {
+      const root = document.documentElement
+      const before = root.style.fontSize
+      root.style.fontSize = '20px'
+      const fontSize = parseFloat(getComputedStyle(document.querySelector('.garden-segment')).fontSize)
+      const overflow = root.scrollWidth - window.innerWidth
+      root.style.fontSize = before
+      return { fontSize, overflow }
+    })
+    check(gardenLargeText.fontSize >= 17 && gardenLargeText.overflow <= 1,
+      tag + ': 20px root font enlarges Garden controls without horizontal overflow')
     check(await page.locator('a[href="/api/garden/export"]').count() === 0, tag + ': no garden ZIP export')
     check(await page.getByText('正在生长', { exact: true }).count() === 0, tag + ': no active/archive filter')
     check(await page.getByText('已归档', { exact: true }).count() === 0, tag + ': no archive filter')
@@ -159,6 +177,22 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     check(tagStyles.every(s => s.visible && s.display !== 'none' && s.font === '10px' &&
       s.width > 0 && s.height > 0 && s.scrollWidth <= s.width + 1),
       tag + ': shift text keeps 10px font, remains visible and is never truncated')
+    const enlargedCalendar = await calendarRoot.evaluate(node => {
+      const root = document.documentElement
+      const before = root.style.fontSize
+      const day = node.querySelector('.calendar .date')
+      const shift = node.querySelector('.calendar .shift')
+      const initialDateSize = parseFloat(getComputedStyle(day).fontSize)
+      root.style.fontSize = '20px'
+      const enlargedDateSize = parseFloat(getComputedStyle(day).fontSize)
+      const shiftSize = getComputedStyle(shift).fontSize
+      const horizontalOverflow = root.scrollWidth - window.innerWidth
+      root.style.fontSize = before
+      return { initialDateSize, enlargedDateSize, shiftSize, horizontalOverflow }
+    })
+    check(enlargedCalendar.enlargedDateSize > enlargedCalendar.initialDateSize &&
+      enlargedCalendar.shiftSize === '10px' && enlargedCalendar.horizontalOverflow <= 1,
+      tag + ': large date text preserves the exact shift chip font and page width')
     check((await calendarRoot.locator('.schedule-legend').textContent()).includes('备班'),
       tag + ': standby is in the four-shift legend')
     const scheduleCell = await calendarRoot.locator('.calendar .day').first().boundingBox()
@@ -207,6 +241,22 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
       tag + ': cancelling browser Back keeps the draft')
     await page.evaluate(() => window.history.back())
     await routerGuard.getByRole('button', { name: '放弃更改' }).click()
+    await page.getByText('库存总览').waitFor()
+
+    // Repeat the real browser Back/Forward draft guard with a shift change.
+    await page.locator('footer button').filter({ hasText: '日历' }).click()
+    await calendarRoot.getByRole('button', { name: '调整当天排班' }).click()
+    await dayEditor.getByLabel('调整类型').selectOption('standby')
+    await page.evaluate(() => window.history.back())
+    const shiftGuard = page.getByRole('dialog', { name: '放弃未保存的排班修改？' })
+    await shiftGuard.waitFor()
+    check(await page.locator('.app-shell').getAttribute('data-module') === '日历',
+      tag + ': Safari-style Back is blocked by unsaved shift changes')
+    await shiftGuard.getByRole('button', { name: '继续编辑' }).click()
+    check(await dayEditor.getByLabel('调整类型').inputValue() === 'standby',
+      tag + ': declining Back preserves the shift draft')
+    await page.evaluate(() => window.history.back())
+    await shiftGuard.getByRole('button', { name: '放弃更改' }).click()
     await page.getByText('库存总览').waitFor()
     console.log('PASS browser garden: ' + tag)
   } catch (e) {
