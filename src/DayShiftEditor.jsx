@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { Alert, Button } from '@mui/material'
 import moment from 'moment'
+const WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 import ShiftEditDialog from './ShiftEditDialog'
 import { shiftNames, shiftStyle } from './shifts'
 import { saveDayShift } from './shiftSettingsApi'
@@ -37,7 +38,7 @@ export default function DayShiftEditor({ open = true, date, baseShift, snapshot,
   return <ShiftEditDialog open={open} title="调整当天排班" titleId="day-shift-title"
     saving={saving} dirty={dirty} onCancel={onCancel} onConfirm={confirm} confirmDisabled={locked}>
     <div className="shift-day-preview">
-      <p className="shift-day-title">{moment(date).format('YYYY年MM月DD日 dddd')}</p>
+      <p className="shift-day-title">{moment(date).format('YYYY年MM月DD日') + ' ' + WEEKDAYS[moment(date).day()]}</p>
       <div className="shift-preview-row">
         <span>保存后的班次</span><span className="shift-cycle-chip" style={shiftStyle(effective)}>{effective}</span>
       </div>

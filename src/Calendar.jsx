@@ -1,6 +1,6 @@
 import moment from 'moment'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Box, Button, IconButton, Typography } from '@mui/material'
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Typography } from '@mui/material'
 import { ChevronLeft, ChevronRight, SettingsOutlined, TodayOutlined } from '@mui/icons-material'
 import './Calendar.css'
 import { getDaysTogether, getShift } from './utils'
@@ -14,8 +14,40 @@ import DayShiftEditor from './DayShiftEditor'
 // Keep shift labels visible in every date cell, including standby. The palette
 // remains the single shared source for Calendar, Settings and Editors.
 const LEGEND = ['白班', '夜班', '休息', '备班']
+const WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 const dateKey = value => value.format('YYYY-MM-DD')
 const firstOfMonth = value => value.clone().startOf('month')
+
+function MonthPicker({ open, month, onClose, onConfirm }) {
+  const [year, setYear] = useState(month.year())
+  const [selectedMonth, setSelectedMonth] = useState(month.month() + 1)
+  useEffect(() => {
+    if (!open) return
+    setYear(month.year())
+    setSelectedMonth(month.month() + 1)
+  }, [open, month])
+  const valid = Number.isInteger(year) && year >= 1900 && year <= 2100
+  return <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"
+    aria-labelledby="schedule-month-picker-title" className="schedule-month-picker-dialog">
+    <DialogTitle id="schedule-month-picker-title">跳转年月</DialogTitle>
+    <DialogContent>
+      <div className="schedule-month-fields">
+        <TextField label="年份" type="number" value={year} onChange={event => setYear(Number(event.target.value))}
+          inputProps={{ min: 1900, max: 2100, inputMode: 'numeric' }} error={!valid}
+          helperText={valid ? '1900 至 2100 年' : '请输入有效年份'} />
+        <label>月份
+          <select aria-label="月份" value={selectedMonth} onChange={event => setSelectedMonth(Number(event.target.value))}>
+            {Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1} 月</option>)}
+          </select>
+        </label>
+      </div>
+    </DialogContent>
+    <DialogActions sx={{ p: 2 }}>
+      <Button onClick={onClose}>取消</Button>
+      <Button variant="contained" disabled={!valid} onClick={() => { onConfirm(year, selectedMonth); onClose() }}>跳转</Button>
+    </DialogActions>
+  </Dialog>
+}
 
 export default function Calendar({ active = true }) {
   const [todayKey, setTodayKey] = useState(() => dateKey(moment()))
@@ -31,6 +63,7 @@ export default function Calendar({ active = true }) {
   const [dayShiftsError, setDayShiftsError] = useState('')
   const [dayEditor, setDayEditor] = useState(null)
   const [showPending, setShowPending] = useState(false)
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false)
 
   const calendarRef = useRef(null)
   const swipeStart = useRef(null)
@@ -241,7 +274,7 @@ export default function Calendar({ active = true }) {
         key={dateKey(day)}
         className={'day' + (isToday ? ' today' : '') + (isSelected ? ' selected' : '') + (!isCurrentMonth ? ' other-month' : '')}
         data-date={dateKey(day)}
-        aria-label={day.format('YYYY年MM月DD日 dddd') + ' ' + shift +
+        aria-label={day.format('YYYY年MM月DD日') + ' ' + WEEKDAYS[day.day()] + ' ' + shift +
           (isToday ? '，今天' : '') + (isSelected ? '，已选中' : '') +
           (override?.kind === 'swap' ? '，换班' : '')}
         aria-current={isToday ? 'date' : undefined}
@@ -272,7 +305,10 @@ export default function Calendar({ active = true }) {
 
       <div className="header">
         <IconButton onClick={handleSlidePrevious} aria-label="上个月"><ChevronLeft /></IconButton>
-        <h2 aria-live="polite">{currentMonth.format('YYYY年MM月')}</h2>
+        <h2 aria-live="polite"><button className="schedule-month-button" type="button"
+          aria-label="选择年月" onClick={() => setMonthPickerOpen(true)}>
+          {currentMonth.format('YYYY年MM月')}
+        </button></h2>
         <IconButton onClick={handleSlideNext} aria-label="下个月"><ChevronRight /></IconButton>
         <Button startIcon={<TodayOutlined />} onClick={jumpToToday} variant="text" className="schedule-today-button">今天</Button>
       </div>
@@ -299,7 +335,7 @@ export default function Calendar({ active = true }) {
       <section className="selected-date-info" aria-label="选中日期详情">
         <div className="selected-date-header">
           <div className="selected-date-heading">
-            <Typography component="h3">{selectedDate.format('YYYY年MM月DD日 dddd')}</Typography>
+            <Typography component="h3">{selectedDate.format('YYYY年MM月DD日') + ' ' + WEEKDAYS[selectedDate.day()]}</Typography>
             <Typography variant="caption" color="text.secondary">
               {selectedDate.isSame(today, 'day') ? '今天 · ' : ''}
               {selectedDate.isSame(currentMonth, 'month') ? '本月日期' : '不在当前月份'}
@@ -319,6 +355,8 @@ export default function Calendar({ active = true }) {
         </div>
       </section>
     </div>
+    <MonthPicker open={monthPickerOpen} month={currentMonth} onClose={() => setMonthPickerOpen(false)}
+      onConfirm={(year, month) => setCurrentMonth(moment({ year, month: month - 1, day: 1 }).startOf('month'))} />
     <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)}
       onReload={() => reloadSettings()} onSaved={setSettings} />
     {dayEditor && <DayShiftEditor key={dayEditor.date} {...dayEditor} open={active}

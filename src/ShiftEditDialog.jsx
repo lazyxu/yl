@@ -30,7 +30,7 @@ export default function ShiftEditDialog({
       aria-labelledby={titleId} data-keyboard-open={keyboardOpen}
       onClose={requestClose}
       PaperProps={{ style: keyboardOpen ? { height: viewport.height, maxHeight: viewport.height } : undefined }}>
-      <DialogTitle className="shift-settings-heading shift-editor-toolbar">
+      <DialogTitle component="div" className="shift-settings-heading shift-editor-toolbar">
         <Button onClick={requestClose} disabled={saving}>取消</Button>
         <h2 id={titleId}>{title}</h2>
         <Button variant="contained" disableElevation onClick={onConfirm}

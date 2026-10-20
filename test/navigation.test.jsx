@@ -88,7 +88,7 @@ test('拼豆子页有明确的主导航归属，浏览器后退后仍保留日�
   await mount()
   expect(document.querySelector('nav[aria-label="主导航"]')).not.toBeNull()
   expect(button('日历').getAttribute('aria-current')).toBe('page')
-  await click('→')
+  await click('下个月')
   const chosenMonth = document.querySelector('.header h2').textContent
   await click('拼豆')
   await click('补豆')

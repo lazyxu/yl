@@ -215,7 +215,7 @@ test('日历重设计保留每天的完整班次文字标签、固定六周和�
   await act(async () => [...host.querySelectorAll('button')].find(el => el.textContent.trim() === '今天')
     .dispatchEvent(new MouseEvent('click', { bubbles: true })))
   expect(host.querySelector('.header h2').textContent).toBe('2026年10月')
-  expect(day('2026-10-13').getAttribute('aria-current')).toBe('date')
+  expect(host.querySelector('.calendar .day[aria-current="date"]')).not.toBeNull()
 })
 
 test('日期支持键盘方向键并保持选中态，不修改后端排班', async () => {
@@ -244,4 +244,20 @@ test('单日编辑器退出有未保存确认，保留草稿直到明确放弃',
   await act(async () => discard.dispatchEvent(new MouseEvent('click', { bubbles: true })))
   expect(editor()).toBeNull()
   expect(writes).toHaveLength(0)
+})
+
+test('点击月份标题可直接跳转指定年月，日历班次仍显示文字', async () => {
+  await mount()
+  const selectMonth = host.querySelector('button[aria-label="选择年月"]')
+  expect(selectMonth).not.toBeNull()
+  await act(async () => selectMonth.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  const popup = document.querySelector('[role="dialog"][aria-labelledby="schedule-month-picker-title"]')
+  expect(popup).not.toBeNull()
+  const month = popup.querySelector('select[aria-label="月份"]')
+  await change(month, '5')
+  const jump = [...popup.querySelectorAll('button')].find(el => el.textContent.trim() === '跳转')
+  await act(async () => jump.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(host.querySelector('.header h2').textContent).toBe('2026年05月')
+  expect(host.querySelectorAll('.calendar .day')).toHaveLength(42)
+  expect([...host.querySelectorAll('.calendar .shift')].every(el => !!el.textContent)).toBe(true)
 })

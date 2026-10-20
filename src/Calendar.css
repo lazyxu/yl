@@ -145,3 +145,24 @@
 @media (prefers-reduced-motion: reduce) {
   .schedule-screen .calendar { transition: none !important; }
 }
+
+.schedule-screen .schedule-month-button {
+  appearance: none; background: transparent; color: inherit; border: 0;
+  border-radius: 10px; font: inherit; font-weight: inherit;
+  padding: 6px 8px; min-height: 44px; cursor: pointer;
+}
+.schedule-screen .schedule-month-button:focus-visible { outline: 2px solid #347c52; outline-offset: 2px; }
+.schedule-month-fields {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  align-items: center; padding-top: 15px;
+}
+.schedule-month-fields label {
+  display: grid; gap: 6px; font-size: 14px;
+}
+.schedule-month-fields select {
+  width: 100%; min-height: 48px; border-radius: 10px;
+  border: 1px solid var(--app-border, #ccd8d1);
+  background: var(--app-surface, #fff); color: var(--app-ink, #203329);
+  font-size: 16px; padding: 8px 12px;
+}
+@media (max-width: 349px) { .schedule-month-fields { grid-template-columns: 1fr; } }
