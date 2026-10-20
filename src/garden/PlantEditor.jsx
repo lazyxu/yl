@@ -1,6 +1,6 @@
 
-import React, { useEffect, useState } from 'react'
-import { Button, FormControl, InputLabel, MenuItem, Select, Stack, TextField } from '@mui/material'
+import React, { useEffect, useRef, useState } from 'react'
+import { Button, FormControl, InputLabel, MenuItem, Select, Stack, TextField, Typography } from '@mui/material'
 import { gardenRequest, gardenJSON, localInputTime } from '../gardenApi'
 import GardenFormDialog from './GardenFormDialog'
 
@@ -10,6 +10,8 @@ export default function PlantEditor({ open, plant, species, onClose, onSaved, on
   const [form, setForm] = useState(EMPTY_PLANT)
   const [speciesName, setSpeciesName] = useState('')
   const [saving, setSaving] = useState(false)
+  const busy = useRef(false)
+  const speciesBusy = useRef(false)
   const [dirty, setDirty] = useState(false)
   const plantId = plant?.id
   useEffect(() => {
@@ -26,7 +28,8 @@ export default function PlantEditor({ open, plant, species, onClose, onSaved, on
     setForm(prev => ({ ...prev, [key]: value }))
   }
   async function addSpecies() {
-    if (!speciesName.trim()) return
+    if (!speciesName.trim() || speciesBusy.current) return
+    speciesBusy.current = true
     try {
       const created = await gardenRequest('/species', gardenJSON({ name: speciesName.trim() }))
       change('species_id', created.id)
@@ -34,9 +37,12 @@ export default function PlantEditor({ open, plant, species, onClose, onSaved, on
       setSpeciesName('')
       notify('已添加品种')
     } catch (err) { notify(err.message, true) }
+    finally { speciesBusy.current = false }
   }
   async function save() {
+    if (busy.current) return
     if (!form.name.trim()) return notify('请填写花卉名称', true)
+    busy.current = true
     setSaving(true)
     try {
       await gardenRequest(plant ? '/plants/' + plant.id : '/plants', gardenJSON(form, plant ? 'PATCH' : 'POST'))
@@ -44,7 +50,7 @@ export default function PlantEditor({ open, plant, species, onClose, onSaved, on
       onSaved(); onClose()
       notify(plant ? '档案已更新' : '新花卉已加入花园')
     } catch (err) { notify(err.message, true) }
-    finally { setSaving(false) }
+    finally { busy.current = false; setSaving(false) }
   }
   return <GardenFormDialog open={open} title={plant ? '编辑花卉档案' : '添加花卉'}
     dirty={dirty} busy={saving} onClose={onClose} onSave={save}>
@@ -65,6 +71,9 @@ export default function PlantEditor({ open, plant, species, onClose, onSaved, on
         <Button variant="outlined" disabled={!speciesName.trim() || saving} onClick={addSpecies}
           sx={{ flexShrink: 0 }}>添加品种</Button>
       </Stack>
+      <Typography variant="caption" color="text.secondary" sx={{ mt: '-12px !important' }}>
+        新品种会立即保存；即使取消当前花卉编辑，也不会自动删除该品种。
+      </Typography>
       <TextField type="date" label="种植日期" value={form.planted_on || ''}
         onChange={e => change('planted_on', e.target.value)} InputLabelProps={{ shrink: true }}/>
       <TextField label="种植位置" placeholder="阳台 / 院子 / 客厅"

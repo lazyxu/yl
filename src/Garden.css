@@ -8,6 +8,7 @@
   --garden-tint: var(--app-pressed, #e8f4ec);
   padding: 0 max(14px, env(safe-area-inset-right, 0px)) 30px max(14px, env(safe-area-inset-left, 0px));
   max-width: 1080px;
+  --garden-gutter: 14px;
   min-height: 100%;
   margin: 0 auto;
   color: var(--garden-ink);
@@ -132,8 +133,8 @@
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--garden-border);
-  margin: 0 -14px 16px;
-  padding: 0 14px;
+  margin: 0 calc(-1 * var(--garden-gutter, 14px)) 16px;
+  padding: 0 var(--garden-gutter, 14px);
 }
 .garden-detail-back { color: var(--garden-green) !important; }
 .garden-detail-hero {
@@ -188,7 +189,12 @@
 }
 .garden-detail-skeleton { min-height: 460px; padding-top: 18px; }
 .garden-calendar-panel { background: var(--garden-card); border: 1px solid var(--garden-border); border-radius: 20px; padding: 14px; }
-.garden-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.garden-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-rows: 30px repeat(6, minmax(44px, 1fr));
+  gap: 3px; touch-action: pan-y;
+}
 .garden-calendar-day {
   border: 0;
   border-radius: 12px;
@@ -200,13 +206,15 @@
   cursor: pointer;
 }
 .garden-calendar-day:disabled { cursor: default; }
-.garden-calendar-day[aria-selected="true"] { color: #fff; background: #347c52; }
-.garden-calendar-day:not([aria-selected="true"]):not(:disabled):focus-visible { outline: 2px solid #347c52; }
+.garden-calendar-day[aria-pressed="true"] { color: #fff; background: #347c52; }
+.garden-calendar-day[aria-current="date"] { outline: 2px solid #e2763b; outline-offset: -2px; }
+.garden-calendar-day.other-month { opacity: .45; }
+.garden-calendar-day:not([aria-pressed="true"]):not(:disabled):focus-visible { outline: 2px solid #347c52; }
 .garden-calendar-day .garden-calendar-dot {
   position: absolute; width: 5px; height: 5px;
   background: #347c52; border-radius: 50%; bottom: 4px; left: calc(50% - 2.5px);
 }
-.garden-calendar-day[aria-selected="true"] .garden-calendar-dot { background: #fff; }
+.garden-calendar-day[aria-pressed="true"] .garden-calendar-dot { background: #fff; }
 .garden-calendar-weekday { text-align: center; color: var(--garden-muted); padding: 10px 0; font-weight: 600; font-size: 12px; }
 .garden-calendar-record { display: flex; align-items: center; gap: 12px; border-radius: 13px; padding: 8px; }
 .garden-calendar-record .garden-cover { width: 62px; border-radius: 10px; overflow: hidden; }
@@ -222,12 +230,12 @@
   position: relative; z-index: 2;
 }
 .garden-viewer-stage { display: grid; place-items: center; min-height: 0; position: relative; overflow: hidden; touch-action: pan-y; }
-.garden-viewer-stage img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; transition: transform .12s ease-out; }
+.garden-viewer-stage img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; transition: none; }
 .garden-viewer-footer { text-align: center; font-size: 12px; color: #d5e0d7; padding: 10px 16px max(14px, env(safe-area-inset-bottom, 0px)); }
 .garden-install-hint { border: 1px solid var(--garden-border); background: var(--garden-card); border-radius: 15px; padding: 12px 14px; margin: 18px 0; display: flex; align-items: center; gap: 10px; }
 .garden-install-hint p { margin: 0; flex: 1; font-size: 12px; line-height: 1.5; color: var(--garden-muted); }
 @media (min-width: 600px) {
-  .garden-root { padding: 12px 26px 40px; }
+  .garden-root { padding: 12px 26px 40px; --garden-gutter: 26px; }
   .garden-header { padding: 28px 0 18px; }
   .garden-detail-hero { display: flex; }
   .garden-detail-cover { width: 44%; aspect-ratio: 4 / 3; }
@@ -241,7 +249,7 @@
   .garden-calendar-grid { gap: 1px; }
 }
 @media (max-width: 349px) {
-  .garden-root { padding-left: 10px; padding-right: 10px; }
+  .garden-root { padding-left: 10px; padding-right: 10px; --garden-gutter: 10px; }
   .garden-heading { font-size: 27px; }
   .garden-card-info { padding: 10px 9px 12px; }
   /* 320px screens: seven 44px touch targets still fit edge-to-edge. */
@@ -272,3 +280,51 @@
   .garden-card, .garden-timeline-entry, .garden-calendar-panel, .garden-search { border-width: 2px; }
   .garden-segment[aria-selected="true"], .garden-view-switch button[aria-pressed="true"] { outline: 2px solid currentColor; }
 }
+
+/* iPhone-specific finishing: preserve label semantics without scroll jumps. */
+.garden-segment { min-height: 44px; }
+.garden-header .garden-heading { overflow-wrap: anywhere; }
+.garden-cover-failure { font-size: 12px; text-align: center; padding: 5px; color: var(--garden-muted); }
+.garden-cover[data-retryable="true"] { cursor: pointer; }
+.garden-cover[data-retryable="true"]:active { opacity: .8; }
+.garden-calendar-day[aria-pressed="true"][aria-current="date"] {
+  outline: 2px solid #ffd1a9; outline-offset: -2px;
+}
+@media (max-width: 380px) {
+  .garden-header > .MuiStack-root { flex-wrap: wrap; }
+  .garden-add-btn { margin-left: auto !important; }
+  .garden-list-header { flex-wrap: wrap; }
+  .garden-view-switch { margin-left: auto; }
+}
+@media (min-width: 600px) {
+  .garden-calendar-grid { grid-template-rows: 33px repeat(6, minmax(62px, 1fr)); }
+}
+
+.garden-draft-fallback {
+  display: flex; align-items: center; justify-content: center;
+  text-align: center; font-size: 12px; line-height: 1.5;
+  padding: 10px; color: var(--garden-ink); border: 1px dashed var(--garden-border);
+  box-sizing: border-box;
+}
+.garden-viewer-stage .garden-large-photo { will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .garden-viewer-stage .garden-large-photo { transition: none; }
+}
+
+/* Defer costly painting for nonvirtualized, grouped diary/timeline sections.
+   Heights are refined when the browser renders the actual section. */
+.garden-species-group, .garden-timeline-entry {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
+}
+.garden-virtual-grid .garden-card-info { min-height: 90px; box-sizing: border-box; }
+.garden-virtual-grid .garden-card { height: 100%; }
+
+.garden-editor-dialog[data-keyboard-open="true"] { max-height: var(--keyboard-height, 100dvh); }
+@media (prefers-reduced-motion: reduce) {
+  .garden-loading-grid, .garden-loading-card { animation: none !important; }
+}
+ 
+/* Two-line flower names reduce truncation without changing image aspect. */
+.garden-card-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  white-space: normal; overflow-wrap: anywhere; min-height: 2.7em; }

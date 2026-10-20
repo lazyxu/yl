@@ -166,3 +166,18 @@
   font-size: 16px; padding: 8px 12px;
 }
 @media (max-width: 349px) { .schedule-month-fields { grid-template-columns: 1fr; } }
+
+/* No unconditional desktop-style hover state left stuck on touch screens. */
+@media (hover: hover) and (pointer: fine) {
+  .schedule-screen .calendar button.day:hover { background: var(--schedule-tint); }
+}
+@media (hover: none) { .schedule-screen .calendar button.day:hover { background: transparent; } }
+.schedule-screen .selected-date-header { flex-wrap: wrap; }
+.schedule-screen .selected-date-heading { min-width: min(100%, 185px); }
+@media (max-height: 470px) and (orientation: landscape) {
+  .schedule-screen { padding-block: 4px 12px; }
+  .schedule-screen .schedule-topbar { margin: 0 0 4px; }
+  .schedule-screen .schedule-legend { padding-block: 2px 5px; }
+  .schedule-screen .calendar { grid-template-rows: 23px repeat(6, minmax(44px, 1fr)); padding-block: 3px; }
+  .schedule-screen .calendar button.day { min-height: 44px; }
+}

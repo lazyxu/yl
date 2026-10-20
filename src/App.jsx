@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react'
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react'
 import './App.css'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
@@ -10,7 +10,7 @@ import LocalFloristOutlinedIcon from '@mui/icons-material/LocalFloristOutlined'
 import Typography from '@mui/material/Typography'
 import BottomNavigation from '@mui/material/BottomNavigation'
 import BottomNavigationAction from '@mui/material/BottomNavigationAction'
-import { useSearchParams } from 'react-router-dom'
+import { UNSAFE_DataRouterContext, useSearchParams } from 'react-router-dom'
 import { createPindouDraft } from './pindouDraft'
 import useKeyboardViewport from './useKeyboardViewport'
 
@@ -42,6 +42,17 @@ function systemPrefersDark() {
   return Boolean(typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
 }
 
+function DeferredPageFallback() {
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    const timer = setTimeout(() => setShow(true), 180)
+    return () => clearTimeout(timer)
+  }, [])
+  return <div className="page-loading" role={show ? 'status' : undefined} aria-live="polite">
+    {show && <Typography variant="caption" color="text.secondary">正在打开页面…</Typography>}
+  </div>
+}
+
 function Page({ name, active, positions, children }) {
   const element = useRef(null)
   useLayoutEffect(() => {
@@ -50,13 +61,14 @@ function Page({ name, active, positions, children }) {
   return (
     <section ref={element} className="app-page" data-view={name} aria-label={name} hidden={!active}
       onScroll={event => { if (active) positions.current[name] = event.currentTarget.scrollTop }}>
-      <Suspense fallback={<div className="page-loading" aria-hidden="true" />}>{children}</Suspense>
+      <Suspense fallback={<DeferredPageFallback />}>{children}</Suspense>
     </section>
   )
 }
 
 function App() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const dataRouter = useContext(UNSAFE_DataRouterContext)
   const [dark, setDark] = useState(systemPrefersDark)
   useEffect(() => {
     const media = window.matchMedia?.('(prefers-color-scheme: dark)')
@@ -96,10 +108,20 @@ function App() {
 
   const navigateToView = useCallback(nextView => {
     if (nextView === view) return
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.set('view', nextView)
-    setSearchParams(nextParams)
-  }, [searchParams, setSearchParams, view])
+    const commit = () => {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set('view', nextView)
+      setSearchParams(nextParams)
+    }
+    // Editors may veto in-app navigation and continue it only after the user
+    // explicitly discards a dirty form. Leave browser unload protection intact.
+    // Production routes have native navigation blockers, including Safari
+    // history POPs. MemoryRouter tests retain the original narrow event guard.
+    if (dataRouter) { commit(); return }
+    const intent = new CustomEvent('yl:navigation-intent', { cancelable: true,
+      detail: { proceed: commit, target: nextView } })
+    if (window.dispatchEvent(intent)) commit()
+  }, [searchParams, setSearchParams, view, dataRouter])
 
   function openPindouWith(operation, initialRows = null) {
     if (initialRows?.length) setDrafts(previous => ({ ...previous, [operation]: createPindouDraft(initialRows) }))

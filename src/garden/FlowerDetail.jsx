@@ -18,7 +18,14 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   const [entries, setEntries] = useState([])
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [showSkeleton, setShowSkeleton] = useState(false)
+  useEffect(() => {
+    if (!loading || plant) { setShowSkeleton(false); return }
+    const timer = setTimeout(() => setShowSkeleton(true), 180)
+    return () => clearTimeout(timer)
+  }, [loading, plant])
   const [moreBusy, setMoreBusy] = useState(false)
+  const paging = useRef(false)
   const [plantEditor, setPlantEditor] = useState(false)
   const [entryEditor, setEntryEditor] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -39,6 +46,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     const controller = new AbortController()
     controllerRef.current = controller
     setMoreBusy(false)
+    paging.current = false
     try {
       const [p, list] = await Promise.all([
         gardenRequest('/plants/' + id, { signal: controller.signal }),
@@ -64,7 +72,8 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   }, [load])
 
   async function more() {
-    if (!hasMore || moreBusy) return
+    if (!hasMore || moreBusy || paging.current) return
+    paging.current = true
     const version = requestVersion.current
     const controller = new AbortController()
     moreController.current = controller
@@ -77,6 +86,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     } catch (err) {
       if (version === requestVersion.current && err.name !== 'AbortError') notify(err.message, true)
     } finally {
+      paging.current = false
       if (version === requestVersion.current) setMoreBusy(false)
     }
   }
@@ -107,8 +117,9 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     setPhotoIndex(null)
     requestAnimationFrame(() => photoButton.current?.focus?.())
   }
-  if (loading && !plant) return <div className="garden-detail-skeleton" aria-label="正在加载花卉档案">
-    <div className="garden-loading-card" style={{ aspectRatio: '16/10' }} />
+  if (loading && !plant) return <div className="garden-detail-skeleton" aria-busy="true"
+    aria-label="正在加载花卉档案">
+    {showSkeleton && <div className="garden-loading-card" style={{ aspectRatio: '16/10' }} />}
   </div>
   if (!plant) return <Alert severity="warning">花卉不存在或已删除。<Button onClick={onBack}>返回花园</Button></Alert>
 
@@ -131,7 +142,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
       <div className="garden-detail-info">
         <Typography component="h2" className="garden-detail-title">{plant.name}</Typography>
         <div className="garden-detail-description">{plant.species_name || '未分类'}{plant.location ? ' · ' + plant.location : ''}</div>
-        <Typography variant="body2" sx={{ color: '#46815c', mt: 1 }}>
+        <Typography variant="body2" sx={{ color: 'var(--garden-green, #347c52)', mt: 1 }}>
           {plantedDays(plant.planted_on) ? '种植第 ' + plantedDays(plant.planted_on) + ' 天 · ' : ''}{plant.photo_count} 张成长照片
         </Typography>
         {plant.notes && <Typography sx={{ whiteSpace: 'pre-wrap', mt: 1.5, overflowWrap: 'anywhere' }}>{plant.notes}</Typography>}
@@ -154,7 +165,8 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
       onSpecies={onSpecies} notify={notify} />
     <EntryEditor open={entryEditor} plantId={id} editing={editing}
       onClose={() => setEntryEditor(false)} onSaved={() => { load(); onChange() }} notify={notify} />
-    {photoIndex !== null && <Viewer photos={photos} current={photoIndex} onClose={closePhoto} />}
+    {photoIndex !== null && <Viewer photos={photos} current={photoIndex} onClose={closePhoto}
+      hasMore={hasMore} loadingMore={moreBusy} onEndReached={more} />}
     <GardenConfirmDialog open={Boolean(pendingDelete)} title={pendingDelete?.kind === 'plant' ? '删除这株花卉？' : '删除这条成长日记？'}
       description={pendingDelete?.kind === 'plant'
         ? '「' + plant.name + '」和它的全部成长日记、照片将永久删除，无法撤销。'

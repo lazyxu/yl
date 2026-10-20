@@ -136,7 +136,7 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.keyboard.press('ArrowLeft')
     check(await page.getByRole('tab', { name: '花卉', exact: true }).getAttribute('aria-selected') === 'true', tag + ': keyboard tabs navigate left')
     await page.getByRole('tab', { name: '成长日历' }).click()
-    await page.getByRole('button', { name: '今天' }).click()
+    await page.getByRole('button', { name: '今天', exact: true }).click()
     const dayCell = await page.locator('.garden-calendar-day:not([disabled])').first().boundingBox()
     check(dayCell && dayCell.width >= 44 && dayCell.height >= 44, tag + ': calendar cell must have 44px touch target')
     await page.getByRole('button', { name: '上个月' }).click()
@@ -193,6 +193,21 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.locator('footer button').filter({ hasText: '花园' }).click()
     check(await page.locator('.app-shell').getAttribute('data-theme') === colorScheme, tag + ': garden restores preferred theme')
     await page.getByText(name, { exact: true }).waitFor()
+    // A real browser history POP (Safari Back), not a footer-navigation click.
+    await page.getByRole('button', { name: '添加花卉' }).click()
+    const draftDialog = page.getByRole('dialog', { name: '添加花卉' })
+    await draftDialog.getByLabel('给这株花起个名字').fill('浏览器后退保护草稿')
+    await page.evaluate(() => window.history.back())
+    const routerGuard = page.getByRole('dialog', { name: '放弃未保存的花园草稿？' })
+    await routerGuard.waitFor()
+    check(await page.locator('.app-shell').getAttribute('data-module') === '花园',
+      tag + ': browser Back cannot silently discard a flower draft')
+    await routerGuard.getByRole('button', { name: '继续编辑' }).click()
+    check(await draftDialog.getByLabel('给这株花起个名字').inputValue() === '浏览器后退保护草稿',
+      tag + ': cancelling browser Back keeps the draft')
+    await page.evaluate(() => window.history.back())
+    await routerGuard.getByRole('button', { name: '放弃更改' }).click()
+    await page.getByText('库存总览').waitFor()
     console.log('PASS browser garden: ' + tag)
   } catch (e) {
     error = e

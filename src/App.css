@@ -75,6 +75,8 @@ body { overflow: hidden; }
   padding: 0 env(safe-area-inset-right, 0px) 12px env(safe-area-inset-left, 0px);
   overflow-anchor: none;
 }
+/* Calendar and Garden apply the safe area once at their content root. */
+.app-page[data-view="日历"], .app-page[data-view="花园"] { padding-inline: 0; }
 .app-page[hidden], .app-footer[hidden] { display: none; }
 .app-footer {
   position: relative;
@@ -111,3 +113,14 @@ body { overflow: hidden; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Modal and popover portals render under body, outside .app-shell. */
+@media (prefers-reduced-motion: reduce) {
+  body .MuiDialog-root *, body .MuiPopover-root *, body .MuiModal-root * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+ 
+.page-loading { display: flex; align-items: flex-start; justify-content: center; padding-top: 42px; }

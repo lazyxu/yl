@@ -1,6 +1,7 @@
 import moment from 'moment'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Typography } from '@mui/material'
+import { flushSync } from 'react-dom'
+import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, TextField, Typography, useMediaQuery } from '@mui/material'
 import { ChevronLeft, ChevronRight, SettingsOutlined, TodayOutlined } from '@mui/icons-material'
 import './Calendar.css'
 import { getDaysTogether, getShift } from './utils'
@@ -19,6 +20,7 @@ const dateKey = value => value.format('YYYY-MM-DD')
 const firstOfMonth = value => value.clone().startOf('month')
 
 function MonthPicker({ open, month, onClose, onConfirm }) {
+  const phone = useMediaQuery('(max-width:599.95px), (max-height:480px) and (pointer:coarse)')
   const [year, setYear] = useState(month.year())
   const [selectedMonth, setSelectedMonth] = useState(month.month() + 1)
   useEffect(() => {
@@ -28,7 +30,11 @@ function MonthPicker({ open, month, onClose, onConfirm }) {
   }, [open, month])
   const valid = Number.isInteger(year) && year >= 1900 && year <= 2100
   return <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"
-    aria-labelledby="schedule-month-picker-title" className="schedule-month-picker-dialog">
+    aria-labelledby="schedule-month-picker-title" className="schedule-month-picker-dialog"
+    sx={phone ? { '& .MuiDialog-container': { alignItems: 'flex-end' } } : undefined}
+    PaperProps={{ sx: phone ? { m: 0, width: '100%', maxWidth: { xs: '100%', sm: 520 },
+      borderRadius: '18px 18px 0 0', pb: 'max(6px, env(safe-area-inset-bottom, 0px))',
+      maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - 12px)' } : undefined }}>
     <DialogTitle id="schedule-month-picker-title">跳转年月</DialogTitle>
     <DialogContent>
       <div className="schedule-month-fields">
@@ -156,7 +162,8 @@ export default function Calendar({ active = true }) {
     return () => clearTimeout(timer)
   }, [loadingSettings, loadingDayShifts])
 
-  const canAdjust = active && !loadingSettings && !loadingDayShifts && settings.version !== null && dayShifts.version !== null
+  const confirmed = settings.version !== null && dayShifts.version !== null
+  const canAdjust = active && !loadingSettings && !loadingDayShifts && confirmed
   const shiftFor = day => {
     const override = dayShifts.overrides[dateKey(day)]
     return override?.shift || getShift(day, settings.rules)
@@ -205,25 +212,31 @@ export default function Calendar({ active = true }) {
   const onTouchEnd = event => {
     const start = swipeStart.current
     swipeStart.current = null
-    resetSwipeTransform()
-    if (!active || gestureBlocked.current || dayEditor || !start || start.edge || start.axis === 'vertical') return
+    if (!active || gestureBlocked.current || dayEditor || !start || start.edge || start.axis === 'vertical') {
+      resetSwipeTransform(); return
+    }
     const touch = event.changedTouches[0]
-    if (!touch) return
+    if (!touch) { resetSwipeTransform(); return }
     const dx = touch.clientX - start.x
     const dy = touch.clientY - start.y
-    if (Math.abs(dx) <= 50 || Math.abs(dx) <= Math.abs(dy) * 1.25) return
-    if (dx < 0) handleSlideNext()
-    else handleSlidePrevious()
+    if (Math.abs(dx) <= 50 || Math.abs(dx) <= Math.abs(dy) * 1.25) {
+      resetSwipeTransform(); return
+    }
+    // Commit the new month before dropping the old month's translated pixels.
+    // Touchmove remains rAF-only and does not render React each frame.
+    flushSync(() => moveMonth(dx < 0 ? 1 : -1, false))
+    resetSwipeTransform()
   }
   const onTouchCancel = () => { swipeStart.current = null; resetSwipeTransform() }
-  const handleSlidePrevious = () => {
-    resetSwipeTransform()
-    setCurrentMonth(month => month.clone().subtract(1, 'month'))
+  const moveMonth = (offset, reset = true) => {
+    if (reset) resetSwipeTransform()
+    const target = currentMonth.clone().add(offset, 'month')
+    const nextDay = Math.min(selectedDate.date(), target.daysInMonth())
+    setCurrentMonth(target)
+    setSelectedDate(target.clone().date(nextDay))
   }
-  const handleSlideNext = () => {
-    resetSwipeTransform()
-    setCurrentMonth(month => month.clone().add(1, 'month'))
-  }
+  const handleSlidePrevious = () => moveMonth(-1)
+  const handleSlideNext = () => moveMonth(1)
   const jumpToToday = () => {
     const now = moment().startOf('day')
     resetSwipeTransform()
@@ -318,7 +331,10 @@ export default function Calendar({ active = true }) {
         </span>)}
       </div>
 
-      {showPending && (loadingSettings || loadingDayShifts) && !settingsError && !dayShiftsError &&
+      {!confirmed && showPending && <Alert severity="info" className="schedule-unverified" role="status">
+        当前显示内置或上次获取的排班预览，尚未核对服务器数据；确认完成前不能修改排班。
+      </Alert>}
+      {confirmed && showPending && (loadingSettings || loadingDayShifts) && !settingsError && !dayShiftsError &&
         <Typography variant="caption" color="text.secondary" className="schedule-loading">正在核对最新排班…</Typography>}
       {settingsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
       {dayShiftsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
@@ -355,7 +371,11 @@ export default function Calendar({ active = true }) {
       </section>
     </div>
     <MonthPicker open={monthPickerOpen} month={currentMonth} onClose={() => setMonthPickerOpen(false)}
-      onConfirm={(year, month) => setCurrentMonth(moment({ year, month: month - 1, day: 1 }).startOf('month'))} />
+      onConfirm={(year, month) => {
+        const target = moment({ year, month: month - 1, day: 1 }).startOf('month')
+        setCurrentMonth(target)
+        setSelectedDate(target.clone().date(Math.min(selectedDate.date(), target.daysInMonth())))
+      }} />
     <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)}
       onReload={() => reloadSettings()} onSaved={setSettings} />
     {dayEditor && <DayShiftEditor key={dayEditor.date} {...dayEditor} open={active}

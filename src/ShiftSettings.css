@@ -165,3 +165,19 @@
   .shift-settings-dialog .shift-sort-day,
   .shift-settings-dialog .shift-day-preview { border-width: 2px; }
 }
+
+/* Date validation beside its own field; readable under both appearances. */
+.shift-date-error { color: #bb3037; font-size: 13px; margin: 6px 0 12px; }
+.shift-settings-dialog .shift-current-eyebrow { color: var(--app-accent, #347c52); }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="dark"] .shift-date-error { color: #ffc0c0; }
+}
+
+@media (max-height: 480px) and (orientation: landscape) {
+  .shift-settings-dialog .shift-settings-heading { min-height: 48px; padding-block: 6px; }
+  .shift-settings-dialog .shift-settings-content { padding-block: 12px; }
+}
+ 
+/* Long cycles avoid painting offscreen editor rows while retaining drag order. */
+.shift-sort-day { content-visibility: auto; contain-intrinsic-size: auto 105px; }
+.shift-day-dragging { content-visibility: visible; }

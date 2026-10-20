@@ -2,6 +2,8 @@
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import PhotoViewer from '../src/garden/PhotoViewer'
+import PlantGrid from '../src/garden/PlantGrid'
+import GardenCalendar from '../src/garden/GardenCalendar'
 import GrowthTimeline from '../src/garden/GrowthTimeline'
 import FlowerDetail from '../src/garden/FlowerDetail'
 import EntryEditor from '../src/garden/EntryEditor'
@@ -201,5 +203,86 @@ test('移动端编辑保护未保存草稿，误触取消需要明确确认', as
     host.remove()
     URL.createObjectURL = oldCreate
     URL.revokeObjectURL = oldRevoke
+  }
+})
+
+
+test('大量花卉卡片只渲染可见窗口，保留完整列表语义与数量', async () => {
+  global.IS_REACT_ACT_ENVIRONMENT = true
+  const host = document.createElement('div')
+  host.className = 'app-page'
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  const flowers = Array.from({ length: 500 }, (_, i) => ({
+    id: i + 1, name: '花卉' + (i + 1), species_name: '月季', planted_on: null, photo_count: 0,
+    latest_photo_id: null,
+  }))
+  try {
+    await act(async () => root.render(<PlantGrid items={flowers} onSelect={() => {}} />))
+    expect(host.querySelector('[role="list"][aria-label="全部花卉列表"]')).not.toBeNull()
+    expect(host.querySelectorAll('.garden-card').length).toBeLessThan(100)
+    expect(host.querySelectorAll('.garden-card').length).toBeGreaterThan(0)
+    expect(host.querySelectorAll('.garden-card')).not.toHaveLength(500)
+  } finally { await act(async () => root.unmount()); host.remove() }
+})
+
+test('成长日历固定六周、星期日开头并用真实今天标识和按钮选中状态', async () => {
+  global.IS_REACT_ACT_ENVIRONMENT = true
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  const before = global.fetch
+  const now = new Date()
+  const first = new Date(now.getFullYear(), now.getMonth(), 1)
+  const format = date => date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') +
+    '-' + String(date.getDate()).padStart(2, '0')
+  const selected = format(now)
+  global.fetch = jest.fn(async url => ({
+    ok: true, json: async () => String(url).includes('/calendar/day?')
+      ? { items: [], total: 0, has_more: false, next_cursor: null } : [],
+  }))
+  try {
+    await act(async () => root.render(<GardenCalendar active month={first} selected={selected}
+      onMonthChange={() => {}} onSelectedChange={() => {}} selectPlant={() => {}} notify={() => {}} />))
+    expect(host.querySelectorAll('.garden-calendar-day')).toHaveLength(42)
+    expect(host.querySelector('.garden-calendar-weekday')?.textContent).toBe('日')
+    const today = host.querySelector('[data-garden-date="' + selected + '"]')
+    expect(today).not.toBeNull()
+    expect(today.getAttribute('aria-current')).toBe('date')
+    expect(today.getAttribute('aria-pressed')).toBe('true')
+  } finally { await act(async () => root.unmount()); host.remove(); global.fetch = before }
+})
+
+test('照片分享优先传递原图文件而不是私有照片链接', async () => {
+  global.IS_REACT_ACT_ENVIRONMENT = true
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  const previousShare = Object.getOwnPropertyDescriptor(navigator, 'share')
+  const previousCanShare = Object.getOwnPropertyDescriptor(navigator, 'canShare')
+  const oldFetch = global.fetch
+  const share = jest.fn(async () => {})
+  Object.defineProperty(navigator, 'share', { configurable: true, value: share })
+  Object.defineProperty(navigator, 'canShare', { configurable: true,
+    value: jest.fn(args => args.files?.length === 1) })
+  global.fetch = jest.fn(async () => ({ ok: true, blob: async () => new Blob(['raw image'], { type: 'image/jpeg' }) }))
+  try {
+    await act(async () => root.render(<PhotoViewer photos={[{ id: 77, name: '花.jpg' }]}
+      current={0} onClose={() => {}} />))
+    await act(async () => document.querySelector('[aria-label="分享照片"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(global.fetch).toHaveBeenCalledWith('/api/garden/photos/77/original', { cache: 'no-store' })
+    expect(share).toHaveBeenCalledTimes(1)
+    expect(share.mock.calls[0][0].files[0]).toBeInstanceOf(File)
+    expect(share.mock.calls[0][0].files[0].name).toBe('花.jpg')
+    expect(share.mock.calls[0][0]).not.toHaveProperty('url')
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
+    global.fetch = oldFetch
+    if (previousShare) Object.defineProperty(navigator, 'share', previousShare)
+    else delete navigator.share
+    if (previousCanShare) Object.defineProperty(navigator, 'canShare', previousCanShare)
+    else delete navigator.canShare
   }
 })
