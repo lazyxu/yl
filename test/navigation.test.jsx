@@ -330,11 +330,44 @@ test('花园是第三个一级模块，默认仍为日历，切回拼豆保持�
   expect(button('日历').getAttribute('aria-current')).toBe('page')
 })
 
-test('花园提供完整备份下载入口', async () => {
+test('花园保留全部历史归档花卉，且不显示归档或 ZIP 导出入口', async () => {
+  const flowers = [
+    { id: 1, name: '历史归档月季', species_name: '月季', status: 'archived', planted_on: null,
+      photo_count: 1, latest_photo_id: 11, location: '阳台' },
+    { id: 2, name: '正在生长的雏菊', species_name: '雏菊', status: 'active', planted_on: null,
+      photo_count: 0, latest_photo_id: 0, location: '' },
+  ]
+  const paths = []
+  global.fetch = jest.fn(async url => {
+    const uri = String(url)
+    paths.push(uri)
+    let body
+    if (uri.startsWith('/api/garden/plants?')) {
+      expect(new URL(uri, 'http://localhost').searchParams.get('status')).toBe('all')
+      body = { items: flowers, total: 2, has_more: false, next_cursor: null }
+    } else if (uri === '/api/garden/species') body = []
+    else if (uri === '/api/garden/plants/1') body = flowers[0]
+    else if (uri.startsWith('/api/garden/entries?')) body = { items: [], has_more: false }
+    else if (uri === '/api/inventory' || uri === '/api/reminders') body = []
+    else body = { rules: [{ startDate: '2024-01-01', shifts: ['休息'] }], version: 0 }
+    return { ok: true, status: 200, json: async () => body }
+  })
   await mount('花园')
-  const link = document.querySelector('a[aria-label="导出花园数据"]')
-  expect(link).not.toBeNull()
-  expect(link.getAttribute('href')).toBe('/api/garden/export')
+  expect(document.body.textContent).toContain('历史归档月季')
+  expect(document.body.textContent).toContain('正在生长的雏菊')
+  expect(document.body.textContent).toContain('已显示 2 / 2 株')
+  expect(paths.some(path => path.includes('/api/garden/plants?status=all'))).toBe(true)
+  expect(document.querySelector('a[href="/api/garden/export"]')).toBeNull()
+  expect(button('正在生长')).toBeUndefined()
+  expect(button('已归档')).toBeUndefined()
+  const archivedCard = [...document.querySelectorAll('button')]
+    .find(node => !node.closest('[hidden]') && node.textContent.includes('历史归档月季'))
+  expect(archivedCard).toBeDefined()
+  await act(async () => archivedCard.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(document.querySelector('[aria-label="归档或恢复"]')).toBeNull()
+  // "删除" refers only to the export feature; never remove real deletion controls.
+  expect(document.querySelector('[aria-label="删除花卉"]')).not.toBeNull()
+  expect(document.querySelector('[aria-label="编辑花卉"]')).not.toBeNull()
 })
 
 test('图片上传失败时阻止写入拼豆记录并保留本次草稿', async () => {
@@ -397,11 +430,12 @@ test('花园列表通过游标加载全部记录且保留总数，不显示固�
   const flowers = Array.from({ length: 45 }, (_, index) => ({
     id: index + 1, name: '花卉' + (index + 1), species_name: '月季',
     planted_on: null, photo_count: 0, latest_photo_id: 0,
-    location: '', status: 'active',
+    location: '', status: index === 44 ? 'archived' : 'active',
   }))
   global.fetch = jest.fn(async url => {
     const uri = String(url)
     const body = uri.startsWith('/api/garden/plants?') ? (() => {
+      expect(new URL(uri, 'http://localhost').searchParams.get('status')).toBe('all')
       const after = uri.includes('&cursor=after-first')
       return {
         items: after ? flowers.slice(36) : flowers.slice(0, 36),

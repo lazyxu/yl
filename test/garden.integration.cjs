@@ -2,7 +2,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const crypto = require('node:crypto')
 
-test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACKUP_TEST_MYSQL }, async () => {
+test('garden MySQL CRUD, photos, calendar and no ZIP export', { skip: !process.env.BACKUP_TEST_MYSQL }, async () => {
   const database = 'yl_garden_ci_' + crypto.randomBytes(5).toString('hex')
   Object.assign(process.env, {
     DB_HOST: process.env.BACKUP_TEST_HOST || 'mysql',
@@ -129,9 +129,8 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     const update = await request('/entries/' + entry.body.id, json(updatedPayload, 'PATCH'))
     assert.equal(update.code, 200)
     assert.equal((await request('/entries?plant_id=' + id)).body.items[0].note, '开花第二天')
-    const exported = await fetch(base + '/export')
-    assert.equal(exported.status, 200)
-    assert.ok((await exported.arrayBuffer()).byteLength > 100)
+    const removedExport = await fetch(base + '/export')
+    assert.equal(removedExport.status, 404, 'garden ZIP export route must no longer exist')
     const archived = await request('/plants/' + id, json({
       name: '第一株月季', species_id: s.body.id, planted_on: '2026-05-01',
       location: '窗台', notes: '', status: 'archived',
@@ -139,6 +138,12 @@ test('garden MySQL CRUD, photos, calendar and export', { skip: !process.env.BACK
     assert.equal(archived.code, 200)
     assert.equal((await request('/plants')).body.length, 0)
     assert.equal((await request('/plants?status=archived')).body.length, 1)
+    const withArchived = await request('/plants?status=all&limit=36')
+    assert.equal(withArchived.code, 200)
+    assert.equal(withArchived.body.total, 1)
+    assert.equal(withArchived.body.items[0].id, id)
+    assert.equal(withArchived.body.items[0].status, 'archived', 'legacy archived state must be preserved')
+    assert.equal((await request('/plants/' + id)).body.status, 'archived')
     // The legacy endpoint stays an array; the paged endpoint must not truncate
     // plants or silently discard calendar-day entries.
     const models = require('../server/models/garden')

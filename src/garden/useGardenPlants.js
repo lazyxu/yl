@@ -6,7 +6,6 @@ export default function useGardenPlants(active, notify) {
   const [plants, setPlants] = useState([])
   const [species, setSpecies] = useState([])
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('active')
   const [loading, setLoading] = useState(false)
   const [plantCursor, setPlantCursor] = useState(null)
   const [plantHasMore, setPlantHasMore] = useState(false)
@@ -19,7 +18,7 @@ export default function useGardenPlants(active, notify) {
     const generation = cursor ? plantRequestGeneration.current : ++plantRequestGeneration.current
     if (!cursor) setLoading(true)
     try {
-      const path = '/plants?status=' + status + '&q=' + encodeURIComponent(search) + '&limit=36' +
+      const path = '/plants?status=all&q=' + encodeURIComponent(search) + '&limit=36' +
         (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
       const page = await gardenRequest(path, { signal })
       if (!signal?.aborted && generation === plantRequestGeneration.current) {
@@ -32,7 +31,7 @@ export default function useGardenPlants(active, notify) {
     finally {
       if (!signal?.aborted && !cursor && generation === plantRequestGeneration.current) setLoading(false)
     }
-  }, [search, status, notify])
+  }, [search, notify])
   useEffect(() => {
     if (!active) return
     const controller = new AbortController()
@@ -48,7 +47,7 @@ export default function useGardenPlants(active, notify) {
     finally { setPlantLoadingMore(false) }
   }
   return {
-    plants, species, search, setSearch, status, setStatus, loading,
+    plants, species, search, setSearch, loading,
     plantHasMore, plantTotal, plantLoadingMore, fetchSpecies, refresh, loadMorePlants,
   }
 }

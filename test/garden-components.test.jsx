@@ -137,6 +137,8 @@ test('花卉详情仅展示正序成长时间线，跨页照片仍能查看和�
       onBack={() => {}} onChange={() => {}} onSpecies={() => {}} notify={() => {}} />))
     expect(host.textContent).toContain('成长时间线')
     expect(host.textContent).not.toContain('成长对比')
+    expect(host.querySelector('[aria-label="归档或恢复"]')).toBeNull()
+    expect(host.querySelector('[aria-label="删除花卉"]')).not.toBeNull()
     expect(host.querySelectorAll('[role="tab"]')).toHaveLength(0)
     expect(host.textContent.indexOf('最早的记录')).toBeLessThan(host.textContent.indexOf('第40条记录'))
     expect(host.querySelector('[aria-label="查看照片：image-1.jpg"]')).not.toBeNull()

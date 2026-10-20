@@ -19,6 +19,8 @@
 - 当前主仓库是 yl；以 React/JavaScript/MUI + Express/Sequelize/MySQL + SSH/PM2/Nginx + GitLab CI 为统一选型。
 - 一级模块只有 日历 / 拼豆 / 花园；主页仍为日历，不改变拼豆的补豆、消耗、历史页面和已有状态恢复。
 - 花园采用一株一档案、品种分组、照片 + 时间 + 可选备注；无家庭成员登录（暂不做），可选记录者昵称，不改造已有日历/拼豆认证。
+- 花园首页统一查询 status=all，展示当前和历史 archived 花卉；UI 不提供归档/恢复或 active/archived 筛选。保留已有 status 字段、归档数据和兼容旧客户端的状态查询/编辑能力，不迁移、不清空历史记录。
+- 移除花园 ZIP 导出按钮及 /api/garden/export 接口；系统备份/恢复（MySQL + uploads）必须保留。这里的「删除」仅指删除导出功能，严禁删掉「删除花卉」「删除日记」及其 API、照片查看或原图下载。
 - 所有花园表名使用 garden_ 前缀，不修改现有排班/拼豆表；媒体文件只能保存在 server/uploads/garden 下，兼容既有 SSH 发布、数据库/上传目录备份与恢复。
 - 花园上传限 JPEG、PNG、WEBP、HEIC；必须校验内容签名、尺寸、数量，限制 8 张、单张 20 MiB、单篇 90 MiB，原图保留并生成受支持的预览。
 - iPhone Safari 首选，底栏安全区、键盘、照片拍摄、时区日期以及返回状态都要验证；未完成实机检查时明确标注。
@@ -48,7 +50,7 @@
 
 
 - 花园图片解码和缩略图必须限制并发/排队数量；缩略图应从有界尺寸预览派生，不要为了两种分辨率重复解码巨大原图。
-- UUID 命名的缩略图和预览可使用 private Cache-Control 与稳定 ETag/条件请求；原图、导出文件不应进行共享缓存；HEIC 无解码器时的 fallback 不得伪造 JPEG MIME。
+- UUID 命名的缩略图和预览可使用 private Cache-Control 与稳定 ETag/条件请求；原图不应进行共享缓存；HEIC 无解码器时的 fallback 不得伪造 JPEG MIME。
 - 新增图片处理改动必须验证错误清理、缩略图尺寸、ETag 304、原图无缓存，并做媒体 worker 过载测试。
 
 ## iPhone 日历滑动性能
