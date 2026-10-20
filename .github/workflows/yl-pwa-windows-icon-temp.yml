@@ -1,0 +1,42 @@
+name: PWA Windows icon-build regression
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --legacy-peer-deps
+      - name: Build PWA with new brand icon on Windows
+        run: npm run build
+      - name: Regression - missing dist icons auto recover
+        run: node --test test/pwa.test.cjs
+      - name: Verify favicon and both sizes
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'dist/icon-192.png')) { throw '192 icon missing' }
+          if (!(Test-Path 'dist/icon-512.png')) { throw '512 icon missing' }
+          if (!(Test-Path 'dist/app-icon.svg')) { throw 'SVG icon missing' }
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --legacy-peer-deps
+      - name: Build static PWA
+        run: npm run build
+      - name: Regression - missing dist icons auto recover
+        run: node --test test/pwa.test.cjs
+      - name: Jest regression
+        run: npm test -- --runInBand --testPathIgnorePatterns='test/(ocr|recognize.image).test.js'
+      - name: Deployment and rollback safety
+        run: node --test test/deployment.test.cjs test/deployment-rollback.test.cjs
