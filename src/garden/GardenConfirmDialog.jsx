@@ -7,7 +7,9 @@ export default function GardenConfirmDialog({ open, title, description, confirmT
   return <Dialog open={Boolean(open)} onClose={busy ? undefined : onCancel} maxWidth="xs" fullWidth
     sx={phone ? { '& .MuiDialog-container': { alignItems: 'flex-end' } } : undefined}
     PaperProps={{ sx: phone ? {
-      m: 0, width: '100%', maxWidth: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
+      m: 0, width: '100%', maxWidth: { xs: '100%', sm: 520 },
+      maxHeight: 'calc(100dvh - env(safe-area-inset-top, 0px) - 12px)',
+      borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
       borderTopLeftRadius: 20, borderTopRightRadius: 20,
       pb: 'max(8px, env(safe-area-inset-bottom, 0px))',
     } : undefined }}

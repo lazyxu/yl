@@ -41,7 +41,10 @@ export default function ShiftRuleEditor({ open = true, rule, snapshot, onCancel,
     {error && <Alert severity="error" action={locked ? <Button color="inherit" onClick={reload} disabled={saving}>重新加载</Button> : undefined}>{error.message}{locked && '。重新加载后关闭弹窗，请重新编辑。'}</Alert>}
     <label className="shift-date-field">生效日期<input type="date" aria-label="生效日期" value={startDate}
       aria-invalid={Boolean(error?.message && /日期/.test(error.message))}
+      aria-describedby={error?.message && /日期/.test(error.message) ? 'shift-rule-date-error' : undefined}
       disabled={saving || locked} onChange={event => update(() => setStartDate(event.target.value))} /></label>
+    {error?.message && /日期/.test(error.message) &&
+      <p id="shift-rule-date-error" role="alert" className="shift-date-error">{error.message}</p>}
     <p className="shift-edit-hint">长按左侧拖动柄调整顺序，确认后按新顺序循环。也可点击上移/下移，键盘可用 Alt＋方向键。</p>
     <SortableShiftDays days={days} disabled={saving || locked} onChange={value => update(() => setDays(value))} />
     <div className="shift-editor-actions"><Button disabled={saving || locked || days.length >= 366} onClick={() => update(() => setDays([...days, { id: nextId.current++, shift: '休息' }]))}>添加一天</Button>

@@ -96,9 +96,16 @@ function App() {
 
   const navigateToView = useCallback(nextView => {
     if (nextView === view) return
-    const nextParams = new URLSearchParams(searchParams)
-    nextParams.set('view', nextView)
-    setSearchParams(nextParams)
+    const commit = () => {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.set('view', nextView)
+      setSearchParams(nextParams)
+    }
+    // Editors may veto in-app navigation and continue it only after the user
+    // explicitly discards a dirty form. Leave browser unload protection intact.
+    const intent = new CustomEvent('yl:navigation-intent', { cancelable: true,
+      detail: { proceed: commit, target: nextView } })
+    if (window.dispatchEvent(intent)) commit()
   }, [searchParams, setSearchParams, view])
 
   function openPindouWith(operation, initialRows = null) {
