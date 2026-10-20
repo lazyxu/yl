@@ -1,6 +1,6 @@
 /* eslint-env serviceworker */
 // Build-time injection by scripts/build-pwa-shell.mjs (Vite hashed precache).
-// __YL_MANIFEST__ is replaced in dist/sw.js, never used for dev registration.
+// The build's manifest placeholder is replaced in dist/sw.js, never in dev.
 const PRE_CACHE = __YL_MANIFEST__
 const CACHE_NAME = 'yl-shell-' + __YL_VERSION__
 const PREFIX = 'yl-shell-'

@@ -14,7 +14,7 @@ function collect(dir) {
     // No private API, uploaded originals, OCR model, WASM or huge runtime
     // assets. The standard Vite component chunks and shell are retained.
     if (url.startsWith('/assets/') && /\.(js|css|svg|woff2?|png)$/.test(url) &&
-      size <= 3 * 1024 * 1024 && !/ocr|tesseract|worker|\.wasm/i.test(url)) {
+      size <= 6 * 1024 * 1024 && !/ocr|tesseract|worker|\.wasm/i.test(url)) {
       candidates.push({ url, bytes: size, file: path })
     }
   }
@@ -41,8 +41,10 @@ const source = readFileSync('public/sw.js', 'utf8')
 if (!source.includes('__YL_MANIFEST__') || !source.includes('__YL_VERSION__')) {
   throw new Error('PWA manifest injection placeholder missing')
 }
-const target = source.replace('__YL_MANIFEST__', JSON.stringify(manifest))
-  .replace('__YL_VERSION__', JSON.stringify(version))
+const target = source.replace('const PRE_CACHE = __YL_MANIFEST__',
+  'const PRE_CACHE = ' + JSON.stringify(manifest))
+  .replace("const CACHE_NAME = 'yl-shell-' + __YL_VERSION__",
+    "const CACHE_NAME = 'yl-shell-' + " + JSON.stringify(version))
 writeFileSync(join(root, 'sw.js'), target)
 writeFileSync(join(root, 'pwa-precache.json'), JSON.stringify({
   version, entries: manifest.length, bytes: totalBytes, manifest,

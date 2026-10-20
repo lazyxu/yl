@@ -48,7 +48,7 @@ if (distPath) {
   app.use(express.static(distPath, {
     setHeaders(res, filePath) {
       const rel = path.relative(distPath, filePath).replace(/\\/g, '/');
-      if (/^assets\/.+\.[a-f0-9]{8,}\.(js|css|woff2?|svg|png)$/i.test(rel)) {
+      if (/^assets\/.+\.[A-Za-z0-9_-]{8,}\.(js|css|woff2?|svg|png)$/i.test(rel)) {
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       } else if (rel === 'sw.js') {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
