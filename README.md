@@ -153,3 +153,13 @@ The harness starts the real Express application with a randomly named disposable
 release_deploy.sh 的主流程：先本地构建并验证远端 MySQL/.env/uploads 备份，然后将版本文件传输到现网基础目录下的 .yl-releases/release-* 独立目录；旧代码和 node_modules 始终不覆盖。scripts/activate-staged-release.sh 在新版本目录安装依赖和检查语法，确认 PM2 中旧 yl 的运行目录，再切换服务到新目录，并验证 /api/garden/species HTTP 200。出现依赖安装错误、PM2 启动失败或健康检查失败，自动恢复旧实例；Nginx 只在新服务健康后应用，并保留旧配置用于失败恢复。
 运行 Node 故障注入测试：node --test test/deployment-rollback.test.cjs。测试使用临时本地目录及模拟 npm/pm2/curl，不连远程服务器。
 重要：这种回滚只恢复代码/进程/网关配置，不会自动回滚已经改变的 MySQL 数据或表结构。正式升级前必须留存可验证备份，并在 SSH staging 完成故障、Nginx 和数据恢复演练。旧代码仍可从上一 PM2 cwd 启动，别在验证前清理旧 .yl-releases。
+
+
+### 我的花园 · iPhone PWA 交互规范
+
+- 新界面以 iPhone 浏览器和主屏幕 PWA 为优先：花园首页大标题与照片卡片、双入口分段视图、搜索防抖、网络出错重试和稳定占位；归档仍统一展示，删除按钮和日记照片保留。
+- 列表进入详情后回退恢复花卉列表或成长日历的滚动锚点；成长日历保留月与选中日期，不在快速请求期间短暂显示错误的空状态。
+- 花卉/成长日记表单在手机端使用全屏编辑界面，修改草稿后退出有二次确认；系统拍照与照片库入口保留、上传提供原生进度反馈。
+- 照片查看器使用安全区布局，支持左右滑动、双击/双指缩放、方向键导航、原图下载以及浏览器支持时系统分享。
+- PWA 跟随系统明暗模式、安全区、键盘与减少动态效果；Safari 安装提示可永久关闭。已有 `/sw.js` 仍不缓存私有 API/照片，不承诺离线编辑。
+- 运行 Jest、Node、MySQL、Vite/PWA 和 Chromium/WebKit 浏览器验收；WebKit 桌面模拟不等于真实 iPhone Safari，发布前仍需要真机及 SSH staging。

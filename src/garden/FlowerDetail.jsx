@@ -1,14 +1,15 @@
+
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Box, Button, CircularProgress, IconButton, Paper, Stack, Typography } from '@mui/material'
-import { ArrowBack, CameraAltOutlined, DeleteOutline, EditOutlined } from '@mui/icons-material'
+import { Alert, Button, IconButton, Menu, MenuItem, Stack, Typography } from '@mui/material'
+import { ArrowBackIosNew, CameraAltOutlined, DeleteOutline, EditOutlined, MoreHoriz } from '@mui/icons-material'
 import { gardenRequest, plantedDays } from '../gardenApi'
 import { Cover } from './Shared'
 import PlantEditor from './PlantEditor'
 import EntryEditor from './EntryEditor'
 import Viewer from './PhotoViewer'
 import GrowthTimeline from './GrowthTimeline'
+import GardenConfirmDialog from './GardenConfirmDialog'
 
-const CONFIRM_DELETE = '此操作无法撤销，照片和成长日记将一并永久删除。'
 const entryPagePath = (plantId, offset = 0) =>
   '/entries?plant_id=' + plantId + '&limit=40&order=asc' + (offset ? '&offset=' + offset : '')
 
@@ -22,76 +23,142 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   const [entryEditor, setEntryEditor] = useState(false)
   const [editing, setEditing] = useState(null)
   const [photoIndex, setPhotoIndex] = useState(null)
+  const [menuAnchor, setMenuAnchor] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const photoButton = useRef(null)
   const requestVersion = useRef(0)
+  const controllerRef = useRef(null)
+  const moreController = useRef(null)
+
   const load = useCallback(async () => {
     if (!active) return
     const version = ++requestVersion.current
+    controllerRef.current?.abort()
+    moreController.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
     setMoreBusy(false)
     try {
       const [p, list] = await Promise.all([
-        gardenRequest('/plants/' + id), gardenRequest(entryPagePath(id)),
+        gardenRequest('/plants/' + id, { signal: controller.signal }),
+        gardenRequest(entryPagePath(id), { signal: controller.signal }),
       ])
-      if (version !== requestVersion.current) return
+      if (version !== requestVersion.current || controller.signal.aborted) return
       setPlant(p); setEntries(list.items); setHasMore(list.has_more)
-    } catch (err) { if (version === requestVersion.current) notify(err.message, true) }
-    finally { if (version === requestVersion.current) setLoading(false) }
+    } catch (err) {
+      if (version === requestVersion.current && err.name !== 'AbortError') notify(err.message, true)
+    } finally {
+      if (version === requestVersion.current) setLoading(false)
+    }
   }, [id, active, notify])
-  useEffect(() => { setLoading(true); load(); return () => { requestVersion.current++ } }, [load])
+
+  useEffect(() => {
+    setLoading(true)
+    load()
+    return () => {
+      requestVersion.current++
+      controllerRef.current?.abort()
+      moreController.current?.abort()
+    }
+  }, [load])
+
   async function more() {
     if (!hasMore || moreBusy) return
     const version = requestVersion.current
+    const controller = new AbortController()
+    moreController.current = controller
     setMoreBusy(true)
     try {
-      const res = await gardenRequest(entryPagePath(id, entries.length))
-      if (version !== requestVersion.current) return
+      const res = await gardenRequest(entryPagePath(id, entries.length), { signal: controller.signal })
+      if (version !== requestVersion.current || controller.signal.aborted) return
       setEntries(current => [...current, ...res.items])
       setHasMore(res.has_more)
     } catch (err) {
-      if (version === requestVersion.current) notify(err.message, true)
+      if (version === requestVersion.current && err.name !== 'AbortError') notify(err.message, true)
     } finally {
       if (version === requestVersion.current) setMoreBusy(false)
     }
   }
-  async function deletePlant() {
-    if (!window.confirm('确定删除「' + plant.name + '」？' + CONFIRM_DELETE)) return
+  async function confirmDelete() {
+    const intent = pendingDelete
+    if (!intent || deleting) return
+    setDeleting(true)
     try {
-      await gardenRequest('/plants/' + id, { method: 'DELETE' })
-      notify('已删除花卉')
-      onBack(); onChange()
+      if (intent.kind === 'plant') {
+        await gardenRequest('/plants/' + id, { method: 'DELETE' })
+        notify('已删除花卉')
+        onBack(); onChange()
+      } else {
+        await gardenRequest('/entries/' + intent.entry.id, { method: 'DELETE' })
+        await load()
+        onChange(); notify('记录已删除')
+      }
+      setPendingDelete(null)
     } catch (err) { notify(err.message, true) }
-  }
-  async function deleteEntry(entry) {
-    if (!window.confirm('确定删除这条记录？' + CONFIRM_DELETE)) return
-    try {
-      await gardenRequest('/entries/' + entry.id, { method: 'DELETE' })
-      await load(); onChange()
-      notify('记录已删除')
-    } catch (err) { notify(err.message, true) }
+    finally { setDeleting(false) }
   }
   const photos = entries.flatMap(entry => entry.photos || [])
-  if (loading && !plant) return <Stack alignItems="center" py={8}><CircularProgress /></Stack>
+  const openPhoto = index => {
+    photoButton.current = document.activeElement
+    setPhotoIndex(index)
+  }
+  const closePhoto = () => {
+    setPhotoIndex(null)
+    requestAnimationFrame(() => photoButton.current?.focus?.())
+  }
+  if (loading && !plant) return <div className="garden-detail-skeleton" aria-label="正在加载花卉档案">
+    <div className="garden-loading-card" style={{ aspectRatio: '16/10' }} />
+  </div>
   if (!plant) return <Alert severity="warning">花卉不存在或已删除。<Button onClick={onBack}>返回花园</Button></Alert>
-  return <Box className="garden-enter">
-    <Button startIcon={<ArrowBack />} onClick={onBack} sx={{ mb: 1 }}>返回我的花园</Button>
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mb={3}>
-      <Paper sx={{ overflow: 'hidden', width: { xs: '100%', sm: 230 }, flexShrink: 0, borderRadius: 3 }}><Cover id={plant.latest_photo_id} height={230} /></Paper>
-      <Stack justifyContent="center" spacing={.8} flex={1}>
-        <Typography variant="h5" fontWeight={750}>{plant.name}</Typography>
-        <Typography color="text.secondary" variant="body2">{plant.species_name || '未分类'} {plant.location ? ' · ' + plant.location : ''}</Typography>
-        <Typography color="#467d57" variant="body2">{plantedDays(plant.planted_on) ? '种植第 ' + plantedDays(plant.planted_on) + ' 天 · ' : ''}{plant.photo_count} 张成长照片</Typography>
-        {plant.notes && <Typography sx={{ whiteSpace: 'pre-wrap', py: 1 }}>{plant.notes}</Typography>}
-        <Stack direction="row" alignItems="center" flexWrap="wrap" useFlexGap spacing={1} mt={1}>
-          <Button startIcon={<CameraAltOutlined />} variant="contained" onClick={() => { setEditing(null); setEntryEditor(true) }}>记录成长</Button>
-          <IconButton title="编辑花卉" aria-label="编辑花卉" onClick={() => setPlantEditor(true)}><EditOutlined /></IconButton>
-          <IconButton title="永久删除花卉" aria-label="删除花卉" color="error" onClick={deletePlant}><DeleteOutline /></IconButton>
-        </Stack>
-      </Stack>
-    </Stack>
-    <Typography variant="h6" fontWeight={700} mb={2}>成长时间线</Typography>
-    <GrowthTimeline entries={entries} photos={photos} onEdit={entry => { setEditing(entry); setEntryEditor(true) }} onDelete={deleteEntry} onOpenPhoto={setPhotoIndex} />
-    {hasMore && <Stack alignItems="center" py={2}><Button variant="outlined" disabled={moreBusy} onClick={more}>{moreBusy ? '加载中…' : '加载更多后续记录'}</Button></Stack>}
-    <PlantEditor open={plantEditor} plant={plant} species={species} onClose={() => setPlantEditor(false)} onSaved={() => { load(); onChange() }} onSpecies={onSpecies} notify={notify} />
-    <EntryEditor open={entryEditor} plantId={id} editing={editing} onClose={() => setEntryEditor(false)} onSaved={() => { load(); onChange() }} notify={notify} />
-    {photoIndex !== null && <Viewer photos={photos} current={photoIndex} onClose={() => setPhotoIndex(null)} />}
-  </Box>
+
+  return <div className="garden-detail">
+    <header className="garden-detail-header">
+      <Button className="garden-detail-back" startIcon={<ArrowBackIosNew fontSize="small" />} onClick={onBack}>花园</Button>
+      <Typography fontWeight={680} fontSize={15} component="h1">花卉档案</Typography>
+      <IconButton aria-label="更多花卉操作" onClick={event => setMenuAnchor(event.currentTarget)}><MoreHoriz/></IconButton>
+      <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
+        <MenuItem aria-label="编辑花卉" onClick={() => { setMenuAnchor(null); setPlantEditor(true) }}>
+          <EditOutlined sx={{ mr: 1 }} fontSize="small"/>编辑花卉
+        </MenuItem>
+        <MenuItem aria-label="删除花卉" onClick={() => { setMenuAnchor(null); setPendingDelete({ kind: 'plant' }) }} sx={{ color: 'error.main' }}>
+          <DeleteOutline sx={{ mr: 1 }} fontSize="small"/>删除花卉
+        </MenuItem>
+      </Menu>
+    </header>
+    <section className="garden-detail-hero">
+      <Cover id={plant.latest_photo_id} height={null} className="garden-detail-cover" label={plant.name}/>
+      <div className="garden-detail-info">
+        <Typography component="h2" className="garden-detail-title">{plant.name}</Typography>
+        <div className="garden-detail-description">{plant.species_name || '未分类'}{plant.location ? ' · ' + plant.location : ''}</div>
+        <Typography variant="body2" sx={{ color: '#46815c', mt: 1 }}>
+          {plantedDays(plant.planted_on) ? '种植第 ' + plantedDays(plant.planted_on) + ' 天 · ' : ''}{plant.photo_count} 张成长照片
+        </Typography>
+        {plant.notes && <Typography sx={{ whiteSpace: 'pre-wrap', mt: 1.5, overflowWrap: 'anywhere' }}>{plant.notes}</Typography>}
+      </div>
+    </section>
+    <Typography component="h2" className="garden-timeline-heading">成长时间线</Typography>
+    <GrowthTimeline entries={entries} photos={photos}
+      onEdit={entry => { setEditing(entry); setEntryEditor(true) }}
+      onDelete={entry => setPendingDelete({ kind: 'entry', entry })}
+      onOpenPhoto={openPhoto} />
+    {hasMore && <Stack alignItems="center" py={2}>
+      <Button variant="outlined" disabled={moreBusy} onClick={more}>{moreBusy ? '加载中…' : '加载更多后续记录'}</Button>
+    </Stack>}
+    <div className="garden-record-dock">
+      <Button startIcon={<CameraAltOutlined/>} color="success" variant="contained"
+        onClick={() => { setEditing(null); setEntryEditor(true) }}>记录成长</Button>
+    </div>
+    <PlantEditor open={plantEditor} plant={plant} species={species}
+      onClose={() => setPlantEditor(false)} onSaved={() => { load(); onChange() }}
+      onSpecies={onSpecies} notify={notify} />
+    <EntryEditor open={entryEditor} plantId={id} editing={editing}
+      onClose={() => setEntryEditor(false)} onSaved={() => { load(); onChange() }} notify={notify} />
+    {photoIndex !== null && <Viewer photos={photos} current={photoIndex} onClose={closePhoto} />}
+    <GardenConfirmDialog open={Boolean(pendingDelete)} title={pendingDelete?.kind === 'plant' ? '删除这株花卉？' : '删除这条成长日记？'}
+      description={pendingDelete?.kind === 'plant'
+        ? '「' + plant.name + '」和它的全部成长日记、照片将永久删除，无法撤销。'
+        : '这条记录及其中的照片将永久删除，无法撤销。'}
+      confirmText="永久删除" busy={deleting} onCancel={() => setPendingDelete(null)} onConfirm={confirmDelete}/>
+  </div>
 }

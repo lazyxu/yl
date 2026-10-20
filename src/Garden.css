@@ -1,92 +1,274 @@
+
 .garden-root {
-  padding: 12px max(12px, env(safe-area-inset-right, 0px)) 28px max(12px, env(safe-area-inset-left, 0px));
-  max-width: 1160px;
-  margin: auto;
+  --garden-green: var(--app-accent, #347c52);
+  --garden-ink: var(--app-ink, #203329);
+  --garden-muted: var(--app-muted, #687970);
+  --garden-card: var(--app-surface, #fff);
+  --garden-border: var(--app-border, #e3eae4);
+  --garden-tint: var(--app-pressed, #e8f4ec);
+  padding: 0 max(14px, env(safe-area-inset-right, 0px)) 30px max(14px, env(safe-area-inset-left, 0px));
+  max-width: 1080px;
+  min-height: 100%;
+  margin: 0 auto;
+  color: var(--garden-ink);
 }
-.garden-root .MuiButton-containedSuccess {
-  background-color: #447e56;
+.garden-root .MuiButton-containedSuccess { background: #347c52; color: #fff; }
+.garden-root .MuiButton-root { font-weight: 650; }
+.garden-header {
+  position: relative;
+  padding: 24px 0 16px;
 }
+.garden-heading { font-size: clamp(28px, 7.5vw, 36px); font-weight: 770; letter-spacing: -.7px; line-height: 1.15; }
+.garden-subtitle { font-size: 14px; color: var(--garden-muted); margin-top: 5px; }
+.garden-add-btn { flex: 0 0 auto; white-space: nowrap; }
+.garden-segments {
+  display: flex;
+  background: var(--garden-tint);
+  padding: 4px;
+  border-radius: 14px;
+  margin-bottom: 16px;
+  gap: 4px;
+}
+.garden-segment {
+  flex: 1;
+  border: 0;
+  border-radius: 11px;
+  color: var(--garden-muted);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 640;
+  min-height: 42px;
+  cursor: pointer;
+}
+.garden-segment[aria-selected="true"] {
+  color: var(--garden-ink);
+  background: var(--garden-card);
+  box-shadow: 0 1px 4px rgb(22 45 30 / 11%);
+}
+.garden-search {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--garden-border);
+  border-radius: 15px;
+  background: var(--garden-card);
+  padding: 0 6px 0 14px;
+  min-height: 48px;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.garden-search input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 16px;
+  color: var(--garden-ink);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.garden-search:focus-within { outline: 2px solid #70a687; outline-offset: 1px; }
+.garden-list-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 10px 0 14px; }
+.garden-view-switch { border: 1px solid var(--garden-border); border-radius: 12px; overflow: hidden; display: flex; }
+.garden-view-switch button {
+  border: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  font-weight: 650;
+  font-size: 12px;
+  background: transparent;
+  color: var(--garden-muted);
+}
+.garden-view-switch button[aria-pressed="true"] { background: var(--garden-tint); color: var(--garden-ink); }
+.garden-card {
+  height: 100%;
+  border: 1px solid var(--garden-border);
+  background: var(--garden-card);
+  border-radius: 17px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgb(25 48 31 / 4%);
+}
+.garden-card .MuiCardActionArea-root { display: flex; flex-direction: column; height: 100%; align-items: stretch; justify-content: flex-start; }
+.garden-card-info { padding: 11px 12px 13px; }
+.garden-card-title { font-size: 1rem; font-weight: 720; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.garden-card-meta { margin-top: 3px; font-size: .82rem; color: var(--garden-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .garden-cover {
-  background: #e7f0e5;
+  background: var(--garden-tint);
   display: grid;
   place-items: center;
   overflow: hidden;
-}
-.garden-cover img {
-  display: block;
+  position: relative;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  flex-shrink: 0;
 }
+.garden-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.garden-card-cover { aspect-ratio: 4 / 5; }
+.garden-group-heading { font-size: 18px; margin: 22px 0 12px; font-weight: 730; }
+.garden-group-count { font-size: 12px; font-weight: 500; color: var(--garden-muted); margin-left: 7px; }
+.garden-loading-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.garden-loading-card {
+  border-radius: 17px;
+  aspect-ratio: 4 / 6;
+  background: linear-gradient(100deg, var(--garden-tint) 0%, var(--garden-card) 40%, var(--garden-tint) 80%);
+  background-size: 250% 100%;
+  animation: garden-skeleton 1.6s ease-in-out infinite;
+}
+@keyframes garden-skeleton { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.garden-empty {
+  padding: 40px 20px;
+  text-align: center;
+  background: var(--garden-card);
+  border: 1px solid var(--garden-border);
+  border-radius: 18px;
+}
+.garden-error { margin: 10px 0 16px; }
+.garden-pagination { display: flex; flex-direction: column; align-items: center; padding: 22px 0; gap: 10px; color: var(--garden-muted); }
+.garden-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  min-height: 52px;
+  background: var(--app-canvas, #f7faf7);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--garden-border);
+  margin: 0 -14px 16px;
+  padding: 0 14px;
+}
+.garden-detail-back { color: var(--garden-green) !important; }
+.garden-detail-hero {
+  border-radius: 22px;
+  overflow: hidden;
+  background: var(--garden-card);
+  border: 1px solid var(--garden-border);
+  margin-bottom: 20px;
+}
+.garden-detail-cover { aspect-ratio: 16 / 10; }
+.garden-detail-info { padding: 18px; }
+.garden-detail-title { font-size: clamp(24px, 6.5vw, 32px); font-weight: 770; letter-spacing: -.3px; }
+.garden-detail-description { color: var(--garden-muted); font-size: 14px; margin-top: 5px; }
+.garden-timeline-heading { font-size: 20px; font-weight: 750; padding: 4px 0 12px; }
+.garden-timeline-month { color: var(--garden-muted); font-size: 13px; font-weight: 750; padding: 18px 0 12px; letter-spacing: .4px; }
+.garden-timeline-entry {
+  background: var(--garden-card);
+  border-radius: 16px;
+  border: 1px solid var(--garden-border);
+  overflow: hidden;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.garden-timeline-date { font-weight: 720; font-size: 14px; }
+.garden-timeline-note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.6; margin: 10px 0 12px; }
 .garden-picture-button {
   cursor: pointer;
   width: 100%;
   display: block;
   border: 0;
-  border-radius: 9px;
+  border-radius: 11px;
   padding: 0;
   overflow: hidden;
-  background: #e9f0e8;
+  background: var(--garden-tint);
+  min-height: 44px;
 }
-.garden-picture-button img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1.25;
-  object-fit: cover;
+.garden-picture-button img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.garden-record-dock {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 4px;
+  z-index: 4;
+  pointer-events: none;
 }
-.garden-large-photo {
-  display: block;
-  object-fit: contain;
-  max-width: 100%;
-  max-height: calc(100dvh - 130px);
+.garden-record-dock button {
+  pointer-events: auto;
+  width: min(100%, 340px);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgb(14 52 31 / 20%);
 }
-.garden-draft-image {
-  display: block;
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: cover;
-  border-radius: 8px;
-  background: #e9f0e8;
-}
-.garden-calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 5px;
-}
+.garden-detail-skeleton { min-height: 460px; padding-top: 18px; }
+.garden-calendar-panel { background: var(--garden-card); border: 1px solid var(--garden-border); border-radius: 20px; padding: 14px; }
+.garden-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
 .garden-calendar-day {
   border: 0;
-  border-radius: 10px;
-  height: 54px;
+  border-radius: 12px;
+  min-height: 46px;
   position: relative;
   background: none;
-  color: #203e2d;
-  font-size: 14px;
+  color: var(--garden-ink);
+  font-size: 15px;
   cursor: pointer;
 }
 .garden-calendar-day:disabled { cursor: default; }
-.garden-calendar-day:not(:disabled):hover { background: #e8f2e5; }
-.garden-calendar-day.garden-calendar-selected { color: #fff; background: #467e54; }
-.garden-calendar-day i {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  background: #518862;
-  border-radius: 50%;
-  bottom: 5px;
-  left: calc(50% - 3px);
+.garden-calendar-day[aria-selected="true"] { color: #fff; background: #347c52; }
+.garden-calendar-day:not([aria-selected="true"]):not(:disabled):focus-visible { outline: 2px solid #347c52; }
+.garden-calendar-day .garden-calendar-dot {
+  position: absolute; width: 5px; height: 5px;
+  background: #347c52; border-radius: 50%; bottom: 4px; left: calc(50% - 2.5px);
 }
-.garden-calendar-day.garden-calendar-selected i { background: #fff; }
-.garden-enter {
-  animation: garden-enter 180ms ease-out;
+.garden-calendar-day[aria-selected="true"] .garden-calendar-dot { background: #fff; }
+.garden-calendar-weekday { text-align: center; color: var(--garden-muted); padding: 10px 0; font-weight: 600; font-size: 12px; }
+.garden-calendar-record { display: flex; align-items: center; gap: 12px; border-radius: 13px; padding: 8px; }
+.garden-calendar-record .garden-cover { width: 62px; border-radius: 10px; overflow: hidden; }
+.garden-draft-image { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; background: var(--garden-tint); }
+.garden-form-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 54px; gap: 6px; }
+.garden-form-toolbar h2 { font-size: 18px; font-weight: 720; text-align: center; flex: 1; margin: 0; }
+.garden-form-section { padding: 10px 0 24px; }
+.garden-draft-remove { position: absolute !important; right: 2px; top: 2px; background: var(--garden-card) !important; border-radius: 50% !important; }
+.garden-viewer { background: #090c0a; color: #fff; }
+.garden-viewer-toolbar {
+  min-height: calc(52px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+  position: relative; z-index: 2;
 }
-@keyframes garden-enter {
-  from { opacity: .75; }
-  to { opacity: 1; }
-}
+.garden-viewer-stage { display: grid; place-items: center; min-height: 0; position: relative; overflow: hidden; touch-action: pan-y; }
+.garden-viewer-stage img { display: block; width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; transition: transform .12s ease-out; }
+.garden-viewer-footer { text-align: center; font-size: 12px; color: #d5e0d7; padding: 10px 16px max(14px, env(safe-area-inset-bottom, 0px)); }
+.garden-install-hint { border: 1px solid var(--garden-border); background: var(--garden-card); border-radius: 15px; padding: 12px 14px; margin: 18px 0; display: flex; align-items: center; gap: 10px; }
+.garden-install-hint p { margin: 0; flex: 1; font-size: 12px; line-height: 1.5; color: var(--garden-muted); }
 @media (min-width: 600px) {
-  .garden-root { padding: 24px 24px 40px; }
-  .garden-calendar-day { height: 72px; }
+  .garden-root { padding: 12px 26px 40px; }
+  .garden-header { padding: 28px 0 18px; }
+  .garden-detail-hero { display: flex; }
+  .garden-detail-cover { width: 44%; aspect-ratio: 4 / 3; }
+  .garden-detail-info { flex: 1; }
+  .garden-loading-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .garden-calendar-day { min-height: 62px; }
+}
+@media (min-width: 350px) and (max-width: 399px) {
+  /* Keep all seven dates at least 44 CSS pixels across 350–399px iPhones. */
+  .garden-calendar-panel { padding: 6px; margin-inline: -7px; }
+  .garden-calendar-grid { gap: 1px; }
+}
+@media (max-width: 349px) {
+  .garden-root { padding-left: 10px; padding-right: 10px; }
+  .garden-heading { font-size: 27px; }
+  .garden-card-info { padding: 10px 9px 12px; }
+  /* 320px screens: seven 44px touch targets still fit edge-to-edge. */
+  .garden-calendar-panel { padding: 2px; margin-inline: -9px; }
+  .garden-calendar-grid { gap: 0; }
+  .garden-calendar-day { min-height: 44px; border-radius: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .garden-enter { animation: none; }
+  .garden-loading-card { animation: none; }
+  .garden-viewer-stage img { transition: none; }
+}
+
+.garden-editor-dialog { background: var(--app-surface, #fff); color: var(--app-ink, #203329); }
+.garden-editor-dialog .MuiDialogContent-root {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+}
+.garden-editor-dialog input[type="date"], .garden-editor-dialog input[type="datetime-local"] {
+  min-height: 44px;
+}
+@media (max-width: 599.95px), (max-height: 480px) and (pointer: coarse) {
+  .garden-editor-dialog { height: 100dvh !important; max-height: 100dvh !important; }
+  .garden-editor-dialog .MuiDialogTitle-root { border-bottom: 1px solid var(--app-border, #e3eae4); }
+}
+
+@media (prefers-contrast: more) {
+  .garden-card, .garden-timeline-entry, .garden-calendar-panel, .garden-search { border-width: 2px; }
+  .garden-segment[aria-selected="true"], .garden-view-switch button[aria-pressed="true"] { outline: 2px solid currentColor; }
 }

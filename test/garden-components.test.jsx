@@ -21,6 +21,10 @@ test('拆分后的 PhotoViewer 保留多照片切换、原图下载和关闭', a
     const next = document.querySelector('[aria-label="下一张"]')
     await act(async () => next.dispatchEvent(new MouseEvent('click', { bubbles: true })))
     expect(current().getAttribute('src')).toBe('/api/garden/photos/12/preview')
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })))
+    expect(current().getAttribute('src')).toBe('/api/garden/photos/11/preview')
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })))
+    expect(current().getAttribute('src')).toBe('/api/garden/photos/12/preview')
     const download = document.querySelector('[aria-label="下载原图"]')
     expect(download.getAttribute('href')).toBe('/api/garden/photos/12/original?download=1')
     await act(async () => document.querySelector('[aria-label="关闭"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
@@ -46,8 +50,10 @@ test('拆分后的成长时间线仍能编辑、删除和打开选中的照片',
       onEdit={onEdit} onDelete={onDelete} onOpenPhoto={onOpenPhoto} />))
     expect(host.textContent).toContain('第一朵开花')
     expect(host.textContent).toContain('家人')
-    await act(async () => host.querySelector('[aria-label="编辑日记"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
-    await act(async () => host.querySelector('[aria-label="删除日记"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await act(async () => host.querySelector('[aria-label="日记操作"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await act(async () => document.querySelector('[aria-label="编辑日记"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await act(async () => host.querySelector('[aria-label="日记操作"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await act(async () => document.querySelector('[aria-label="删除日记"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
     await act(async () => host.querySelector('[aria-label="查看照片：花.jpg"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
     expect(onEdit).toHaveBeenCalledWith(entry)
     expect(onDelete).toHaveBeenCalledWith(entry)
@@ -138,7 +144,10 @@ test('花卉详情仅展示正序成长时间线，跨页照片仍能查看和�
     expect(host.textContent).toContain('成长时间线')
     expect(host.textContent).not.toContain('成长对比')
     expect(host.querySelector('[aria-label="归档或恢复"]')).toBeNull()
-    expect(host.querySelector('[aria-label="删除花卉"]')).not.toBeNull()
+    expect(host.querySelector('[aria-label="更多花卉操作"]')).not.toBeNull()
+    await act(async () => host.querySelector('[aria-label="更多花卉操作"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(document.querySelector('[aria-label="删除花卉"]')).not.toBeNull()
+    await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
     expect(host.querySelectorAll('[role="tab"]')).toHaveLength(0)
     expect(host.textContent.indexOf('最早的记录')).toBeLessThan(host.textContent.indexOf('第40条记录'))
     expect(host.querySelector('[aria-label="查看照片：image-1.jpg"]')).not.toBeNull()
@@ -159,5 +168,38 @@ test('花卉详情仅展示正序成长时间线，跨页照片仍能查看和�
     await act(async () => root.unmount())
     host.remove()
     global.fetch = oldFetch
+  }
+})
+
+
+test('移动端编辑保护未保存草稿，误触取消需要明确确认', async () => {
+  global.IS_REACT_ACT_ENVIRONMENT = true
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  const onClose = jest.fn()
+  const oldCreate = URL.createObjectURL
+  const oldRevoke = URL.revokeObjectURL
+  URL.createObjectURL = jest.fn(() => 'blob:draft-protect')
+  URL.revokeObjectURL = jest.fn()
+  try {
+    await act(async () => root.render(<EntryEditor open plantId={19} editing={null}
+      onClose={onClose} onSaved={() => {}} notify={() => {}} />))
+    const input = document.querySelector('input[type="file"][multiple]')
+    Object.defineProperty(input, 'files', { configurable: true,
+      value: [new File(['data'], 'diary.png', { type: 'image/png' })] })
+    await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })))
+    const cancel = Array.from(document.querySelectorAll('button')).find(b => b.textContent === '取消')
+    await act(async () => cancel.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('放弃未保存的更改')
+    const abandon = Array.from(document.querySelectorAll('button')).find(b => b.textContent === '放弃更改')
+    await act(async () => abandon.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
+    URL.createObjectURL = oldCreate
+    URL.revokeObjectURL = oldRevoke
   }
 })

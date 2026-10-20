@@ -58,27 +58,33 @@ async function waitForServer() {
   }
   throw new Error('Server did not become ready: ' + tail)
 }
-async function runBrowser(engine, viewport) {
+async function runBrowser(engine, viewport, colorScheme = 'light') {
   const browser = await engine.launch({ headless: true })
+  const touchDevice = viewport.width < 500 || (viewport.height <= 480 && viewport.width < 1000)
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: 2,
-    isMobile: viewport.width < 500,
-    hasTouch: viewport.width < 500,
+    isMobile: touchDevice,
+    hasTouch: touchDevice,
+    colorScheme,
     locale: 'zh-CN',
     timezoneId: 'Asia/Tokyo',
     acceptDownloads: true,
   })
   const page = await context.newPage()
-  const tag = engine.name() + '-' + viewport.width
+  const tag = engine.name() + '-' + viewport.width + 'x' + viewport.height + '-' + colorScheme
   let error = null
   try {
     const name = 'E2E 月季-' + tag + '-' + crypto.randomBytes(3).toString('hex')
     await page.goto(url + '/?view=花园', { waitUntil: 'domcontentloaded' })
     await page.getByText('我的花园', { exact: true }).waitFor({ timeout: 25000 })
+    check(await page.locator('.app-shell').getAttribute('data-theme') === colorScheme, tag + ': app follows system appearance')
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    check(overflow <= 1, tag + ': no page-level horizontal overflow')
     check(await page.locator('a[href="/api/garden/export"]').count() === 0, tag + ': no garden ZIP export')
     check(await page.getByText('正在生长', { exact: true }).count() === 0, tag + ': no active/archive filter')
     check(await page.getByText('已归档', { exact: true }).count() === 0, tag + ': no archive filter')
+    check(await page.getByRole('button', { name: '添加花卉' }).count() === 1, tag + ': single add-plant entry')
     await page.getByRole('button', { name: '添加花卉' }).click()
     const modal = page.getByRole('dialog')
     await modal.getByLabel('给这株花起个名字').fill(name)
@@ -87,7 +93,9 @@ async function runBrowser(engine, viewport) {
     await page.getByText(name, { exact: true }).click()
     await page.getByRole('button', { name: '记录成长' }).waitFor()
     check(await page.getByRole('button', { name: '归档或恢复' }).count() === 0, tag + ': no archive button')
-    await page.getByRole('button', { name: '删除花卉' }).waitFor()
+    await page.getByRole('button', { name: '更多花卉操作' }).click()
+    await page.getByRole('menuitem', { name: '删除花卉' }).waitFor()
+    await page.keyboard.press('Escape')
     await page.getByText('成长时间线', { exact: true }).waitFor()
     check(await page.getByRole('tab', { name: '照片', exact: true }).count() === 0, tag + ': no photo-grid tab')
     check(await page.getByRole('tab', { name: '成长对比', exact: true }).count() === 0, tag + ': no comparison tab')
@@ -113,16 +121,31 @@ async function runBrowser(engine, viewport) {
 
     const record = page.getByText('浏览器端到端测试：开花', { exact: true })
     await record.waitFor()
-    page.once('dialog', async dialog => dialog.accept())
-    await page.getByRole('button', { name: '删除日记' }).click()
+    await page.getByRole('button', { name: '日记操作' }).click()
+    await page.getByRole('menuitem', { name: '删除日记' }).click()
+    await page.getByRole('button', { name: '永久删除' }).click()
     await record.waitFor({ state: 'detached' })
-    await page.getByRole('button', { name: '返回我的花园' }).click()
+    await page.locator('.garden-detail-back').click()
+    await page.getByText(name, { exact: true }).waitFor()
+    await page.getByRole('tab', { name: '花卉', exact: true }).focus()
+    await page.keyboard.press('ArrowRight')
+    check(await page.getByRole('tab', { name: '成长日历' }).getAttribute('aria-selected') === 'true', tag + ': keyboard tabs navigate right')
+    await page.keyboard.press('ArrowLeft')
+    check(await page.getByRole('tab', { name: '花卉', exact: true }).getAttribute('aria-selected') === 'true', tag + ': keyboard tabs navigate left')
+    await page.getByRole('tab', { name: '成长日历' }).click()
+    await page.getByRole('button', { name: '今天' }).click()
+    const dayCell = await page.locator('.garden-calendar-day:not([disabled])').first().boundingBox()
+    check(dayCell && dayCell.width >= 44 && dayCell.height >= 44, tag + ': calendar cell must have 44px touch target')
+    await page.getByRole('button', { name: '上个月' }).click()
+    await page.getByRole('tab', { name: '花卉', exact: true }).click()
     await page.getByText(name, { exact: true }).waitFor()
     await page.locator('footer button').filter({ hasText: '日历' }).click()
+    check(await page.locator('.app-shell').getAttribute('data-theme') === 'light', tag + ': calendar keeps existing light theme')
     await page.locator('section[data-view="日历"]:not([hidden]) .header h2').waitFor()
     await page.locator('footer button').filter({ hasText: '拼豆' }).click()
     await page.getByText('库存总览').waitFor()
     await page.locator('footer button').filter({ hasText: '花园' }).click()
+    check(await page.locator('.app-shell').getAttribute('data-theme') === colorScheme, tag + ': garden restores preferred theme')
     await page.getByText(name, { exact: true }).waitFor()
     console.log('PASS browser garden: ' + tag)
   } catch (e) {
@@ -148,11 +171,15 @@ try {
   server.stderr.on('data', chunk => { tail = (tail + chunk.toString()).slice(-12_000) })
   await waitForServer()
   const scenarios = [
-    [chromium, { width: 390, height: 844 }],
+    [chromium, { width: 320, height: 700 }],
+    [chromium, { width: 375, height: 812 }],
     [webkit, { width: 390, height: 844 }],
+    [chromium, { width: 430, height: 932 }],
+    [webkit, { width: 812, height: 375 }],
     [chromium, { width: 1280, height: 800 }],
+    [chromium, { width: 390, height: 844 }, 'dark'],
   ]
-  for (const [engine, viewport] of scenarios) await runBrowser(engine, viewport)
+  for (const [engine, viewport, colorScheme] of scenarios) await runBrowser(engine, viewport, colorScheme)
   if (failures.length) throw new Error(failures.map(x => x.tag + ': ' + x.error + '\nScreenshot: ' + x.file).join('\n\n'))
 } finally {
   if (server && server.exitCode == null) {

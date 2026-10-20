@@ -1,53 +1,91 @@
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { gardenRequest } from '../gardenApi'
 
-// Shared, cancellable paging state for the garden listing and species selector.
 export default function useGardenPlants(active, notify) {
   const [plants, setPlants] = useState([])
   const [species, setSpecies] = useState([])
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(Boolean(active))
+  const [error, setError] = useState('')
   const [plantCursor, setPlantCursor] = useState(null)
   const [plantHasMore, setPlantHasMore] = useState(false)
   const [plantTotal, setPlantTotal] = useState(0)
   const [plantLoadingMore, setPlantLoadingMore] = useState(false)
-  const plantRequestGeneration = useRef(0)
-  const fetchSpecies = useCallback(() =>
-    gardenRequest('/species').then(setSpecies).catch(err => notify(err.message, true)), [notify])
-  const loadPlants = useCallback(async (signal, cursor = null) => {
-    const generation = cursor ? plantRequestGeneration.current : ++plantRequestGeneration.current
-    if (!cursor) setLoading(true)
-    try {
-      const path = '/plants?status=all&q=' + encodeURIComponent(search) + '&limit=36' +
-        (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
-      const page = await gardenRequest(path, { signal })
-      if (!signal?.aborted && generation === plantRequestGeneration.current) {
-        setPlants(previous => cursor ? [...previous, ...page.items] : page.items)
-        setPlantTotal(page.total)
-        setPlantHasMore(page.has_more)
-        setPlantCursor(page.next_cursor)
-      }
-    } catch (err) { if (err.name !== 'AbortError') notify(err.message, true) }
-    finally {
-      if (!signal?.aborted && !cursor && generation === plantRequestGeneration.current) setLoading(false)
+  const generation = useRef(0)
+  const activeController = useRef(null)
+  const pageController = useRef(null)
+  const paging = useRef(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(search.trim()), 260)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const fetchSpecies = useCallback(async () => {
+    try { setSpecies(await gardenRequest('/species')) }
+    catch (err) { notify(err.message, true) }
+  }, [notify])
+
+  const loadPlants = useCallback(async (cursor = null) => {
+    const version = cursor ? generation.current : ++generation.current
+    const controller = new AbortController()
+    if (!cursor) {
+      activeController.current?.abort()
+      pageController.current?.abort()
+      activeController.current = controller
+      setLoading(true)
+      setError('')
+      setPlantLoadingMore(false)
+      paging.current = false
+    } else {
+      pageController.current = controller
     }
-  }, [search, notify])
+    try {
+      const path = '/plants?status=all&q=' + encodeURIComponent(query) + '&limit=36' +
+        (cursor ? '&cursor=' + encodeURIComponent(cursor) : '')
+      const page = await gardenRequest(path, { signal: controller.signal })
+      if (version !== generation.current || controller.signal.aborted) return
+      setPlants(previous => cursor
+        ? [...previous, ...page.items.filter(item => !previous.some(loaded => loaded.id === item.id))]
+        : page.items)
+      setPlantTotal(page.total)
+      setPlantHasMore(page.has_more)
+      setPlantCursor(page.next_cursor)
+    } catch (err) {
+      if (err.name !== 'AbortError' && version === generation.current) {
+        setError(err.message)
+      }
+    } finally {
+      if (version === generation.current) {
+        if (cursor) { setPlantLoadingMore(false); paging.current = false }
+        else setLoading(false)
+      }
+    }
+  }, [query])
+
   useEffect(() => {
     if (!active) return
-    const controller = new AbortController()
     fetchSpecies()
-    loadPlants(controller.signal)
-    return () => { controller.abort(); plantRequestGeneration.current++ }
+    loadPlants()
+    return () => {
+      generation.current++
+      activeController.current?.abort()
+      pageController.current?.abort()
+    }
   }, [active, fetchSpecies, loadPlants])
-  function refresh() { return loadPlants() }
-  async function loadMorePlants() {
-    if (!plantHasMore || !plantCursor || plantLoadingMore) return
+
+  const refresh = useCallback(() => loadPlants(), [loadPlants])
+  const loadMorePlants = useCallback(async () => {
+    if (!plantHasMore || !plantCursor || paging.current) return
+    paging.current = true
     setPlantLoadingMore(true)
-    try { await loadPlants(undefined, plantCursor) }
-    finally { setPlantLoadingMore(false) }
-  }
+    await loadPlants(plantCursor)
+  }, [plantHasMore, plantCursor, loadPlants])
+
   return {
-    plants, species, search, setSearch, loading,
+    plants, species, search, setSearch, loading, error,
     plantHasMore, plantTotal, plantLoadingMore, fetchSpecies, refresh, loadMorePlants,
   }
 }

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState, Suspense } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Suspense } from 'react'
 import './App.css'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
@@ -20,16 +20,27 @@ const PindouConsume = React.lazy(() => import('./PindouConsume'))
 const History = React.lazy(() => import('./History'))
 const Garden = React.lazy(() => import('./Garden'))
 const views = ['日历', '拼豆', '历史', '补豆', '消耗', '花园']
-const theme = createTheme({
-  palette: { mode: 'light' },
+const createAppTheme = (mode, garden) => createTheme({
+  palette: {
+    mode,
+    primary: { main: garden ? '#347c52' : '#1976d2' },
+    success: { main: '#347c52' },
+    background: mode === 'dark' ? { default: '#101914', paper: '#1b2921' } : { default: '#f7faf7', paper: '#ffffff' },
+  },
+  shape: { borderRadius: 14 },
+  typography: { fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif' },
   components: {
-    MuiButton: { styleOverrides: { root: { minHeight: 44 } } },
+    MuiButton: { styleOverrides: { root: { minHeight: 44, textTransform: 'none', borderRadius: 12 } } },
     MuiIconButton: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
     MuiToggleButton: { styleOverrides: { root: { minHeight: 44 } } },
     MuiCheckbox: { styleOverrides: { root: { minWidth: 44, minHeight: 44 } } },
     MuiInputBase: { styleOverrides: { root: { minHeight: 44 }, input: { fontSize: 16 } } },
+    MuiDialog: { styleOverrides: { paper: { borderRadius: 20 } } },
   },
 })
+function systemPrefersDark() {
+  return Boolean(typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
+}
 
 function Page({ name, active, positions, children }) {
   const element = useRef(null)
@@ -39,15 +50,32 @@ function Page({ name, active, positions, children }) {
   return (
     <section ref={element} className="app-page" data-view={name} aria-label={name} hidden={!active}
       onScroll={event => { if (active) positions.current[name] = event.currentTarget.scrollTop }}>
-      <Suspense fallback={<div className="page-loading" role="status">正在加载…</div>}>{children}</Suspense>
+      <Suspense fallback={<div className="page-loading" aria-hidden="true" />}>{children}</Suspense>
     </section>
   )
 }
 
 function App() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const [dark, setDark] = useState(systemPrefersDark)
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
+    if (!media) return
+    const update = event => setDark(Boolean(event.matches))
+    media.addEventListener?.('change', update)
+    return () => media.removeEventListener?.('change', update)
+  }, [])
   const requestedView = searchParams.get('view') || '日历'
   const view = views.includes(requestedView) ? requestedView : '日历'
+  // Keep Calendar and Pindou's existing light appearance unchanged.
+  const gardenMode = view === '花园'
+  const appearance = gardenMode && dark ? 'dark' : 'light'
+  const theme = useMemo(() => createAppTheme(appearance, gardenMode), [appearance, gardenMode])
+  useEffect(() => {
+    document.documentElement.dataset.theme = appearance
+    document.querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', appearance === 'dark' ? '#101914' : '#f7faf7')
+  }, [appearance])
   const [visited, setVisited] = useState(() => new Set([view]))
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0)
   const [drafts, setDrafts] = useState(() => ({ 补豆: createPindouDraft(), 消耗: createPindouDraft() }))
@@ -92,7 +120,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <div className="app-shell" data-module-page={isModulePage} data-keyboard-open={keyboardOpen} style={keyboardOpen ? { '--keyboard-height': `${height}px` } : undefined}>
+      <div className="app-shell" data-module-page={isModulePage} data-module={primaryView} data-theme={appearance} data-keyboard-open={keyboardOpen} style={keyboardOpen ? { '--keyboard-height': `${height}px` } : undefined}>
         {!isModulePage && <header className="app-header">
           <IconButton aria-label="返回库存" disabled={formBusy} onClick={() => navigateToView('拼豆')}><ArrowBackIcon /></IconButton>
           <Typography component="h1" className="app-title">{view}</Typography>
