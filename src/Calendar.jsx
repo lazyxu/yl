@@ -1,264 +1,331 @@
-import moment from 'moment';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import './Calendar.css';
-import { getDaysTogether, getMenstrualState, getShift } from './utils';
-import { Alert, Box, Button } from '@mui/material';
-import defaultRules from '../server/config/shift-defaults.json';
-import ShiftSettings from './ShiftSettings';
-import { loadShiftSettings } from './shiftSettingsApi';
-import { shiftStyle } from './shifts';
-import CalendarDay from './CalendarDay';
-import DayShiftEditor from './DayShiftEditor';
-import { loadDayShifts } from './shiftSettingsApi';
+import moment from 'moment'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Alert, Box, Button, IconButton, Typography } from '@mui/material'
+import { ChevronLeft, ChevronRight, SettingsOutlined, TodayOutlined } from '@mui/icons-material'
+import './Calendar.css'
+import { getDaysTogether, getShift } from './utils'
+import defaultRules from '../server/config/shift-defaults.json'
+import ShiftSettings from './ShiftSettings'
+import { loadShiftSettings, loadDayShifts } from './shiftSettingsApi'
+import { shiftStyle } from './shifts'
+import CalendarDay from './CalendarDay'
+import DayShiftEditor from './DayShiftEditor'
 
-const 经期状态映射 = {
-  经期: '腰酸、烦躁、疲惫、压力大',
-  卵泡期: '心情愉悦、头脑清醒、充满干劲',
-  排卵期: '粘人精，要贴贴',
-  黄体期: '精力下降、情绪波动、emo',
-}
+// Keep shift labels visible in every date cell, including standby. The palette
+// remains the single shared source for Calendar, Settings and Editors.
+const LEGEND = ['白班', '夜班', '休息', '备班']
+const dateKey = value => value.format('YYYY-MM-DD')
+const firstOfMonth = value => value.clone().startOf('month')
 
-const Calendar = ({ active = true }) => {
-  const today = moment();
-  const [currentMonth, setCurrentMonth] = useState(moment().startOf('month'));
-  const calendarRef = useRef(null);
-  const swipeStart = useRef(null);
-  const swipeFrame = useRef(null);
-  const swipeDelta = useRef(0);
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [settings, setSettings] = useState({ rules: defaultRules, version: null });
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [loadingSettings, setLoadingSettings] = useState(true);
-  const [settingsError, setSettingsError] = useState('');
-  const [dayShifts, setDayShifts] = useState({ overrides: {}, version: null });
-  const [loadingDayShifts, setLoadingDayShifts] = useState(true);
-  const [dayShiftsError, setDayShiftsError] = useState('');
-  const [dayEditor, setDayEditor] = useState(null);
-  const gestureBlocked = useRef(false);
-  // Touch moves only mutate a compositor transform once per animation frame.
-  // The month grid must never re-render on every touchmove.
+export default function Calendar({ active = true }) {
+  const [todayKey, setTodayKey] = useState(() => dateKey(moment()))
+  const today = moment(todayKey, 'YYYY-MM-DD', true)
+  const [currentMonth, setCurrentMonth] = useState(() => moment().startOf('month'))
+  const [selectedDate, setSelectedDate] = useState(() => moment().startOf('day'))
+  const [settings, setSettings] = useState({ rules: defaultRules, version: null })
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [loadingSettings, setLoadingSettings] = useState(true)
+  const [settingsError, setSettingsError] = useState('')
+  const [dayShifts, setDayShifts] = useState({ overrides: {}, version: null })
+  const [loadingDayShifts, setLoadingDayShifts] = useState(true)
+  const [dayShiftsError, setDayShiftsError] = useState('')
+  const [dayEditor, setDayEditor] = useState(null)
+  const [showPending, setShowPending] = useState(false)
+
+  const calendarRef = useRef(null)
+  const swipeStart = useRef(null)
+  const swipeFrame = useRef(null)
+  const swipeDelta = useRef(0)
+  const gestureBlocked = useRef(false)
+
+  // Refresh "today" on foreground activation and at the next local midnight;
+  // never reset the month or selected date while doing so.
+  useEffect(() => {
+    if (!active) return
+    let timeout
+    const update = () => {
+      const now = moment()
+      setTodayKey(value => value === dateKey(now) ? value : dateKey(now))
+      const nextMidnight = now.clone().add(1, 'day').startOf('day')
+      clearTimeout(timeout)
+      timeout = setTimeout(update, Math.max(500, nextMidnight.diff(now) + 50))
+    }
+    const foreground = () => { if (document.visibilityState !== 'hidden') update() }
+    update()
+    document.addEventListener('visibilitychange', foreground)
+    window.addEventListener('focus', foreground)
+    return () => {
+      clearTimeout(timeout)
+      document.removeEventListener('visibilitychange', foreground)
+      window.removeEventListener('focus', foreground)
+    }
+  }, [active])
+
   function resetSwipeTransform() {
     if (swipeFrame.current !== null) {
-      if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(swipeFrame.current);
-      else clearTimeout(swipeFrame.current);
-      swipeFrame.current = null;
+      if (typeof window.cancelAnimationFrame === 'function') window.cancelAnimationFrame(swipeFrame.current)
+      else clearTimeout(swipeFrame.current)
+      swipeFrame.current = null
     }
-    swipeDelta.current = 0;
-    if (calendarRef.current) calendarRef.current.style.transform = '';
+    swipeDelta.current = 0
+    if (calendarRef.current) calendarRef.current.style.transform = ''
   }
   function scheduleSwipeTransform(pixels) {
-    swipeDelta.current = pixels;
-    if (swipeFrame.current !== null) return;
+    swipeDelta.current = pixels
+    if (swipeFrame.current !== null) return
     const paint = () => {
-      swipeFrame.current = null;
+      swipeFrame.current = null
       if (calendarRef.current) calendarRef.current.style.transform =
-        'translate3d(' + swipeDelta.current + 'px, 0, 0)';
-    };
+        'translate3d(' + swipeDelta.current + 'px, 0, 0)'
+    }
     swipeFrame.current = typeof window.requestAnimationFrame === 'function'
       ? window.requestAnimationFrame(paint)
-      : setTimeout(paint, 16);
+      : setTimeout(paint, 16)
   }
-  useEffect(() => () => {
-    resetSwipeTransform();
-  }, []);
-
+  useEffect(() => () => resetSwipeTransform(), [])
 
   const reloadSettings = useCallback(async signal => {
-    setLoadingSettings(true);
-    setSettingsError('');
+    setLoadingSettings(true)
+    setSettingsError('')
     try {
-      const loaded = await loadShiftSettings(signal);
-      setSettings(current => current.version === null || loaded.version >= current.version ? loaded : current);
-      return loaded;
+      const loaded = await loadShiftSettings(signal)
+      setSettings(current => current.version === null || loaded.version >= current.version ? loaded : current)
+      return loaded
     } catch (error) {
-      if (error.name !== 'AbortError') setSettingsError('无法读取排班设置，当前按已加载的规则显示。请重新加载后再修改。');
+      if (error.name !== 'AbortError') setSettingsError('无法读取排班设置，当前显示上次已获取或内置规则。请重新加载后再修改。')
     } finally {
-      if (!signal?.aborted) setLoadingSettings(false);
+      if (!signal?.aborted) setLoadingSettings(false)
     }
-  }, []);
-
+  }, [])
   const reloadDayShifts = useCallback(async signal => {
-    setLoadingDayShifts(true); setDayShiftsError('');
+    setLoadingDayShifts(true)
+    setDayShiftsError('')
     try {
-      const loaded = await loadDayShifts(signal);
-      setDayShifts(current => current.version === null || loaded.version >= current.version ? loaded : current);
-      return loaded;
+      const loaded = await loadDayShifts(signal)
+      setDayShifts(current => current.version === null || loaded.version >= current.version ? loaded : current)
+      return loaded
     } catch (error) {
-      if (error.name !== 'AbortError') setDayShiftsError('无法读取单日调整，请重新加载后再修改。');
-    } finally { if (!signal?.aborted) setLoadingDayShifts(false); }
-  }, []);
-
+      if (error.name !== 'AbortError') setDayShiftsError('无法读取单日调整，请重新加载后再修改。')
+    } finally {
+      if (!signal?.aborted) setLoadingDayShifts(false)
+    }
+  }, [])
   useEffect(() => {
     if (!active) { setSettingsOpen(false); return }
-    const controller = new AbortController();
-    reloadSettings(controller.signal);
-    reloadDayShifts(controller.signal);
-    return () => controller.abort();
-  }, [active, reloadSettings, reloadDayShifts]);
+    const controller = new AbortController()
+    reloadSettings(controller.signal)
+    reloadDayShifts(controller.signal)
+    return () => controller.abort()
+  }, [active, reloadSettings, reloadDayShifts])
+  useEffect(() => {
+    if (!loadingSettings && !loadingDayShifts) { setShowPending(false); return }
+    const timer = setTimeout(() => setShowPending(true), 220)
+    return () => clearTimeout(timer)
+  }, [loadingSettings, loadingDayShifts])
 
-  const canAdjust = active && !loadingSettings && !loadingDayShifts && settings.version !== null && dayShifts.version !== null;
+  const canAdjust = active && !loadingSettings && !loadingDayShifts && settings.version !== null && dayShifts.version !== null
   const shiftFor = day => {
-    const override = dayShifts.overrides[day.format('YYYY-MM-DD')];
-    return override?.shift || getShift(day, settings.rules);
-  };
-  const selectedOverride = dayShifts.overrides[selectedDate.format('YYYY-MM-DD')];
-  const adjustDay = day => {
-    if (!canAdjust) return;
-    gestureBlocked.current = true;
-    resetSwipeTransform();
-    swipeStart.current = null;
-    setSelectedDate(day);
-    setDayEditor({ date: day.format('YYYY-MM-DD'), baseShift: getShift(day, settings.rules), snapshot: { ...dayShifts, overrides: { ...dayShifts.overrides } } });
-  };
+    const override = dayShifts.overrides[dateKey(day)]
+    return override?.shift || getShift(day, settings.rules)
+  }
+  const selectedOverride = dayShifts.overrides[dateKey(selectedDate)]
+  const baseShift = getShift(selectedDate, settings.rules)
+  const currentShift = shiftFor(selectedDate)
 
-  const onTouchStart = (event) => {
-    if (!active) return;
-    gestureBlocked.current = Boolean(dayEditor);
-    const touch = event.touches[0];
-    if (!touch) return;
-    resetSwipeTransform();
+  const adjustDay = day => {
+    if (!canAdjust) return
+    gestureBlocked.current = true
+    resetSwipeTransform()
+    swipeStart.current = null
+    setSelectedDate(day)
+    setDayEditor({
+      date: dateKey(day),
+      baseShift: getShift(day, settings.rules),
+      snapshot: { ...dayShifts, overrides: { ...dayShifts.overrides } },
+    })
+  }
+  const onTouchStart = event => {
+    if (!active) return
+    gestureBlocked.current = Boolean(dayEditor)
+    const touch = event.touches[0]
+    if (!touch || event.touches.length !== 1) return
+    resetSwipeTransform()
     swipeStart.current = {
       x: touch.clientX, y: touch.clientY, axis: null,
       edge: touch.clientX <= 24 || touch.clientX >= window.innerWidth - 24,
-    };
-  };
-  const onTouchMove = (event) => {
-    const start = swipeStart.current;
-    if (!active || gestureBlocked.current || dayEditor || !start || start.edge) return;
-    const touch = event.touches[0];
-    if (!touch || event.touches.length !== 1) return;
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
+    }
+  }
+  const onTouchMove = event => {
+    const start = swipeStart.current
+    if (!active || gestureBlocked.current || dayEditor || !start || start.edge) return
+    const touch = event.touches[0]
+    if (!touch || event.touches.length !== 1) return
+    const dx = touch.clientX - start.x
+    const dy = touch.clientY - start.y
     if (!start.axis) {
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-      start.axis = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
+      start.axis = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical'
     }
-    if (start.axis !== 'horizontal') return;
-    scheduleSwipeTransform(Math.max(-120, Math.min(120, dx * 0.45)));
-  };
-  const onTouchEnd = (event) => {
-    const start = swipeStart.current;
-    swipeStart.current = null;
-    resetSwipeTransform();
-    if (!active || gestureBlocked.current || dayEditor || !start || start.edge || start.axis === 'vertical') return;
-    const touch = event.changedTouches[0];
-    if (!touch) return;
-    const dx = touch.clientX - start.x;
-    const dy = touch.clientY - start.y;
-    if (Math.abs(dx) <= 50 || Math.abs(dx) <= Math.abs(dy) * 1.25) return;
-    if (dx < 0) handleSlideNext();
-    else handleSlidePrevious();
-  };
-  const onTouchCancel = () => {
-    swipeStart.current = null;
-    resetSwipeTransform();
-  };
+    if (start.axis !== 'horizontal') return
+    scheduleSwipeTransform(Math.max(-120, Math.min(120, dx * 0.45)))
+  }
+  const onTouchEnd = event => {
+    const start = swipeStart.current
+    swipeStart.current = null
+    resetSwipeTransform()
+    if (!active || gestureBlocked.current || dayEditor || !start || start.edge || start.axis === 'vertical') return
+    const touch = event.changedTouches[0]
+    if (!touch) return
+    const dx = touch.clientX - start.x
+    const dy = touch.clientY - start.y
+    if (Math.abs(dx) <= 50 || Math.abs(dx) <= Math.abs(dy) * 1.25) return
+    if (dx < 0) handleSlideNext()
+    else handleSlidePrevious()
+  }
+  const onTouchCancel = () => { swipeStart.current = null; resetSwipeTransform() }
   const handleSlidePrevious = () => {
-    resetSwipeTransform();
-    setCurrentMonth(month => month.clone().subtract(1, 'month'));
-  };
+    resetSwipeTransform()
+    setCurrentMonth(month => month.clone().subtract(1, 'month'))
+  }
   const handleSlideNext = () => {
-    resetSwipeTransform();
-    setCurrentMonth(month => month.clone().add(1, 'month'));
-  };
+    resetSwipeTransform()
+    setCurrentMonth(month => month.clone().add(1, 'month'))
+  }
+  const jumpToToday = () => {
+    const now = moment().startOf('day')
+    resetSwipeTransform()
+    setTodayKey(dateKey(now))
+    setCurrentMonth(firstOfMonth(now))
+    setSelectedDate(now)
+  }
+  const handleDateClick = day => {
+    setSelectedDate(day)
+    if (!day.isSame(currentMonth, 'month')) setCurrentMonth(firstOfMonth(day))
+  }
+  // Roving focus supports arrows, Home/End, PgUp/PgDn without modifying
+  // a 42-cell calendar during any touchmove.
+  const onCalendarKeyDown = event => {
+    const target = event.target.closest?.('button.day')
+    if (!target) return
+    const focusDay = moment(target.dataset.date, 'YYYY-MM-DD', true)
+    if (!focusDay.isValid()) return
+    const steps = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 7, ArrowUp: -7 }
+    let next
+    if (Object.prototype.hasOwnProperty.call(steps, event.key)) next = focusDay.clone().add(steps[event.key], 'days')
+    else if (event.key === 'Home') next = focusDay.clone().startOf('week')
+    else if (event.key === 'End') next = focusDay.clone().endOf('week')
+    else if (event.key === 'PageUp') next = focusDay.clone().subtract(1, 'month')
+    else if (event.key === 'PageDown') next = focusDay.clone().add(1, 'month')
+    else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault(); handleDateClick(focusDay); return
+    } else return
+    event.preventDefault()
+    setSelectedDate(next)
+    if (!next.isSame(currentMonth, 'month')) setCurrentMonth(firstOfMonth(next))
+    window.requestAnimationFrame?.(() => {
+      calendarRef.current?.querySelector('[data-date="' + dateKey(next) + '"]')?.focus()
+    })
+  }
 
-  const handleDateClick = (day) => {
-    setSelectedDate(day);
-  };
-
-  // 生成月份日历
   const generateCalendar = () => {
-    const startOfMonth = currentMonth.clone().startOf('month');
-    const endOfMonth = currentMonth.clone().endOf('month').endOf('week');
-    const days = [];
-    let currentDay = startOfMonth.clone().startOf('week');
+    const first = currentMonth.clone().startOf('month').startOf('week')
+    // Exactly six rows: month switches never push the selected-day panel around.
+    return Array.from({ length: 42 }, (_, index) => {
+      const day = first.clone().add(index, 'days')
+      const isCurrentMonth = day.isSame(currentMonth, 'month')
+      const isToday = day.isSame(today, 'day')
+      const isSelected = day.isSame(selectedDate, 'day')
+      const shift = shiftFor(day)
+      const override = dayShifts.overrides[dateKey(day)]
+      return <CalendarDay
+        key={dateKey(day)}
+        className={'day' + (isToday ? ' today' : '') + (isSelected ? ' selected' : '') + (!isCurrentMonth ? ' other-month' : '')}
+        data-date={dateKey(day)}
+        aria-label={day.format('YYYY年MM月DD日 dddd') + ' ' + shift +
+          (isToday ? '，今天' : '') + (isSelected ? '，已选中' : '') +
+          (override?.kind === 'swap' ? '，换班' : '')}
+        aria-current={isToday ? 'date' : undefined}
+        aria-pressed={isSelected}
+        tabIndex={isSelected || (!selectedDate.isSame(currentMonth, 'month') && day.isSame(currentMonth, 'day')) ? 0 : -1}
+        canAdjust={canAdjust}
+        onSelect={() => handleDateClick(day)}
+        onAdjust={() => adjustDay(day)}
+      >
+        <span className="date">{day.format('D')}</span>
+        <span className={'shift ' + shift} style={shiftStyle(shift)}>{shift}</span>
+        {override?.kind === 'swap' && <span className="day-adjustment-mark" aria-hidden="true">换</span>}
+      </CalendarDay>
+    })
+  }
 
-    while (currentDay.isSameOrBefore(endOfMonth, 'day')) {
-      const day = currentDay.clone();
-      const isCurrentMonth = day.month() === currentMonth.month();
-      const isToday = day.isSame(today, 'day');
-      const isSelected = day.isSame(selectedDate, 'day');
-      const shift = shiftFor(day);
-      const override = dayShifts.overrides[day.format('YYYY-MM-DD')];
-      // const menstrualState = getMenstrualState(day); // 获取经期状态
+  return <Box className="schedule-screen" aria-label="排班日历">
+    <div className="calendar-container">
+      <header className="schedule-topbar">
+        <div className="schedule-heading">
+          <Typography component="p" className="schedule-eyebrow">排班日历</Typography>
+          <Typography component="h1" className="schedule-page-title">我的日历</Typography>
+        </div>
+        <Button startIcon={<SettingsOutlined />} onClick={() => setSettingsOpen(true)}
+          disabled={loadingSettings || settings.version === null}
+          aria-label="排班设置">排班设置</Button>
+      </header>
 
-      days.push(
-        <CalendarDay
-          key={day.format('YYYY-MM-DD')}
-          style={isCurrentMonth ? {} : { opacity: 0.5 }}
-          className={`day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
-          data-date={day.format('YYYY-MM-DD')}
-          aria-label={`${day.format('YYYY年MM月DD日')} ${shift}${override?.kind === 'swap' ? '，换班' : ''}`}
-          canAdjust={canAdjust}
-          onSelect={() => handleDateClick(day)}
-          onAdjust={() => adjustDay(day)}
-        >
-          <div
-            className={`date`}
-          >
-            {day.format('D')}
-          </div>
-          <div
-            className={`shift ${shift}`}
-            style={shiftStyle(shift)}
-          >
-            {shift}
-          </div>
-          {override?.kind === 'swap' && <span className="day-adjustment-mark" aria-hidden="true">换</span>}
-        </CalendarDay>
-      );
-      currentDay.add(1, 'day');
-    }
-    return days;
-  };
-  // const state = getMenstrualState(selectedDate).split(' ')[0];
-  return (
-    <Box sx={{ p: 1 }}>
-      <div
-        className="calendar-container">
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button size="small" onClick={() => setSettingsOpen(true)} disabled={loadingSettings || settings.version === null}>排班设置</Button>
-        </Box>
-        {loadingSettings && <Alert severity="info">正在加载排班设置…</Alert>}
-        {settingsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
-        {dayShiftsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
-        <div className="header">
-          <button onClick={handleSlidePrevious}>
-            ←
-          </button>
-          <h2>{currentMonth.format('YYYY年MM月')}</h2>
-          <button onClick={handleSlideNext}>
-            →
-          </button>
-        </div>
-        <div className="calendar"
-          ref={calendarRef}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onTouchCancel={onTouchCancel}
-        >
-          {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-            <div key={day} className="weekday">
-              {day}
-            </div>
-          ))}
-          {generateCalendar()}
-        </div>
-        <div className="selected-date-info">
-          <p>{selectedDate.format('YYYY年MM月DD日')} {shiftFor(selectedDate)}</p>
-          {selectedOverride?.kind === 'swap' && <p>{selectedOverride.partner ? `与 ${selectedOverride.partner} 换班` : '已换班'}</p>}
-          {selectedOverride?.note && <p className="day-adjustment-note">{selectedOverride.note}</p>}
-          <Button onClick={() => adjustDay(selectedDate)} disabled={!canAdjust}>调整当天排班</Button>
-          <p>第 {getDaysTogether(selectedDate)} 天</p>
-          {/* <p>{经期状态映射[state]}</p> */}
-        </div>
+      <div className="header">
+        <IconButton onClick={handleSlidePrevious} aria-label="上个月"><ChevronLeft /></IconButton>
+        <h2 aria-live="polite">{currentMonth.format('YYYY年MM月')}</h2>
+        <IconButton onClick={handleSlideNext} aria-label="下个月"><ChevronRight /></IconButton>
+        <Button startIcon={<TodayOutlined />} onClick={jumpToToday} variant="text" className="schedule-today-button">今天</Button>
       </div>
-      <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)} onReload={() => reloadSettings()} onSaved={setSettings} />
-      {dayEditor && <DayShiftEditor key={dayEditor.date} {...dayEditor} open={active} onCancel={() => setDayEditor(null)} onReload={reloadDayShifts}
-        onSaved={saved => { setDayShifts(current => current.version === null || saved.version >= current.version ? saved : current); setDayEditor(null); }} />}
-    </Box>
-  );
-};
 
-export default Calendar;
+      <div className="schedule-legend" aria-label="班次颜色图例">
+        {LEGEND.map(shift => <span className="schedule-legend-item" key={shift}>
+          <i aria-hidden="true" style={shiftStyle(shift)} />{shift}
+        </span>)}
+      </div>
+
+      {showPending && (loadingSettings || loadingDayShifts) && !settingsError && !dayShiftsError &&
+        <Typography variant="caption" color="text.secondary" className="schedule-loading">正在核对最新排班…</Typography>}
+      {settingsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
+      {dayShiftsError && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
+
+      <div className="calendar" role="grid" aria-label={currentMonth.format('YYYY年MM月') + '排班月历'}
+        ref={calendarRef} onKeyDown={onCalendarKeyDown}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd} onTouchCancel={onTouchCancel}>
+        {['日', '一', '二', '三', '四', '五', '六'].map(day => <div key={day} className="weekday" role="columnheader">{day}</div>)}
+        {generateCalendar()}
+      </div>
+
+      <section className="selected-date-info" aria-label="选中日期详情">
+        <div className="selected-date-header">
+          <div className="selected-date-heading">
+            <Typography component="h3">{selectedDate.format('YYYY年MM月DD日 dddd')}</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {selectedDate.isSame(today, 'day') ? '今天 · ' : ''}
+              {selectedDate.isSame(currentMonth, 'month') ? '本月日期' : '不在当前月份'}
+            </Typography>
+          </div>
+          <span className="selected-shift" style={shiftStyle(currentShift)}>{currentShift}</span>
+        </div>
+        {selectedOverride?.kind && <div className="selected-adjustment">
+          <Typography variant="body2">原排班：{baseShift}　·　当天调整：{selectedOverride.kind === 'swap' ? '换班' : '备班'}</Typography>
+          {selectedOverride.kind === 'swap' &&
+            <Typography variant="body2">{selectedOverride.partner ? '与 ' + selectedOverride.partner + ' 换班' : '已换班'}</Typography>}
+          {selectedOverride.note && <p className="day-adjustment-note">{selectedOverride.note}</p>}
+        </div>}
+        <div className="selected-date-footer">
+          <Typography variant="caption" color="text.secondary">在一起第 {getDaysTogether(selectedDate)} 天</Typography>
+          <Button variant="contained" onClick={() => adjustDay(selectedDate)} disabled={!canAdjust}>调整当天排班</Button>
+        </div>
+      </section>
+    </div>
+    <ShiftSettings open={settingsOpen} settings={settings} onClose={() => setSettingsOpen(false)}
+      onReload={() => reloadSettings()} onSaved={setSettings} />
+    {dayEditor && <DayShiftEditor key={dayEditor.date} {...dayEditor} open={active}
+      onCancel={() => setDayEditor(null)} onReload={reloadDayShifts}
+      onSaved={saved => {
+        setDayShifts(current => current.version === null || saved.version >= current.version ? saved : current)
+        setDayEditor(null)
+      }} />}
+  </Box>
+}
