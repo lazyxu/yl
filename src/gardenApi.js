@@ -51,3 +51,32 @@ export function plantedDays(value) {
   if (Number.isNaN(day.getTime())) return null
   return Math.max(1, Math.floor((Date.now() - day.getTime()) / 86400000) + 1)
 }
+
+/**
+ * XHR offers native iOS upload progress; the API and validation are unchanged.
+ * Node callers without XMLHttpRequest keep fetch semantics.
+ */
+export function gardenUpload(formData, onProgress = () => {}) {
+  if (typeof XMLHttpRequest === 'undefined') {
+    return gardenRequest('/entries', { method: 'POST', body: formData })
+  }
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', BASE + '/entries')
+    xhr.responseType = 'json'
+    xhr.upload.addEventListener('progress', event => {
+      if (event.lengthComputable && event.total > 0) onProgress(Math.round(event.loaded / event.total * 100))
+    })
+    xhr.onload = () => {
+      let body = xhr.response
+      if (!body || typeof body !== 'object') {
+        try { body = JSON.parse(xhr.responseText) } catch { body = {} }
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body)
+      else reject(new Error(body?.error || '花园请求失败（' + xhr.status + '）'))
+    }
+    xhr.onerror = () => reject(new Error('网络连接失败，成长记录未保存，请重试'))
+    xhr.onabort = () => reject(new DOMException('上传已取消', 'AbortError'))
+    xhr.send(formData)
+  })
+}
