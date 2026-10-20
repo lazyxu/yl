@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, useMediaQuery } from '@mui/material'
 import useKeyboardViewport from './useKeyboardViewport'
+import RouterDraftGuard from './RouterDraftGuard'
 
 export default function ShiftEditDialog({
   open = true, title, titleId, saving, onCancel, onConfirm, children,
@@ -44,6 +45,8 @@ export default function ShiftEditDialog({
     else onCancel()
   }
   return <>
+    <RouterDraftGuard open={open} when={dirty || saving} busy={saving}
+      onDiscard={onCancel} title="放弃未保存的排班修改？" />
     <Dialog open={open} fullWidth maxWidth="sm" fullScreen={fullScreen}
       className="shift-settings-dialog shift-edit-dialog"
       aria-labelledby={titleId} data-keyboard-open={keyboardOpen}
