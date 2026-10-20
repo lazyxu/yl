@@ -4,7 +4,7 @@ import { Box, Button, Dialog, DialogContent, DialogTitle, useMediaQuery } from '
 import GardenConfirmDialog from './GardenConfirmDialog'
 
 export default function GardenFormDialog({ open, title, busy, dirty, onClose, onSave, children, saveLabel = '保存' }) {
-  const phone = useMediaQuery('(max-width:599.95px)')
+  const phone = useMediaQuery('(max-width:599.95px), (max-height:480px) and (pointer:coarse)')
   const [discardConfirm, setDiscardConfirm] = useState(false)
   useEffect(() => {
     if (!open) setDiscardConfirm(false)

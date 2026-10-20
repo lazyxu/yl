@@ -258,7 +258,7 @@
 .garden-editor-dialog input[type="date"], .garden-editor-dialog input[type="datetime-local"] {
   min-height: 44px;
 }
-@media (max-width: 599.95px) {
+@media (max-width: 599.95px), (max-height: 480px) and (pointer: coarse) {
   .garden-editor-dialog { height: 100dvh !important; max-height: 100dvh !important; }
   .garden-editor-dialog .MuiDialogTitle-root { border-bottom: 1px solid var(--app-border, #e3eae4); }
 }

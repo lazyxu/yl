@@ -62,6 +62,14 @@ export default function Garden({ active = true }) {
     rememberScroll()
     setTab(nextTab)
   }
+  const onSegmentKeyDown = event => {
+    const direction = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : direction ? (tab + direction + 2) % 2 : null
+    if (next == null) return
+    event.preventDefault()
+    chooseTab(next)
+    event.currentTarget.parentElement?.querySelectorAll('[role="tab"]')[next]?.focus()
+  }
   useLayoutEffect(() => {
     if (!active) return
     const node = scrollArea()
@@ -107,12 +115,16 @@ export default function Garden({ active = true }) {
       : <Box>
         {heading}
         <div className="garden-segments" role="tablist" aria-label="花园视图">
-          <button type="button" className="garden-segment" role="tab" aria-selected={tab === 0}
+          <button type="button" id="garden-plants-tab" className="garden-segment" role="tab"
+            aria-selected={tab === 0} aria-controls="garden-plants-panel" tabIndex={tab === 0 ? 0 : -1}
+            onKeyDown={onSegmentKeyDown}
             onClick={() => chooseTab(0)}><GridViewOutlined sx={{ fontSize: 18, verticalAlign: 'middle', mr: .6 }} />花卉</button>
-          <button type="button" className="garden-segment" role="tab" aria-selected={tab === 1}
+          <button type="button" id="garden-calendar-tab" className="garden-segment" role="tab"
+            aria-selected={tab === 1} aria-controls="garden-calendar-panel" tabIndex={tab === 1 ? 0 : -1}
+            onKeyDown={onSegmentKeyDown}
             onClick={() => chooseTab(1)}><CalendarMonthOutlined sx={{ fontSize: 18, verticalAlign: 'middle', mr: .6 }} />成长日历</button>
         </div>
-        {tab === 0 ? <>
+        {tab === 0 ? <div role="tabpanel" id="garden-plants-panel" aria-labelledby="garden-plants-tab">
           <label className="garden-search">
             <SearchOutlined aria-hidden="true" sx={{ color: 'var(--garden-muted)' }} />
             <input type="search" aria-label="搜索花卉或位置" placeholder="搜索花卉、品种或位置"
@@ -163,9 +175,11 @@ export default function Garden({ active = true }) {
             <p>在 Safari 点「分享」→「添加到主屏幕」，即可像 App 一样打开花园。</p>
             <IconButton aria-label="关闭安装提示" onClick={dismissInstall}><Close fontSize="small"/></IconButton>
           </div>}
-        </> : <GardenCalendar active={active} month={calendarMonth}
-          selected={selectedDay} onMonthChange={nextMonth => setCalendarMonth(current => sameMonth(current, nextMonth) ? current : nextMonth)}
-          onSelectedChange={setSelectedDay} selectPlant={goPlant} notify={notify} />}
+        </div> : <div role="tabpanel" id="garden-calendar-panel" aria-labelledby="garden-calendar-tab">
+          <GardenCalendar active={active} month={calendarMonth}
+            selected={selectedDay} onMonthChange={nextMonth => setCalendarMonth(current => sameMonth(current, nextMonth) ? current : nextMonth)}
+            onSelectedChange={setSelectedDay} selectPlant={goPlant} notify={notify} />
+        </div>}
       </Box>}
     <PlantEditor open={creating} plant={null} species={species} onClose={() => setCreating(false)}
       onSaved={refresh} onSpecies={fetchSpecies} notify={notify} />

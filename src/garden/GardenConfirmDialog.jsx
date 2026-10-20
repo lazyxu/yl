@@ -3,7 +3,7 @@ import React from 'react'
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, useMediaQuery } from '@mui/material'
 
 export default function GardenConfirmDialog({ open, title, description, confirmText = '删除', busy = false, onCancel, onConfirm, destructive = true }) {
-  const phone = useMediaQuery('(max-width:599.95px)')
+  const phone = useMediaQuery('(max-width:599.95px), (max-height:480px) and (pointer:coarse)')
   return <Dialog open={Boolean(open)} onClose={busy ? undefined : onCancel} maxWidth="xs" fullWidth
     sx={phone ? { '& .MuiDialog-container': { alignItems: 'flex-end' } } : undefined}
     PaperProps={{ sx: phone ? {
