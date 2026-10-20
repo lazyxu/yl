@@ -67,9 +67,9 @@ function App() {
   }, [])
   const requestedView = searchParams.get('view') || '日历'
   const view = views.includes(requestedView) ? requestedView : '日历'
-  // Keep Calendar and Pindou's existing light appearance unchanged.
+  // Calendar and Garden follow system appearance; Pindou keeps its established look.
   const gardenMode = view === '花园'
-  const appearance = gardenMode && dark ? 'dark' : 'light'
+  const appearance = (gardenMode || view === '日历') && dark ? 'dark' : 'light'
   const theme = useMemo(() => createAppTheme(appearance, gardenMode), [appearance, gardenMode])
   useEffect(() => {
     document.documentElement.dataset.theme = appearance

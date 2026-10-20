@@ -70,3 +70,98 @@
   .shift-timeline-rule { padding-left: 14px; }
   .shift-rule-editor { padding: 10px; }
 }
+
+/* iPhone PWA schedule settings: preserve actual text chips in every cycle day. */
+.shift-settings-dialog {
+  --shift-paper: var(--app-surface, #fff);
+  --shift-canvas: var(--app-canvas, #f5f7fb);
+  --shift-ink: var(--app-ink, #253248);
+  --shift-muted: var(--app-muted, #637187);
+  --shift-border: var(--app-border, #e1e7eb);
+}
+.shift-settings-dialog .MuiDialog-paper { background: var(--shift-paper); color: var(--shift-ink); }
+.shift-settings-dialog .shift-settings-heading {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--shift-paper); color: var(--shift-ink);
+  border-bottom-color: var(--shift-border);
+}
+.shift-settings-dialog .shift-settings-content {
+  background: var(--shift-canvas);
+  color: var(--shift-ink);
+  -webkit-overflow-scrolling: touch;
+}
+.shift-settings-dialog .shift-settings-toolbar > span,
+.shift-settings-dialog .shift-rule-interval,
+.shift-settings-dialog .shift-edit-hint,
+.shift-settings-dialog .shift-day-number,
+.shift-settings-dialog .shift-date-field { color: var(--shift-muted); }
+.shift-settings-dialog .shift-rule-date,
+.shift-settings-dialog .shift-day-title { color: var(--shift-ink); }
+.shift-settings-dialog .shift-timeline-rule { border-left-color: var(--shift-border); }
+.shift-settings-dialog .shift-sort-day,
+.shift-settings-dialog .shift-rule-editor,
+.shift-settings-dialog .shift-current-summary,
+.shift-settings-dialog .shift-day-preview {
+  background: var(--shift-paper);
+  border-color: var(--shift-border);
+}
+.shift-current-summary {
+  border: 1px solid var(--shift-border); border-radius: 17px;
+  padding: 15px 16px; margin: 4px 0 16px;
+}
+.shift-current-eyebrow { font-size: 12px; font-weight: 700; color: #347c52; letter-spacing: .3px; }
+.shift-current-heading { font-weight: 720; font-size: 16px; margin: 6px 0 12px; }
+.shift-settings-section-title { font-size: 16px; font-weight: 720; margin: 18px 0 15px; color: var(--shift-ink); }
+.shift-settings-dialog .shift-cycle { grid-template-columns: repeat(auto-fit, minmax(57px, 1fr)); gap: 7px; }
+.shift-settings-dialog .shift-cycle-chip { font-weight: 660; padding-block: 6px; }
+.shift-settings-dialog .shift-rule-active .shift-rule-header {
+  background: var(--shift-paper); border: 1px solid var(--shift-border); padding: 8px; border-radius: 12px;
+}
+.shift-settings-dialog .shift-legend { gap: 8px 18px; justify-content: flex-start; }
+.shift-settings-dialog .shift-legend-item { white-space: nowrap; }
+.shift-editor-toolbar {
+  display: flex !important; gap: 8px; align-items: center;
+  padding-inline: 12px !important;
+}
+.shift-editor-toolbar h2 {
+  font-size: 18px; font-weight: 720; line-height: 1.3;
+  color: var(--shift-ink); text-align: center; flex: 1; min-width: 0; margin: 0;
+}
+.shift-editor-toolbar .MuiButton-root { min-width: 62px; padding-inline: 10px; flex-shrink: 0; }
+.shift-day-preview {
+  border: 1px solid var(--shift-border); border-radius: 15px;
+  padding: 13px 14px; margin-bottom: 16px;
+}
+.shift-day-preview .shift-day-title { margin: 0 0 10px; font-weight: 720; }
+.shift-preview-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.shift-preview-row .shift-cycle-chip { padding: 7px 14px; font-size: 14px; }
+.shift-day-preview .shift-edit-hint { margin: 11px 0 0; }
+.shift-sort-day { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; gap: 6px; }
+.shift-sort-day > label { grid-column: 2; grid-row: 1; }
+.shift-sort-day > .shift-drag-handle { grid-column: 1; grid-row: 1; }
+.shift-sort-day > .MuiIconButton-root:last-child { grid-column: 3; grid-row: 1; }
+.shift-sort-reorder { display: flex; justify-content: flex-end; grid-column: 2 / 4; grid-row: 2; gap: 10px; }
+.shift-sort-reorder .MuiIconButton-root { width: 44px; height: 44px; }
+.shift-settings-dialog input, .shift-settings-dialog select, .shift-settings-dialog textarea { accent-color: #347c52; }
+.shift-settings-dialog .shift-date-field input,
+.shift-settings-dialog .shift-date-field select,
+.shift-settings-dialog .shift-date-field textarea {
+  background: var(--shift-paper); color: var(--shift-ink); border-color: var(--shift-border);
+}
+.shift-settings-dialog .shift-date-field input[aria-invalid="true"] { border: 2px solid #c43e45; }
+@media (min-width: 600px) and (min-height: 481px) {
+  .shift-sort-day { grid-template-columns: 44px minmax(0, 1fr) 100px 44px; }
+  .shift-sort-reorder { grid-column: 3; grid-row: 1; gap: 2px; }
+  .shift-sort-day > .MuiIconButton-root:last-child { grid-column: 4; }
+}
+@media (max-width: 600px), (max-height: 480px) and (pointer: coarse) {
+  .shift-settings-dialog .MuiDialog-paper { border-radius: 0; height: 100dvh; max-height: 100dvh; }
+  .shift-discard-dialog .MuiDialog-paper { border-radius: 18px; height: auto; max-height: 80dvh; }
+  .shift-settings-dialog .shift-settings-heading { padding-top: max(12px, env(safe-area-inset-top, 0px)); }
+  .shift-settings-dialog .shift-settings-content { padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-contrast: more) {
+  .shift-settings-dialog .shift-current-summary,
+  .shift-settings-dialog .shift-sort-day,
+  .shift-settings-dialog .shift-day-preview { border-width: 2px; }
+}

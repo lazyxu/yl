@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { IconButton } from '@mui/material'
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import { shiftNames, shiftStyle } from './shifts'
 
 export default function SortableShiftDays({ days, onChange, disabled }) {
@@ -91,18 +93,30 @@ export default function SortableShiftDays({ days, onChange, disabled }) {
     }
   }, [])
 
+  function shiftRow(index, delta) {
+    if (disabled) return
+    const target = index + delta
+    if (target < 0 || target >= days.length) return
+    const next = [...days]
+    next.splice(target, 0, next.splice(index, 1)[0])
+    onChange(next)
+  }
   function keyboardMove(event, index) {
     if (!event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key) || disabled) return
     event.preventDefault()
-    const target = index + (event.key === 'ArrowUp' ? -1 : 1)
-    if (target < 0 || target >= days.length) return
-    const next = [...days]; next.splice(target, 0, next.splice(index, 1)[0]); onChange(next)
+    shiftRow(index, event.key === 'ArrowUp' ? -1 : 1)
   }
 
   return <div ref={list} className="shift-sort-days" role="list" aria-label="循环班次顺序">
     {days.map((day, index) => <div className={`shift-sort-day ${dragging === day.id ? 'shift-day-dragging' : ''}`} role="listitem" key={day.id} data-sort-id={day.id}>
       <IconButton className="shift-drag-handle" aria-label={`长按拖动第${index + 1}天`} disabled={disabled} onPointerDown={event => { if (!disabled) startDrag.current?.(event, day.id) }} onKeyDown={event => keyboardMove(event, index)} onContextMenu={event => event.preventDefault()}><DragIndicatorIcon /></IconButton>
       <label><span>第 {index + 1} 天</span><select aria-label={`第${index + 1}天班次`} value={day.shift} style={shiftStyle(day.shift)} disabled={disabled || dragging !== null} onChange={event => onChange(days.map(item => item.id === day.id ? { ...item, shift: event.target.value } : item))}>{shiftNames.map(shift => <option key={shift}>{shift}</option>)}</select></label>
+      <div className="shift-sort-reorder">
+        <IconButton aria-label={`上移第${index + 1}天`} disabled={disabled || dragging !== null || index === 0}
+          onClick={() => shiftRow(index, -1)}><ArrowUpwardIcon fontSize="small" /></IconButton>
+        <IconButton aria-label={`下移第${index + 1}天`} disabled={disabled || dragging !== null || index === days.length - 1}
+          onClick={() => shiftRow(index, 1)}><ArrowDownwardIcon fontSize="small" /></IconButton>
+      </div>
       <IconButton aria-label={`移除第${index + 1}天`} disabled={disabled || dragging !== null || days.length === 1} onClick={() => onChange(days.filter(item => item.id !== day.id))}><DeleteOutlineIcon fontSize="small" /></IconButton>
     </div>)}
   </div>

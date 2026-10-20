@@ -11,6 +11,10 @@ export default function ShiftRuleEditor({ open = true, rule, snapshot, onCancel,
   const nextId = useRef(days.length)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const initialShifts = rule?.shifts || snapshot.rules[snapshot.rules.length - 1].shifts
+  const dirty = startDate !== (rule?.startDate || '') ||
+    days.length !== initialShifts.length ||
+    days.some((item, index) => item.shift !== initialShifts[index])
   const [deleting, setDeleting] = useState(false)
   const busy = useRef(false)
   const locked = error?.status === 409
@@ -32,10 +36,13 @@ export default function ShiftRuleEditor({ open = true, rule, snapshot, onCancel,
     catch { setError({ message: '重新加载失败，草稿仍保留', status: 409 }) }
     finally { busy.current = false; setSaving(false) }
   }
-  return <ShiftEditDialog open={open} title={rule ? '编辑排班' : '新增排班'} titleId="shift-rule-editor-title" saving={saving} onCancel={onCancel} onConfirm={() => confirm()} confirmDisabled={locked || deleting}>
+  return <ShiftEditDialog open={open} title={rule ? '编辑排班' : '新增排班'} titleId="shift-rule-editor-title"
+    saving={saving} dirty={dirty || deleting} onCancel={onCancel} onConfirm={() => confirm()} confirmDisabled={locked || deleting}>
     {error && <Alert severity="error" action={locked ? <Button color="inherit" onClick={reload} disabled={saving}>重新加载</Button> : undefined}>{error.message}{locked && '。重新加载后关闭弹窗，请重新编辑。'}</Alert>}
-    <label className="shift-date-field">生效日期<input type="date" aria-label="生效日期" value={startDate} disabled={saving || locked} onChange={event => update(() => setStartDate(event.target.value))} /></label>
-    <p className="shift-edit-hint">长按左侧拖动柄调整顺序，确认后按新顺序循环。键盘可用 Alt＋方向键。</p>
+    <label className="shift-date-field">生效日期<input type="date" aria-label="生效日期" value={startDate}
+      aria-invalid={Boolean(error?.message && /日期/.test(error.message))}
+      disabled={saving || locked} onChange={event => update(() => setStartDate(event.target.value))} /></label>
+    <p className="shift-edit-hint">长按左侧拖动柄调整顺序，确认后按新顺序循环。也可点击上移/下移，键盘可用 Alt＋方向键。</p>
     <SortableShiftDays days={days} disabled={saving || locked} onChange={value => update(() => setDays(value))} />
     <div className="shift-editor-actions"><Button disabled={saving || locked || days.length >= 366} onClick={() => update(() => setDays([...days, { id: nextId.current++, shift: '休息' }]))}>添加一天</Button>
       {rule && <Button color="error" disabled={saving || locked || snapshot.rules.length === 1} onClick={() => setDeleting(true)}>删除排班</Button>}</div>
