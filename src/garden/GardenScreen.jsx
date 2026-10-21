@@ -163,6 +163,12 @@ export default function Garden({ active = true }) {
               : '已离线。仅此前允许保存并浏览过的花园数据可能可见。'}
             联网后自动刷新获取最新状态。
           </Alert>}
+        {error && <Alert severity="warning" role="status" className="garden-error"
+          action={online ? <Button onClick={refresh}>重试</Button> : undefined}>
+          {!online || /failed to fetch|networkerror|load failed|fetch failed/i.test(error)
+            ? '当前处于离线状态，无法读取花园；本设备尚无可用的已保存快照。请联网后重试，或联网时开启花园离线浏览。'
+            : '花园加载失败：' + error}
+        </Alert>}
         <div className="garden-segments" role="tablist" aria-label="花园视图">
           <button type="button" id="garden-plants-tab" className="garden-segment" role="tab"
             aria-selected={tab === 0} aria-controls="garden-plants-panel" tabIndex={tab === 0 ? 0 : -1}
@@ -193,9 +199,6 @@ export default function Garden({ active = true }) {
               </button>
             </div>
           </div>
-          {error && <Alert severity="error" className="garden-error" action={<Button onClick={refresh}>重试</Button>}>
-            {plants.length ? '刷新失败，以下仍是上次的结果：' : '花园加载失败：'}{error}
-          </Alert>}
           {loading && plants.length === 0 && !error
             ? <div style={{ minHeight: 320 }} aria-busy="true" aria-label="正在获取花卉">
               {showLoadingPlaceholder && <div className="garden-loading-grid"><div className="garden-loading-card"/><div className="garden-loading-card"/><div className="garden-loading-card"/><div className="garden-loading-card"/></div>}
