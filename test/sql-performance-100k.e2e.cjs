@@ -42,6 +42,10 @@ async function main() {
     // Chunking bounds heap usage and MySQL packet size; seeding is not request latency.
     const SIZE = 100_000
     const CHUNK = 1_000
+    const scenario = process.env.SQL_PERF_SCENARIO || 'skew'
+    assert(['skew', 'all-hot'].includes(scenario), 'Unknown SQL_PERF_SCENARIO')
+    const HOT_ENTRIES = scenario === 'all-hot' ? SIZE : 60_000
+    const DAY_ENTRIES = scenario === 'all-hot' ? SIZE : 50_000
     const plantIds = []
     const recordProgress = (table, inserted) => {
       if (inserted % 25_000 === 0) console.log('SQL-PERF-SEED ' + table + ' ' + inserted + '/' + SIZE)
@@ -68,11 +72,11 @@ async function main() {
       const length = Math.min(CHUNK, SIZE - start)
       const created = await GardenEntry.bulkCreate(Array.from({ length }, (_, j) => {
         const i = start + j
-        const isPrimary = i < 60_000
-        const onSharedDay = i < 50_000
+        const isPrimary = i < HOT_ENTRIES
+        const onSharedDay = i < DAY_ENTRIES
         const observed = observedBase + i * 15_000
         return {
-          plant_id: isPrimary ? plantId : plantIds[1 + ((i - 60_000) % (plantIds.length - 1))],
+          plant_id: isPrimary ? plantId : plantIds[1 + ((i - HOT_ENTRIES) % (plantIds.length - 1))],
           local_date: onSharedDay ? '2026-10-18' : '2026-09-' + String(i % 26 + 1).padStart(2, '0'),
           observed_at: new Date(observed), observed_ts: observed,
           note: 'E2E query measurement note ' + i, author_name: 'Perf',
@@ -110,8 +114,8 @@ async function main() {
     }
     result.setup_ms = Math.round(performance.now() - setupStart)
     result.dataset = { garden_plants: 100000, garden_entries: 100000,
-      garden_photos: 100000, reminders: 100000, calendar_day_entries: 50000,
-      primary_plant_entries: 60000 }
+      garden_photos: 100000, reminders: 100000, calendar_day_entries: DAY_ENTRIES,
+      primary_plant_entries: HOT_ENTRIES, scenario }
     const app = express()
     app.use(express.json({ limit: '1mb' }))
     app.use('/api/garden', require('../server/routes/garden'))
@@ -183,15 +187,15 @@ async function main() {
       assert(first.data.length > 0)
 
       const hotDetail = await rawRequest('/api/garden/plants/' + plantId)
-      const expectedNewest = await GardenPhoto.findOne({where:{entry_id:entryIds[59_999]}})
-      assert.equal(hotDetail.data.photo_count,60_000)
+      const expectedNewest = await GardenPhoto.findOne({where:{entry_id:entryIds[HOT_ENTRIES-1]}})
+      assert.equal(hotDetail.data.photo_count,HOT_ENTRIES)
       assert.equal(hotDetail.data.latest_photo_id,expectedNewest.id)
       const firstPlant = await rawRequest('/api/garden/plants?status=all&limit=36')
       const cursor = firstPlant.data.next_cursor
       assert.equal(firstPlant.data.total,100000)
       const firstDay = await rawRequest('/api/garden/calendar/day?date=2026-10-18&limit=40')
       const dayCursor = firstDay.data.next_cursor
-      assert.equal(firstDay.data.total,50000)
+      assert.equal(firstDay.data.total,DAY_ENTRIES)
       // Cursor fixtures are made before probes, not charged to API latency.
       const locatePlantCursor = async offset => {
         const row = await GardenPlant.findOne({
@@ -356,7 +360,8 @@ async function main() {
       ['calendar.summary', "SELECT local_date, COUNT(*) FROM garden_entries GROUP BY local_date ORDER BY local_date DESC"],
       ['calendar.byPlant', "SELECT local_date, COUNT(*) FROM garden_entries WHERE plant_id=" + plantId + " GROUP BY local_date ORDER BY local_date DESC"],
       ['reminders.latest200', "SELECT id FROM pindou_reminders ORDER BY occurred_at DESC LIMIT 200"],
-      ['plant.photo.window.hot', "SELECT ranked.plant_id,ranked.photo_count,ranked.id FROM (SELECT e.plant_id,p.id,COUNT(*) OVER (PARTITION BY e.plant_id) AS photo_count,ROW_NUMBER() OVER (PARTITION BY e.plant_id ORDER BY e.observed_ts DESC,p.id DESC) AS rownum FROM garden_photos p JOIN garden_entries e ON p.entry_id=e.id WHERE e.plant_id IN (" + plantId + ")) ranked WHERE ranked.rownum=1"],
+      ['reminders.latest200.full', "SELECT id, operation, items, note, image_path, occurred_at, created_at, updated_at FROM pindou_reminders ORDER BY occurred_at DESC LIMIT 200"],
+      ['plant.photo.aggregate.hot', "SELECT stats.plant_id, stats.photo_count, MAX(p.id) AS latest_photo_id FROM (SELECT e.plant_id, COUNT(*) AS photo_count, MAX(e.observed_ts) AS latest_observed_ts FROM garden_entries e JOIN garden_photos p ON p.entry_id = e.id WHERE e.plant_id IN (" + plantId + ") GROUP BY e.plant_id) stats JOIN garden_entries e ON e.plant_id = stats.plant_id AND e.observed_ts = stats.latest_observed_ts JOIN garden_photos p ON p.entry_id = e.id GROUP BY stats.plant_id, stats.photo_count"],
     ]
     for (const [name, sql] of casesToExplain) {
       const [rows] = await sequelize.query('EXPLAIN ' + sql)
@@ -365,6 +370,36 @@ async function main() {
         key: row.key, rows: row.rows, filtered: row.filtered, Extra: row.Extra,
       }))})
       console.log('SQL-PERF-PLAN ' + JSON.stringify(result.explain[result.explain.length-1]))
+    }
+    // Worst-case destructive paths are single-shot timings, not p95. The
+    // photo fixture contains *metadata only*, so unlink failures are expected
+    // and cleanup time cannot be presented as real filesystem throughput.
+    if (process.env.SQL_PERF_DESTRUCTIVE === '1') {
+      const oneShot = async (name, fn) => {
+        sqlCalls=0; dbDuration=0; sqlSlowest=[]; collect=true
+        sequelize.options.benchmark=true
+        const oldLog=sequelize.options.logging
+        sequelize.options.logging=(sql, ms)=>{
+          if (!collect) return
+          sqlCalls++
+          if (Number.isFinite(ms)) dbDuration+=ms
+        }
+        const start=performance.now()
+        try {
+          const res=await fn()
+          const datum={name, http_ms:Math.round((performance.now()-start)*100)/100,
+            sql_calls:sqlCalls, sql_total_ms:Math.round(dbDuration*100)/100,
+            response_bytes:res.bytes}
+          result.cold[name]=datum
+          console.log('SQL-PERF-ONE-SHOT '+JSON.stringify(datum))
+        } finally {collect=false;sequelize.options.logging=oldLog;sequelize.options.benchmark=false}
+      }
+      await oneShot('garden.plants.delete.hot', ()=>rawRequest(
+        '/api/garden/plants/'+plantId, {method:'DELETE'}))
+      assert.equal(await GardenEntry.count({where:{plant_id:plantId}}),0)
+      await oneShot('garden.species.delete.100k', ()=>rawRequest(
+        '/api/garden/species/'+species.id, {method:'DELETE'}))
+      assert.equal(await GardenPlant.count({where:{species_id:species.id}}),0)
     }
     const outfile = process.env.SQL_PERF_OUTPUT ||
       path.join('test-results','sql-performance-100k.json')

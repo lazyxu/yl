@@ -29,10 +29,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends default-mysql-client
       - run: npm ci --legacy-peer-deps
       - run: npm install --prefix server --omit=dev --package-lock=false
       - name: Execute 100k SQL E2E and EXPLAIN
         run: node test/sql-performance-100k.e2e.cjs
+      - name: Exercise all-100k hot plant/day including large deletes
+        env:
+          SQL_PERF_SCENARIO: all-hot
+          SQL_PERF_DESTRUCTIVE: "1"
+          SQL_PERF_OUTPUT: test-results/sql-performance-100k-all-hot.json
+        run: node test/sql-performance-100k.e2e.cjs
+      - name: Run real MySQL SQL-facing integration regression
+        run: node --test test/garden.integration.cjs test/pindou-stock.integration.cjs test/settings.integration.cjs test/backup.integration.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

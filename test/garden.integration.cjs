@@ -291,6 +291,40 @@ test('garden MySQL CRUD, photos, calendar and no ZIP export', { skip: !process.e
     assert.equal((await request('/entries?plant_id=' + id)).body.items.length, 0)
     const invalid = await request('/plants', json({ name: '错误日期', planted_on: '2026-02-30' }))
     assert.equal(invalid.code, 400)
+    // Photo summary semantics: count every photo, not just photo-bearing entries.
+    // A newer diary without photos must not displace the latest photo. Timestamp
+    // ties must choose highest photo ID regardless of entry ID.
+    const hotPlant = await models.GardenPlant.create({name:'Photo aggregation regression',status:'active'})
+    const hotStart = Date.UTC(2026,9,20,12,0)
+    const toEntry = (ts,note) => ({
+      plant_id:hotPlant.id, observed_at:new Date(ts), observed_ts:ts,
+      local_date:'2026-10-20',note, author_name:'',
+    })
+    const photoEntries = await models.GardenEntry.bulkCreate([
+      toEntry(hotStart,'old'),toEntry(hotStart+60_000,'newer'),
+      toEntry(hotStart+60_000,'same timestamp'),
+      toEntry(hotStart+120_000,'diary without photos'),
+    ])
+    const photoFixture = await models.GardenPhoto.bulkCreate([
+      { entry_id:photoEntries[0].id, storage_name:'perf-reg-old.jpg',
+        original_name:'old.jpg', mime:'image/jpeg', size_bytes:1 },
+      { entry_id:photoEntries[1].id, storage_name:'perf-reg-newer.jpg',
+        original_name:'newer.jpg', mime:'image/jpeg', size_bytes:1 },
+      { entry_id:photoEntries[1].id, storage_name:'perf-reg-newer2.jpg',
+        original_name:'newer2.jpg', mime:'image/jpeg', size_bytes:1 },
+      { entry_id:photoEntries[2].id, storage_name:'perf-reg-tie.jpg',
+        original_name:'tie.jpg', mime:'image/jpeg', size_bytes:1 },
+    ])
+    const summary = await request('/plants/'+hotPlant.id)
+    assert.equal(summary.code,200)
+    assert.equal(summary.body.photo_count,4)
+    assert.equal(summary.body.latest_photo_id,photoFixture[3].id)
+    const photoFree = await models.GardenPlant.create({name:'No photos',status:'active'})
+    const empty = await request('/plants/'+photoFree.id)
+    assert.equal(empty.code,200)
+    assert.equal(empty.body.photo_count,0)
+    assert.equal(empty.body.latest_photo_id,0)
+
   } finally {
     if (server) await new Promise(resolve => server.close(resolve))
     if (sequelize) await sequelize.close()
