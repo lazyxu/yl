@@ -165,7 +165,7 @@
 - 不依赖外部图片 URL、额外 npm/native 绘图库、字体文件或手工 git 忽略文件；保持 `node scripts/generate-pwa-icons.mjs [output_dir]` 能在 Node 22 的 Windows/Linux/macOS 运行。
 - `node --test test/pwa.test.cjs` 必须包括删除 dist 两个图标后单独调用 PWA cache builder 并核对重生成 PNG 与预缓存清单；PR CI 同时在 Windows 与 Linux 执行 Vite build + PWA test。
 
-## 拼豆 iOS PWA UI 验收（白字班次统一，PR 待合并）
+## 拼豆 iOS PWA UI 验收（白字班次统一，PR #29）
 
 - 拼豆保留独立浅色主题，不影响日历/花园的亮暗模式；本模块 CSS 必须由 `.pindou-page` 或对应 view 范围限定，禁止全局污染其它两个一级模块。
 - 库存主操作保留「历史 / 补豆 / 消耗」，在 320/375/390/430px 和横屏下都必须满足 44px 触控高度，不出现横向隐藏或挤压；筛选、分组、颜色数值、排序行为保持不变。
