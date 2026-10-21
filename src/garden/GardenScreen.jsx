@@ -145,7 +145,7 @@ export default function Garden({ active = true }) {
         <Typography component="h1" className="garden-heading">我的花园</Typography>
       </Box>
       <Button aria-label="添加花卉" className="garden-add-btn" variant="contained" color="success"
-        startIcon={<Add />} disabled={!online || Boolean(offlineSnapshotAt) || Boolean(error)}
+        startIcon={<Add />} disabled={loading || !online || Boolean(offlineSnapshotAt) || Boolean(error)}
         onClick={() => setCreating(true)}>添加花卉</Button>
     </Stack>
   </div>
