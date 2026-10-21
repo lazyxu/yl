@@ -171,12 +171,12 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
   function saveThreshold(v){ localStorage.setItem('pindou-threshold', String(v)); setThreshold(v) }
 
   return (
-    <Box sx={{ p:1 }}>
-      <Box sx={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:1,mb:1}}>
-        <Typography variant="h5" sx={{fontSize:{xs:'1.1rem',sm:'1.25rem',md:'1.4rem'},lineHeight:1.25}}>库存总览</Typography>
-          <Box sx={{display:'flex',alignItems:'center',gap:1}}>
+    <Box className="pindou-page pindou-inventory">
+      <Box className="pindou-inventory-header">
+        <Typography component="h1" variant="h5" className="pindou-inventory-title" sx={{ fontSize: { xs: '1.22rem', sm: '1.4rem' } }}>库存总览</Typography>
+          <Box sx={{ display: 'flex', minWidth: 0 }}>
           {/* 色弱模式已移除 */}
-          <Stack direction="row" spacing={1}>
+          <Stack className="pindou-primary-actions" direction="row" spacing={1}>
             <Button size='small' variant="contained" onClick={() => onNavigate('历史')}>历史</Button>
             <Button size='small' variant="contained" color="success" onClick={()=>{ if (typeof onAction==='function') onAction('补豆') }}>补豆</Button>
             <Button size='small' variant="contained" color="warning" onClick={()=>{ if (typeof onAction==='function') onAction('消耗') }}>消耗</Button>
@@ -189,7 +189,7 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
         {inventoryReady ? '离线或服务器暂不可用：显示本次页面已读取的旧库存，不保证实时准确，暂不可提交修改。' :
           '离线或服务器暂不可用：库存未能读取，不能把未知数量当成 0，请联网后重试。'}
       </Alert>}
-      <Box sx={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:1,mb:1}}>
+      <Box className="pindou-filters" aria-label="库存筛选与排序">
         <TextField label="阈值预警（颗）" type="number" size="small" value={threshold} onChange={e=>saveThreshold(Number(e.target.value))} sx={{width:110}} />
         <ToggleButtonGroup size="small" value={displayMode} exclusive onChange={(e, v)=>{ if (v) setDisplayMode(v) }}>
           <ToggleButton value="all">{inventoryReady ? '全部: ' + displayedInventory.length + ' 项' : '全部（未加载）'}</ToggleButton>
@@ -206,15 +206,15 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
 
       
 
-      {loading && <Typography>加载中...</Typography>}
+      {loading && !inventoryReady && <Typography variant="body2" role="status" color="text.secondary">正在读取库存…</Typography>}
 
-      {!loading && inventoryReady && (displayMode === 'all' ? displayedInventory.length===0 : filteredInventory.length===0) && <Typography>暂无库存记录</Typography>}
+      {!loading && inventoryReady && (displayMode === 'all' ? displayedInventory.length===0 : filteredInventory.length===0) && <Typography className="pindou-empty-state" role="status">暂无库存记录</Typography>}
 
       
 
       {/* 虚拟化卡片列表：每行为卡片风格，移动优先单列 */}
       {filteredInventory.length > 0 && (
-        <InventoryGrid groupedInventory={groupedForGrid} findPalette={findPalette} />
+        <Box className="pindou-inventory-sections"><InventoryGrid groupedInventory={groupedForGrid} findPalette={findPalette} /></Box>
       )}
 
       
