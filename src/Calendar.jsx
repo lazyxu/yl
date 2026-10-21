@@ -437,10 +437,6 @@ export default function Calendar({ active = true }) {
         <div className="selected-date-header">
           <div className="selected-date-heading">
             <Typography component="h3">{selectedDate.format('YYYY年MM月DD日') + ' ' + WEEKDAYS[selectedDate.day()]}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {selectedDate.isSame(today, 'day') ? '今天 · ' : ''}
-              {selectedDate.isSame(currentMonth, 'month') ? '本月日期' : '不在当前月份'}
-            </Typography>
           </div>
           <span className="selected-shift" style={shiftStyle(currentShift)}>{currentShift}</span>
         </div>
