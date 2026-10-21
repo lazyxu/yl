@@ -1,0 +1,46 @@
+name: Temporary Pindou iOS visual verification
+on:
+  push:
+    branches: [ui/ios-pwa-shift-contrast-pindou-20261021]
+concurrency:
+  group: pindou-ios-pwa
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+        ports: ["3306:3306"]
+        options: --health-cmd="mysqladmin ping -h localhost -uroot -pci-only-password" --health-interval=5s --health-timeout=5s --health-retries=30
+    env:
+      E2E_MYSQL: "1"
+      BACKUP_TEST_MYSQL: "1"
+      BACKUP_TEST_HOST: 127.0.0.1
+      BACKUP_TEST_PASSWORD: ci-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --legacy-peer-deps
+      - run: npm install --prefix server --omit=dev --package-lock=false
+      - run: npx eslint src/Inventory.jsx src/History.jsx src/PindouConsume.jsx src/App.jsx src/shifts.js
+      - run: npm test -- --runInBand --testPathIgnorePatterns=recognize.image.test.js
+      - run: node --test test/pindou-datetime.test.cjs test/deployment.test.cjs test/deployment-rollback.test.cjs test/garden-validation.test.cjs
+      - run: npm run build
+      - run: node --test test/pwa.test.cjs
+      - run: node --test test/garden.integration.cjs test/settings.integration.cjs test/pindou-stock.integration.cjs
+      - run: npm install --no-save --legacy-peer-deps --package-lock=false playwright@1.56.1
+      - run: npx playwright install --with-deps chromium webkit
+      - run: node test/browser-garden.e2e.mjs
+      - run: node test/browser-pwa-offline.e2e.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pindou-mobile-screenshots
+          path: test-results/
+          if-no-files-found: ignore
