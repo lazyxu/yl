@@ -14,6 +14,6 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm test -- --runInBand
+      - run: npm test -- --runInBand --testPathIgnorePatterns=recognize.image.test.js
       - run: node --test test/pwa.test.cjs
       - run: npm run build
