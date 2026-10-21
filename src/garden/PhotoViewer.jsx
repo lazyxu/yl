@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Box, Button, CircularProgress, Dialog, IconButton, Stack, Typography } from '@mui/material'
+import { Box, Button, CircularProgress, Dialog, DialogTitle, IconButton, Stack, Typography } from '@mui/material'
 import { ChevronLeft, ChevronRight, Close, DownloadOutlined, IosShareOutlined,
   ZoomInOutlined, ZoomOutOutlined, VisibilityOutlined } from '@mui/icons-material'
 import { gardenPhoto } from '../gardenApi'
@@ -231,8 +231,13 @@ export default function Viewer({ photos, current, onClose,
   }
 
   return <Dialog open fullScreen onClose={onClose} PaperProps={{ className: 'garden-viewer', sx: {
-    m: 0, width: '100%', maxWidth: 'none', height: '100dvh', borderRadius: '0 !important', color: '#fff',
-  } }} aria-label="照片查看器">
+    m: 0, width: '100%', maxWidth: 'none', height: '100dvh',
+    borderRadius: '0 !important', backgroundColor: '#090c0a', color: '#fff',
+  } }} aria-labelledby="garden-viewer-title">
+    <DialogTitle component="h2" id="garden-viewer-title" sx={{
+      position: 'absolute', width: 1, height: 1, p: 0, overflow: 'hidden',
+      clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap',
+    }}>照片查看器</DialogTitle>
     {controls && <Stack className="garden-viewer-toolbar" direction="row" alignItems="center" gap={0.5}>
       <IconButton onClick={onClose} aria-label="关闭" sx={{ color: '#fff' }}><Close/></IconButton>
       <Typography flex={1} textAlign="center" fontSize={14} fontWeight={650}>{index + 1} / {photos.length}</Typography>
