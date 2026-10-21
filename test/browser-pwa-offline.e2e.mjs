@@ -377,6 +377,8 @@ async function verify(engine) {
     await page.getByRole('button', { name: '查看照片：offline.png' }).click()
     const offlineViewer = page.getByRole('dialog', { name: '照片查看器' })
     await offlineViewer.getByText('仅显示本机已缓存缩略图', { exact: false }).waitFor({ timeout: 15000 })
+    assert.equal(await offlineViewer.evaluate(element => getComputedStyle(element).backgroundColor),
+      'rgb(9, 12, 10)', tag + ': viewer background stays dark so controls remain legible')
     const viewerSource = await offlineViewer.locator('.garden-large-photo').getAttribute('src')
     assert(viewerSource?.startsWith('blob:'), tag + ': offline viewer uses local thumbnail Object URL')
     assert.equal(await offlineViewer.locator('[aria-label="下载原图"]').count(), 0,
