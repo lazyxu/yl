@@ -275,13 +275,17 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await dayEditor.getByRole('button', { name: '取消' }).click()
     const discard = page.locator('[role="dialog"][aria-labelledby="shift-discard-title"]')
     await discard.getByRole('button', { name: '放弃更改' }).click()
+    // Inspect real computed colors while the Calendar is visible; WebKit
+    // does not resolve computed style consistently inside a hidden tab.
+    const shiftColors = await calendarRoot.locator('.calendar .shift').evaluateAll(els =>
+      els.map(el => getComputedStyle(el).color))
+    check(shiftColors.length === 42 &&
+      shiftColors.every(color => color === 'rgb(255, 255, 255)'),
+      tag + ': all visible daily shift badges use white text')
     await page.locator('footer button').filter({ hasText: '拼豆' }).click()
     check(await page.locator('.app-shell').getAttribute('data-theme') === 'light',
       tag + ': Pindou remains light while Garden/Calendar may be dark')
     await page.getByText('库存总览').waitFor()
-    const shiftBadges = await calendarRoot.locator('.calendar .shift').evaluateAll(els =>
-      els.length > 0 && els.every(el => getComputedStyle(el).color === 'rgb(255, 255, 255)'))
-    check(shiftBadges, tag + ': all daily shift badges use white text')
     await auditPindouLayout(page, tag, 'inventory')
 
     // An actual MySQL-backed long-note record stresses History's narrow
