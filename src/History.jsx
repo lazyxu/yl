@@ -13,7 +13,7 @@ import { toDatetimeLocal, fromDatetimeLocal } from './dateTime'
 
 
 
-export default function History({ active = true, onNavigate = ()=>{}, refreshKey }){
+export default function History({ active = true, refreshKey }){
   const [records, setRecords] = useState([])
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [editingId, setEditingId] = useState(null)
@@ -126,13 +126,6 @@ export default function History({ active = true, onNavigate = ()=>{}, refreshKey
 
   return (
     <Box sx={{ p:1 }}>
-      <Box sx={{ display:'flex', alignItems:'center', justifyContent:'space-between', mb:1 }}>
-        <Typography variant="h6">补豆 / 消耗 历史</Typography>
-        <Box>
-          <Button size="small" onClick={() => onNavigate('拼豆')}>返回</Button>
-        </Box>
-      </Box>
-
       {recordsLoading && <Typography>加载中...</Typography>}
       {!recordsLoading && records.length === 0 && <Typography>暂无历史记录</Typography>}
       {!recordsLoading && records.length > 0 && (
