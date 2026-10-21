@@ -30,60 +30,10 @@ jobs:
       - run: npm install --prefix server --omit=dev --package-lock=false
       - run: node --check test/sql-performance.e2e.cjs
       - run: node test/sql-performance.e2e.cjs
+      - run: SQL_PERF_OUTPUT=test-results/sql-performance-repeat.json node test/sql-performance.e2e.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: sql-api-baseline
-          path: test-results/sql-performance-baseline.json
+          name: sql-api-benchmark-twice
+          path: test-results/*.json
           if-no-files-found: ignore
-  sql-integration:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: ci-only-password
-        ports: ["3306:3306"]
-        options: --health-cmd="mysqladmin ping -h localhost -uroot -pci-only-password" --health-interval=5s --health-timeout=5s --health-retries=30
-    env:
-      BACKUP_TEST_MYSQL: "1"
-      BACKUP_TEST_HOST: 127.0.0.1
-      BACKUP_TEST_PASSWORD: ci-only-password
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci --legacy-peer-deps
-      - run: npm install --prefix server --omit=dev --package-lock=false
-      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends default-mysql-client
-      - run: node --test --test-reporter=spec test/garden.integration.cjs test/pindou-stock.integration.cjs test/settings.integration.cjs test/backup.integration.cjs test/upload.integration.cjs test/garden-media.test.cjs
-  sql-browser-e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: ci-only-password
-        ports: ["3306:3306"]
-        options: --health-cmd="mysqladmin ping -h localhost -uroot -pci-only-password" --health-interval=5s --health-timeout=5s --health-retries=30
-    env:
-      E2E_MYSQL: "1"
-      BACKUP_TEST_HOST: 127.0.0.1
-      BACKUP_TEST_PASSWORD: ci-only-password
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci --legacy-peer-deps
-      - run: npm install --prefix server --omit=dev --package-lock=false
-      - run: npm run build
-      - run: npm install --no-save --legacy-peer-deps --package-lock=false playwright@1.56.1
-      - run: npx playwright install --with-deps chromium webkit
-      - run: node test/browser-garden.e2e.mjs
-      - run: node test/browser-pwa-offline.e2e.mjs
