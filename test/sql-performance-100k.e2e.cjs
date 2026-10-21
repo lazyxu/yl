@@ -182,6 +182,10 @@ async function main() {
       result.cold.inventory_migration_sql_calls = sqlCalls
       assert(first.data.length > 0)
 
+      const hotDetail = await rawRequest('/api/garden/plants/' + plantId)
+      const expectedNewest = await GardenPhoto.findOne({where:{entry_id:entryIds[59_999]}})
+      assert.equal(hotDetail.data.photo_count,60_000)
+      assert.equal(hotDetail.data.latest_photo_id,expectedNewest.id)
       const firstPlant = await rawRequest('/api/garden/plants?status=all&limit=36')
       const cursor = firstPlant.data.next_cursor
       assert.equal(firstPlant.data.total,100000)

@@ -17,7 +17,12 @@ const GardenPlant = sequelize.define('GardenPlant', {
   location: { type: DataTypes.STRING(200), allowNull: false, defaultValue: '' },
   notes: { type: DataTypes.TEXT, allowNull: false, defaultValue: '' },
   status: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'active' },
-}, { tableName: 'garden_plants', underscored: true, indexes: [{ fields: ['species_id', 'status'] }] })
+}, { tableName: 'garden_plants', underscored: true, indexes: [
+  { fields: ['species_id', 'status'] },
+  { fields: ['created_at', 'id'] },
+  { fields: ['status', 'created_at', 'id'] },
+  { fields: ['species_id', 'created_at', 'id'] },
+] })
 
 const GardenEntry = sequelize.define('GardenEntry', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
@@ -27,7 +32,12 @@ const GardenEntry = sequelize.define('GardenEntry', {
   local_date: { type: DataTypes.DATEONLY, allowNull: false },
   note: { type: DataTypes.TEXT, allowNull: false, defaultValue: '' },
   author_name: { type: DataTypes.STRING(60), allowNull: false, defaultValue: '' },
-}, { tableName: 'garden_entries', underscored: true, indexes: [{ fields: ['plant_id', 'observed_ts'] }, { fields: ['local_date'] }] })
+}, { tableName: 'garden_entries', underscored: true, indexes: [
+  { fields: ['plant_id', 'observed_ts'] },
+  { fields: ['local_date'] },
+  { fields: ['local_date', 'observed_ts', 'id'] },
+  { fields: ['plant_id', 'local_date'] },
+] })
 
 const GardenPhoto = sequelize.define('GardenPhoto', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
