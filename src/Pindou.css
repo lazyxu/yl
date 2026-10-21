@@ -1,0 +1,147 @@
+/* iOS PWA Pindou presentation. Scoped: Calendar / Garden remain untouched. */
+.pindou-page {
+  --pindou-line: #e2e8ee;
+  --pindou-muted: #617183;
+  --pindou-surface: #ffffff;
+  width: 100%;
+  max-width: 900px;
+  min-width: 0;
+  margin-inline: auto;
+  padding: 12px 14px 28px;
+  color: #233246;
+}
+.pindou-page, .pindou-page * { box-sizing: border-box; }
+.pindou-page .MuiInputBase-root,
+.pindou-page .MuiFormControl-root { max-width: 100%; min-width: 0; }
+.pindou-page .MuiButton-root { min-height: 44px; }
+.pindou-page .MuiIconButton-root { min-width: 44px; min-height: 44px; }
+.pindou-page .MuiAlert-root { margin-bottom: 12px; overflow-wrap: anywhere; }
+.pindou-page .MuiAlert-message { min-width: 0; overflow-wrap: anywhere; }
+
+.pindou-inventory-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 2px 0 14px;
+}
+.pindou-inventory-title { font-weight: 750; line-height: 1.3; }
+.pindou-primary-actions { display: flex; min-width: 0; flex: 0 1 auto; }
+.pindou-primary-actions .MuiButton-root {
+  min-width: 0;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+.pindou-filters {
+  display: flex; align-items: center; flex-wrap: wrap;
+  min-width: 0; gap: 10px; margin-bottom: 14px;
+}
+.pindou-filters .MuiToggleButtonGroup-root { max-width: 100%; }
+.pindou-filters .MuiToggleButton-root {
+  min-width: 0; padding-inline: 12px; line-height: 1.3; font-weight: 650;
+  white-space: normal; overflow-wrap: anywhere;
+}
+.pindou-page .pindou-empty-state {
+  padding: 20px 12px; text-align: center; color: var(--pindou-muted);
+  border: 1px dashed var(--pindou-line); border-radius: 14px;
+}
+.pindou-page .pindou-inventory-sections .MuiFormGroup-root {
+  padding-block: 6px;
+}
+.pindou-history-list { min-width: 0; }
+.pindou-history-card {
+  min-width: 0; padding: 12px;
+  background: var(--pindou-surface); border: 1px solid var(--pindou-line);
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgb(30 50 70 / 4%);
+}
+.pindou-history-head, .pindou-history-meta, .pindou-history-actions {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+}
+.pindou-history-head { justify-content: space-between; flex-wrap: wrap; }
+.pindou-history-meta { flex: 1 1 135px; flex-wrap: wrap; }
+.pindou-history-meta .MuiTypography-root { overflow-wrap: anywhere; }
+.pindou-history-actions { flex: 0 0 auto; margin-left: auto; }
+.pindou-history-media {
+  display: flex; align-items: flex-start; gap: 10px; min-width: 0;
+  margin: 10px 0 4px; padding-block: 4px;
+}
+.pindou-history-media img {
+  display: block; width: 56px; height: 56px; flex: none;
+  object-fit: cover; border: 1px solid var(--pindou-line); border-radius: 9px;
+}
+.pindou-history-note { min-width: 0; flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pindou-history-editor {
+  padding: 12px; margin: 10px 0; border: 1px solid var(--pindou-line);
+  background: #f8fafc; border-radius: 13px; min-width: 0;
+}
+.pindou-edit-field {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr);
+  align-items: center; gap: 8px; margin-bottom: 12px; min-width: 0;
+}
+.pindou-edit-field input, .pindou-edit-item input, .pindou-edit-item select {
+  display: block; width: 100%; min-width: 0; max-width: 100%;
+  min-height: 44px; padding: 9px 8px;
+  font: inherit; font-size: 16px; border: 1px solid #cbd5e1;
+  border-radius: 10px; background: #fff; color: #233246;
+}
+.pindou-edit-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) minmax(60px, 80px) 44px;
+  gap: 7px; align-items: center; min-width: 0; margin-bottom: 8px;
+}
+.pindou-history-edit-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pindou-history-edit-actions .MuiButton-root { flex: 1 1 90px; }
+
+.pindou-form-field { min-width: 0; margin-bottom: 12px; }
+.pindou-form-color .MuiAutocomplete-root { width: 100%; min-width: 0; }
+.pindou-form-color .MuiAutocomplete-inputRoot {
+  flex-wrap: wrap; max-height: 145px; overflow-y: auto; align-content: center;
+}
+.pindou-form-quantity {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.pindou-form-quantity .MuiTextField-root { flex: 0 1 125px; min-width: 108px; }
+.pindou-file-row {
+  display: flex; align-items: center; min-width: 0; gap: 10px; flex-wrap: wrap;
+}
+.pindou-file-name { flex: 1 1 130px; min-width: 0; overflow-wrap: anywhere; }
+.pindou-draft-photo { display: block; max-width: min(100%, 180px); max-height: 120px;
+  width: auto; height: auto; border-radius: 11px; border: 1px solid var(--pindou-line);
+}
+.pindou-form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.pindou-form-actions .MuiButton-root { flex: 1 1 112px; }
+.pindou-page input[type="file"].pindou-hidden-input { display: none; }
+.pindou-confirm-dialog .MuiDialogContentText-root { overflow-wrap: anywhere; }
+.pindou-image-preview img {
+  display: block; max-width: 100%; max-height: min(70dvh, 580px);
+  width: auto; height: auto; object-fit: contain; margin: auto;
+}
+@media (max-width: 599px) {
+  .pindou-page { padding: 12px 12px 24px; }
+  .pindou-inventory-header { align-items: stretch; flex-direction: column; }
+  .pindou-primary-actions { width: 100%; }
+  .pindou-primary-actions .MuiButton-root { flex: 1 1 0; }
+  .pindou-filters { align-items: stretch; gap: 8px; }
+  .pindou-filters .MuiToggleButtonGroup-root { width: 100%; }
+  .pindou-filters .MuiToggleButton-root { flex: 1 1 0; }
+  .pindou-filters .MuiTextField-root { width: 100%; }
+  .pindou-edit-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .pindou-history-card { padding: 10px; }
+  .pindou-form-quantity .MuiButton-root { flex: 1 1 118px; }
+  .pindou-file-row .pindou-file-name { flex-basis: 100%; }
+  .pindou-confirm-dialog .MuiDialog-container { align-items: flex-end; }
+  .pindou-confirm-dialog .MuiDialog-paper {
+    width: 100%; margin: 0; border-radius: 20px 20px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 12px);
+  }
+}
+@media (max-width: 349px) {
+  .pindou-page { padding-inline: 9px; }
+  .pindou-edit-item { grid-template-columns: 26px minmax(0, 1fr) 65px 44px; gap: 4px; }
+  .pindou-filters .MuiToggleButton-root { padding-inline: 5px; }
+}
+@media (max-height: 480px) and (pointer: coarse) {
+  .pindou-page { padding-block: 6px 14px; }
+}
