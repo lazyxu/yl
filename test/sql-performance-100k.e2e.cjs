@@ -382,16 +382,16 @@ async function main() {
         return rows.map(row=>[row.TABLE_NAME, row.INDEX_NAME, Number(row.columns_count)])
       }
       const beforeIndexes = await indexSnapshot()
+      const rowCounts = () => Promise.all([GardenPlant.count(), GardenEntry.count(), GardenPhoto.count(), Reminder.count()])
+      const beforeCounts = await rowCounts()
       const syncRuns = []
       for (let i = 0; i < 2; i++) {
         const start = performance.now()
         await sequelize.sync({ alter: true })
         const ms = Math.round((performance.now()-start)*100)/100
-        const count = await Promise.all([
-          GardenPlant.count(), GardenEntry.count(), GardenPhoto.count(), Reminder.count(),
-        ])
-        assert.deepEqual(count, [100_000,100_000,100_000,100_000],
-          'Startup schema sync must preserve 100k data rows')
+        const count = await rowCounts()
+        assert.deepEqual(count, beforeCounts,
+          'Startup schema sync must preserve rows including write-test fixtures')
         syncRuns.push({ms,indexes:await indexSnapshot()})
         console.log('SQL-PERF-SCHEMA '+JSON.stringify({run:i+1,ms,indexes:syncRuns[i].indexes.length}))
       }
