@@ -67,7 +67,9 @@ export async function saveCalendarSnapshot({ rules, overrides, rulesVersion, ove
 }
 
 export function gardenOfflineEnabled() {
-  try { return localStorage.getItem(GARDEN_CONSENT) === 'yes' }
+  // Missing preference means "on" for fresh installs; retain an explicit
+  // opt-out so disabling/clearing cache is respected across reloads.
+  try { return localStorage.getItem(GARDEN_CONSENT) !== 'no' }
   catch { return false }
 }
 export async function gardenOfflineSupported() {
@@ -76,20 +78,23 @@ export async function gardenOfflineSupported() {
 export async function setGardenOfflineEnabled(enabled) {
   if (enabled && !(await gardenOfflineSupported())) return false
   try {
-    if (enabled) localStorage.setItem(GARDEN_CONSENT, 'yes')
-    else localStorage.removeItem(GARDEN_CONSENT)
+    localStorage.setItem(GARDEN_CONSENT, enabled ? 'yes' : 'no')
   } catch { return false }
   if (!enabled) await clearGardenOffline(false)
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('yl:garden-offline', { detail: { enabled } }))
   return true
 }
 export async function clearGardenOffline(removePreference = true) {
+  // Revoke retention before asynchronous deletion; an in-flight save must
+  // not silently repopulate the cache after the user has cleared it.
+  if (removePreference) {
+    try { localStorage.setItem(GARDEN_CONSENT, 'no') } catch { /* storage forbidden */ }
+  }
   const keys = await allKeys()
   for (const key of (keys || [])) if (typeof key === 'string' && key.startsWith('garden:')) await remove(key)
   if (typeof caches !== 'undefined') await caches.delete(THUMB_CACHE).catch(() => {})
-  if (removePreference) {
-    try { localStorage.removeItem(GARDEN_CONSENT) } catch { /* storage forbidden */ }
-    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('yl:garden-offline', { detail: { enabled: false } }))
+  if (removePreference && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('yl:garden-offline', { detail: { enabled: false } }))
   }
 }
 export async function saveGardenIndex({ items, total, species = [] }) {

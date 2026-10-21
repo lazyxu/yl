@@ -295,6 +295,8 @@ async function verify(engine) {
     await page.waitForFunction(() => !document.querySelector('.schedule-unverified'))
 
     await page.locator('footer button').filter({ hasText: '花园' }).click()
+    assert.equal(await page.evaluate(() => localStorage.getItem('yl-garden-offline-optin-v1')), null,
+      tag + ': fresh devices start with no explicit preference')
     await page.getByRole('button', { name: '添加花卉' }).click()
     const name = '离线验证月季-' + tag
     const editor = page.getByRole('dialog', { name: '添加花卉' })
@@ -312,14 +314,18 @@ async function verify(engine) {
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
     await page.locator('.garden-detail-back').click()
     await page.getByText(name, { exact: true }).waitFor()
-    await page.getByText('离线浏览设置', { exact: true }).click()
-    await page.getByLabel('开启花园离线浏览').check()
+    await page.getByText('离线缓存', { exact: true }).click()
+    assert.equal(await page.getByLabel('开启花园离线浏览').isChecked(), true,
+      tag + ': garden offline browsing is enabled by default')
+    for (const copy of ['仅限只读：最多', '本地离线内容可能被使用此设备', '浏览器报告的本站点总存储'])
+      assert.equal(await page.getByText(copy, { exact: false }).count(), 0,
+        tag + ': long explanatory copy is removed')
     await page.getByText(name, { exact: true }).click()
     const plantId = await page.evaluate(() => Number(new URLSearchParams(location.search).get('plant')))
     assert(Number.isSafeInteger(plantId) && plantId > 0,
       tag + ': detail URL identifies the actual newly created flower')
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
-    assert(await idbValue(page, 'garden:index'), tag + ': opt-in index persisted')
+    assert(await idbValue(page, 'garden:index'), tag + ': default-enabled index persisted')
     // Chromium and WebKit use the same disposable MySQL instance, and its
     // auto-increment IDs naturally differ across runs. Never hardcode id=1.
     await page.waitForFunction(id => new Promise(resolve => {
@@ -412,12 +418,12 @@ async function verify(engine) {
       await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
     }
     await page.getByText(name, { exact: true }).waitFor()
-    await page.getByText('离线浏览设置', { exact: true }).click()
-    // Clearing IndexedDB and Cache Storage is async: wait until the switch
-    // reports completion rather than treating a still-busy control as failed.
+    await page.getByText('离线缓存', { exact: true }).click()
+    // A user tap changes the switch immediately; cache deletion completes
+    // asynchronously, so verify the durable choice and settled UI afterward.
     await page.getByLabel('开启花园离线浏览').click()
     await page.waitForFunction(() =>
-      localStorage.getItem('yl-garden-offline-optin-v1') !== 'yes' &&
+      localStorage.getItem('yl-garden-offline-optin-v1') === 'no' &&
       document.querySelector('[aria-label="开启花园离线浏览"]')?.checked === false)
     await page.waitForFunction(() => new Promise(resolve => {
       const req = indexedDB.open('yl-offline-readonly', 1)

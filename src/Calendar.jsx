@@ -453,7 +453,7 @@ export default function Calendar({ active = true }) {
           {selectedOverride.note && <p className="day-adjustment-note">{selectedOverride.note}</p>}
         </div>}
         <div className="selected-date-footer">
-          <Typography variant="caption" color="text.secondary">在一起第 {getDaysTogether(selectedDate)} 天</Typography>
+          <Typography variant="caption" color="text.secondary">第 {getDaysTogether(selectedDate)} 天</Typography>
           <Button variant="contained" onClick={() => adjustDay(selectedDate)} disabled={!canAdjust}>调整当天排班</Button>
         </div>
       </section>
