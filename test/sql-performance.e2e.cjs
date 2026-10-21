@@ -179,11 +179,16 @@ async function main() {
       assert(reminderId)
       await probe('pindou.reminders.update', () => rawRequest('/api/reminders/'+reminderId,
         asJSON(newReminder(), 'PUT')), 5)
-      // For deletion, create one disposable reminder per iteration.
-      await probe('pindou.reminders.delete', async () => {
+      // Prepare delete fixtures OUTSIDE the timed requests. Never measure
+      // POST+DELETE as one DELETE transaction (the former inflated p95 under
+      // concurrent GitHub runner load).
+      const deleteIDs = []
+      for (let i = 0; i < 12; i++) {
         const row = await rawRequest('/api/reminders', asJSON(newReminder()))
-        return rawRequest('/api/reminders/'+row.data.id, { method:'DELETE' })
-      }, 5)
+        deleteIDs.push(row.data.id)
+      }
+      await probe('pindou.reminders.delete', () =>
+        rawRequest('/api/reminders/'+deleteIDs.shift(), { method:'DELETE' }), 11)
       const rules = Array.from({ length: 100 }, (_,i) => ({
         startDate: new Date(Date.UTC(2027,0,i+1)).toISOString().slice(0,10),
         shifts: Array(366).fill(i%2 ? '夜班' : '白班'),
