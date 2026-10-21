@@ -325,7 +325,7 @@ async function verify(engine) {
     assert(Number.isSafeInteger(plantId) && plantId > 0,
       tag + ': detail URL identifies the actual newly created flower')
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
-    assert(await idbValue(page, 'garden:index'), tag + ': opt-in index persisted')
+    assert(await idbValue(page, 'garden:index'), tag + ': default-enabled index persisted')
     // Chromium and WebKit use the same disposable MySQL instance, and its
     // auto-increment IDs naturally differ across runs. Never hardcode id=1.
     await page.waitForFunction(id => new Promise(resolve => {
@@ -418,12 +418,10 @@ async function verify(engine) {
       await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
     }
     await page.getByText(name, { exact: true }).waitFor()
-    await page.getByText('离线浏览设置', { exact: true }).click()
-    // Clearing IndexedDB and Cache Storage is async: wait until the switch
-    // reports completion rather than treating a still-busy control as failed.
-    await page.getByLabel('开启花园离线浏览').click()
+    await page.getByText('离线缓存', { exact: true }).click()
+    await page.getByLabel('开启花园离线浏览').uncheck()
     await page.waitForFunction(() =>
-      localStorage.getItem('yl-garden-offline-optin-v1') !== 'yes' &&
+      localStorage.getItem('yl-garden-offline-optin-v1') === 'no' &&
       document.querySelector('[aria-label="开启花园离线浏览"]')?.checked === false)
     await page.waitForFunction(() => new Promise(resolve => {
       const req = indexedDB.open('yl-offline-readonly', 1)
