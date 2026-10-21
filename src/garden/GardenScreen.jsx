@@ -145,7 +145,7 @@ export default function Garden({ active = true }) {
         <Typography component="h1" className="garden-heading">我的花园</Typography>
       </Box>
       <Button aria-label="添加花卉" className="garden-add-btn" variant="contained" color="success"
-        startIcon={<Add />} disabled={!online || Boolean(offlineSnapshotAt)}
+        startIcon={<Add />} disabled={!online || Boolean(offlineSnapshotAt) || Boolean(error)}
         onClick={() => setCreating(true)}>添加花卉</Button>
     </Stack>
   </div>
@@ -156,7 +156,7 @@ export default function Garden({ active = true }) {
           onBack={() => goPlant(null)} onChange={refresh} onSpecies={fetchSpecies} notify={notify} />
       : <Box>
         {heading}
-        {(offlineSnapshotAt || !online && gardenOfflineEnabled()) &&
+        {(offlineSnapshotAt || !online && gardenOfflineEnabled() && !error) &&
           <Alert severity="warning" sx={{ mb: 1.5 }}>
             {offlineSnapshotAt
               ? '仅显示上次离线保存的部分花园数据（' + new Date(offlineSnapshotAt).toLocaleString('zh-CN') + '），不能编辑或删除。'
