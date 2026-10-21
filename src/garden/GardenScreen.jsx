@@ -143,7 +143,6 @@ export default function Garden({ active = true }) {
     <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
       <Box minWidth={0}>
         <Typography component="h1" className="garden-heading">我的花园</Typography>
-        <div className="garden-subtitle">记录每一株花的成长</div>
       </Box>
       <Button aria-label="添加花卉" className="garden-add-btn" variant="contained" color="success"
         startIcon={<Add />} disabled={!online || Boolean(offlineSnapshotAt)}
