@@ -1,26 +1,38 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { cachedThumbnail, rememberThumbnail, gardenOfflineEnabled } from './data'
 
-// Only previously viewed /thumb images can be rendered offline; originals
-// never enter Cache Storage. Object URLs are revoked on source changes/unmount.
+// A retry query changes the network request, not the identity of a consented
+// thumbnail in Cache Storage. Other API responses must never be cached here.
+const cacheKey = source => /^\/api\/garden\/photos\/\d+\/thumb(?:\?.*)?$/.test(source || '')
+  ? source.split('?')[0] : source
+
 export default function OfflinePhoto({ src, alt, onError, ...props }) {
   const [local, setLocal] = useState('')
   const localRef = useRef('')
+  const generation = useRef(0)
+  const pendingFailure = useRef(0)
+
+  const replaceObjectURL = blob => {
+    const next = URL.createObjectURL(blob)
+    if (localRef.current) URL.revokeObjectURL(localRef.current)
+    localRef.current = next
+    setLocal(next)
+  }
+
   useEffect(() => {
-    let alive = true
+    const current = ++generation.current
+    pendingFailure.current = 0
     setLocal('')
     if (localRef.current) URL.revokeObjectURL(localRef.current)
     localRef.current = ''
     if (gardenOfflineEnabled() && typeof navigator !== 'undefined' && !navigator.onLine) {
-      cachedThumbnail(src).then(blob => {
-        if (!alive || !blob) return
-        const url = URL.createObjectURL(blob)
-        localRef.current = url
-        setLocal(url)
-      })
+      cachedThumbnail(cacheKey(src)).then(blob => {
+        if (generation.current !== current || !blob) return
+        replaceObjectURL(blob)
+      }).catch(() => {})
     }
     return () => {
-      alive = false
+      generation.current++
       if (localRef.current) URL.revokeObjectURL(localRef.current)
       localRef.current = ''
     }
@@ -28,14 +40,18 @@ export default function OfflinePhoto({ src, alt, onError, ...props }) {
 
   async function fail() {
     if (local) { onError?.(); return }
-    const blob = await cachedThumbnail(src)
+    const current = generation.current
+    if (pendingFailure.current === current) return
+    pendingFailure.current = current
+    let blob = null
+    try { blob = await cachedThumbnail(cacheKey(src)) } catch { /* no consented cache */ }
+    if (generation.current !== current) return
+    pendingFailure.current = 0
     if (!blob) { onError?.(); return }
-    const url = URL.createObjectURL(blob)
-    if (localRef.current) URL.revokeObjectURL(localRef.current)
-    localRef.current = url
-    setLocal(url)
+    replaceObjectURL(blob)
   }
+
   return <img {...props} src={local || src} alt={alt}
-    onLoad={() => { if (!local) rememberThumbnail(src).catch(() => {}) }}
+    onLoad={() => { if (!local) rememberThumbnail(cacheKey(src)).catch(() => {}) }}
     onError={fail}/>
 }
