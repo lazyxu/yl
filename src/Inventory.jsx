@@ -5,6 +5,7 @@ import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
+import Alert from '@mui/material/Alert'
 // Chip removed; history will show inline color swatches
 import Stack from '@mui/material/Stack'
 import ToggleButton from '@mui/material/ToggleButton'
@@ -50,6 +51,10 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
   })
   const [bulkCountInput, setBulkCountInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [inventoryReady, setInventoryReady] = useState(false)
+  const [inventoryError, setInventoryError] = useState('')
+  const [online, setOnline] = useState(() => navigator.onLine)
+  const [retryKey, setRetryKey] = useState(0)
   const [records, setRecords] = useState([])
   const [recordsLoading, setRecordsLoading] = useState(false)
   const [displayMode, setDisplayMode] = useState('all') // 'all' | 'low'
@@ -57,11 +62,21 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
   // color-blind mode removed
 
   useEffect(() => {
+    const disconnected = () => setOnline(false)
+    const reconnected = () => { setOnline(true); setRetryKey(key => key + 1) }
+    window.addEventListener('offline', disconnected)
+    window.addEventListener('online', reconnected)
+    return () => {
+      window.removeEventListener('offline', disconnected)
+      window.removeEventListener('online', reconnected)
+    }
+  }, [])
+  useEffect(() => {
     if (!active) return
     const controller = new AbortController()
     fetchInventory(controller.signal)
     return () => controller.abort()
-  }, [active, refreshKey])
+  }, [active, refreshKey, retryKey])
 
   // history moved to separate page
 
@@ -69,12 +84,12 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
   // and append any backend inventory entries not present in MARD.
   const displayedInventory = useMemo(() => {
     const map = new Map((inventory || []).map(i => [i.color, i.count]))
-    const list = MARD.map(p => ({ color: p.code, count: map.has(p.code) ? map.get(p.code) : 0 }))
+    const list = inventoryReady ? MARD.map(p => ({ color: p.code, count: map.has(p.code) ? map.get(p.code) : 0 })) : []
     ;(inventory || []).forEach(i => {
       if (!PALETTE_CODES.has(i.color)) list.push(i)
     })
     return list
-  }, [inventory])
+  }, [inventory, inventoryReady])
 
   // filtered by display mode and threshold
   const filteredInventory = useMemo(() => {
@@ -118,13 +133,14 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
 
   async function fetchInventory(signal) {
     setLoading(true)
+    setInventoryError('')
     try {
       const res = await fetch('/api/inventory', { signal })
       const data = await res.json()
       if (!res.ok || !Array.isArray(data)) throw new Error('库存暂时无法更新')
-      if (!signal.aborted) setInventory(data)
+      if (!signal.aborted) { setInventory(data); setInventoryReady(true) }
     } catch (err) {
-      if (err.name !== 'AbortError') console.error(err)
+      if (err.name !== 'AbortError' && !signal.aborted) setInventoryError('无法获取最新库存')
     } finally { if (!signal.aborted) setLoading(false) }
   }
 
@@ -168,11 +184,16 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
         </Box>
       </Box>
 
+      {(!online || inventoryError) && <Alert severity="warning" role="status" sx={{ mb: 1, overflowWrap: 'anywhere' }}
+        action={online ? <Button color="inherit" onClick={() => setRetryKey(key => key + 1)}>重试</Button> : undefined}>
+        {inventoryReady ? '离线或服务器暂不可用：显示本次页面已读取的旧库存，不保证实时准确，暂不可提交修改。' :
+          '离线或服务器暂不可用：库存未能读取，不能把未知数量当成 0，请联网后重试。'}
+      </Alert>}
       <Box sx={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:1,mb:1}}>
         <TextField label="阈值预警（颗）" type="number" size="small" value={threshold} onChange={e=>saveThreshold(Number(e.target.value))} sx={{width:110}} />
         <ToggleButtonGroup size="small" value={displayMode} exclusive onChange={(e, v)=>{ if (v) setDisplayMode(v) }}>
-          <ToggleButton value="all">全部: {displayedInventory.length} 项</ToggleButton>
-          <ToggleButton value="low">低于阈值: {lowCount} 项</ToggleButton>
+          <ToggleButton value="all">{inventoryReady ? '全部: ' + displayedInventory.length + ' 项' : '全部（未加载）'}</ToggleButton>
+          <ToggleButton value="low">{inventoryReady ? '低于阈值: ' + lowCount + ' 项' : '低于阈值（未加载）'}</ToggleButton>
         </ToggleButtonGroup>
         <ToggleButtonGroup size="small" value={sortOrder} exclusive onChange={(e, v)=>{ if (v) setSortOrder(v) }}>
           <ToggleButton value="none">默认</ToggleButton>
@@ -187,7 +208,7 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
 
       {loading && <Typography>加载中...</Typography>}
 
-      {!loading && (displayMode === 'all' ? displayedInventory.length===0 : filteredInventory.length===0) && <Typography>暂无库存记录</Typography>}
+      {!loading && inventoryReady && (displayMode === 'all' ? displayedInventory.length===0 : filteredInventory.length===0) && <Typography>暂无库存记录</Typography>}
 
       
 
