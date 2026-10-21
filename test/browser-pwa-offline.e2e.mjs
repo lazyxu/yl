@@ -393,6 +393,8 @@ async function verify(engine) {
       await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
     }
     await page.getByText('本设备尚无可用的已保存快照', { exact: false }).waitFor()
+    assert.equal(await page.getByRole('button', { name: '添加花卉' }).isDisabled(), true,
+      tag + ': garden mutation is blocked even if WebKit reports online during an origin outage')
     const offlineError = await page.locator('.garden-error').boundingBox()
     const gardenTabs = await page.locator('.garden-segments').boundingBox()
     assert(offlineError && gardenTabs && offlineError.y + offlineError.height <= gardenTabs.y + 2,
