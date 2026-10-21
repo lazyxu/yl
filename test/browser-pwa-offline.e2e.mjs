@@ -419,7 +419,9 @@ async function verify(engine) {
     }
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('离线缓存', { exact: true }).click()
-    await page.getByLabel('开启花园离线浏览').uncheck()
+    // A user tap changes the switch immediately; cache deletion completes
+    // asynchronously, so verify the durable choice and settled UI afterward.
+    await page.getByLabel('开启花园离线浏览').click()
     await page.waitForFunction(() =>
       localStorage.getItem('yl-garden-offline-optin-v1') === 'no' &&
       document.querySelector('[aria-label="开启花园离线浏览"]')?.checked === false)
