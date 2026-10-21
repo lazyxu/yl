@@ -20,7 +20,6 @@
   padding: 24px 0 16px;
 }
 .garden-heading { font-size: clamp(28px, 7.5vw, 36px); font-weight: 770; letter-spacing: -.7px; line-height: 1.15; }
-.garden-subtitle { font-size: 14px; color: var(--garden-muted); margin-top: 5px; }
 .garden-add-btn { flex: 0 0 auto; white-space: nowrap; }
 .garden-segments {
   display: flex;
