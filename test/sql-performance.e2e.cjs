@@ -71,12 +71,12 @@ async function main() {
       garden_photos: 1100, reminders: 1250, calendar_day_entries: 580,
       primary_plant_entries: 530 }
     const app = express()
+    app.use(express.json({ limit: '1mb' }))
     app.use('/api/garden', require('../server/routes/garden'))
     app.use('/api/inventory', require('../server/routes/inventory'))
     app.use('/api/reminders', require('../server/routes/reminders'))
     app.use('/api/settings/shifts/overrides', require('../server/routes/day-shifts'))
     app.use('/api/settings/shifts', require('../server/routes/settings'))
-    app.use(express.json({ limit: '1mb' }))
     server = await new Promise(resolve => {
       const listening = app.listen(0, '127.0.0.1', () => resolve(listening))
     })
