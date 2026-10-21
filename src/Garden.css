@@ -188,6 +188,10 @@
 }
 .garden-detail-skeleton { min-height: 460px; padding-top: 18px; }
 .garden-calendar-panel { background: var(--garden-card); border: 1px solid var(--garden-border); border-radius: 20px; padding: 14px; }
+.garden-calendar-offline-note {
+  font-size: 12px; line-height: 1.5; margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
 .garden-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
