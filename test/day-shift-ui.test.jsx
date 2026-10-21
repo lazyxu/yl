@@ -219,7 +219,8 @@ test('日历重设计保留每天的完整班次文字标签、固定六周和�
   expect(day('2026-10-13').querySelector('.shift').textContent).toBe('备班')
   expect([...host.querySelectorAll('.calendar .shift')].map(el => el.textContent)).toEqual(
     expect.arrayContaining(['白班', '夜班', '休息', '备班']))
-  expect(host.querySelector('.selected-date-info').textContent).toContain('在一起第')
+  expect(host.querySelector('.selected-date-footer').textContent).toMatch(/第\s*\d+\s*天/)
+  expect(host.querySelector('.selected-date-footer').textContent).not.toContain('在一起')
   expect([...host.querySelectorAll('button')].some(el => el.textContent.trim() === '今天')).toBe(true)
   const month = host.querySelector('.header h2')
   await act(async () => host.querySelector('[aria-label="下个月"]').dispatchEvent(new MouseEvent('click', { bubbles: true })))
