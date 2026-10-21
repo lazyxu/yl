@@ -3,6 +3,7 @@ import { Box, Button, CircularProgress, Dialog, IconButton, Stack, Typography } 
 import { ChevronLeft, ChevronRight, Close, DownloadOutlined, IosShareOutlined,
   ZoomInOutlined, ZoomOutOutlined, VisibilityOutlined } from '@mui/icons-material'
 import { gardenPhoto } from '../gardenApi'
+import { cachedThumbnail } from '../offline/data'
 
 const distance = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
 const midpoint = (a, b) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 })
@@ -14,7 +15,8 @@ export default function Viewer({ photos, current, onClose,
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 })
   const [imageError, setImageError] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
-  const [variant, setVariant] = useState('preview')
+  const [variant, setVariant] = useState(() => navigator.onLine ? 'preview' : 'offline')
+  const [cachedUrl, setCachedUrl] = useState('')
   const [retryCount, setRetryCount] = useState(0)
   const [controls, setControls] = useState(true)
   const [shareBusy, setShareBusy] = useState(false)
@@ -25,7 +27,38 @@ export default function Viewer({ photos, current, onClose,
   const frame = useRef(0)
   const lastTap = useRef(0)
   const pageAttempts = useRef(new Set())
+  const cachedObjectURL = useRef('')
+  const offlineRequest = useRef(0)
+  const offlinePending = useRef(false)
   const selected = photos[index]
+
+  // Only explicitly opted-in /thumb media can be viewed without a server.
+  // Previews and originals are never placed into the offline Cache Storage.
+  async function showCachedThumbnail() {
+    if (!selected?.id || offlinePending.current) return
+    offlinePending.current = true
+    const generation = offlineRequest.current
+    setVariant('offline')
+    try {
+      const blob = await cachedThumbnail(gardenPhoto(selected.id, 'thumb'))
+      if (generation !== offlineRequest.current) return
+      if (!blob) { setImageError(true); setImageLoading(false); return }
+      const url = URL.createObjectURL(blob)
+      if (generation !== offlineRequest.current) { URL.revokeObjectURL(url); return }
+      if (cachedObjectURL.current) URL.revokeObjectURL(cachedObjectURL.current)
+      cachedObjectURL.current = url
+      setCachedUrl(url)
+      setImageError(false)
+      setImageLoading(true)
+    } catch {
+      if (generation === offlineRequest.current) {
+        setImageError(true)
+        setImageLoading(false)
+      }
+    } finally {
+      if (generation === offlineRequest.current) offlinePending.current = false
+    }
+  }
 
   function bounded(view) {
     const bounds = stage.current?.getBoundingClientRect()
@@ -62,17 +95,29 @@ export default function Viewer({ photos, current, onClose,
     }
   }, [hasMore, loadingMore, index, photos.length, onEndReached])
   useEffect(() => {
+    ++offlineRequest.current
+    offlinePending.current = false
+    if (cachedObjectURL.current) URL.revokeObjectURL(cachedObjectURL.current)
+    cachedObjectURL.current = ''
+    setCachedUrl('')
     const identity = { scale: 1, x: 0, y: 0 }
     pendingTransform.current = identity
     setTransform(identity)
     setImageError(false)
-    setVariant('preview')
+    setVariant(navigator.onLine ? 'preview' : 'offline')
     setRetryCount(0)
     setImageLoading(true)
     setShareError('')
     setControls(true)
     gesture.current = null
-  }, [index])
+    if (!navigator.onLine) showCachedThumbnail()
+    return () => {
+      ++offlineRequest.current
+      offlinePending.current = false
+      if (cachedObjectURL.current) URL.revokeObjectURL(cachedObjectURL.current)
+      cachedObjectURL.current = ''
+    }
+  }, [index, selected?.id])
   useEffect(() => {
     function key(event) {
       if (event.key === 'ArrowRight') {
@@ -143,7 +188,7 @@ export default function Viewer({ photos, current, onClose,
   }
 
   async function share() {
-    if (!navigator.share || shareBusy) return
+    if (!navigator.share || shareBusy || !navigator.onLine || cachedUrl || imageError) return
     setShareBusy(true)
     setShareError('')
     try {
@@ -168,6 +213,21 @@ export default function Viewer({ photos, current, onClose,
     } finally { setShareBusy(false) }
   }
   const go = step => setIndex(value => clamp(value + step, 0, photos.length - 1))
+  const imageSource = cachedUrl || (variant === 'offline' ? '' :
+    gardenPhoto(selected.id, variant) + (retryCount ? '?retry=' + retryCount : ''))
+  const onlinePhotoActions = navigator.onLine && !cachedUrl && !imageError
+
+  function retryImage() {
+    ++offlineRequest.current
+    offlinePending.current = false
+    if (cachedObjectURL.current) URL.revokeObjectURL(cachedObjectURL.current)
+    cachedObjectURL.current = ''
+    setCachedUrl('')
+    setImageError(false)
+    setImageLoading(true)
+    setVariant('preview')
+    setRetryCount(value => value + 1)
+  }
 
   return <Dialog open fullScreen onClose={onClose} PaperProps={{ className: 'garden-viewer', sx: {
     m: 0, width: '100%', maxWidth: 'none', height: '100dvh', borderRadius: '0 !important', color: '#fff',
@@ -177,12 +237,12 @@ export default function Viewer({ photos, current, onClose,
       <Typography flex={1} textAlign="center" fontSize={14} fontWeight={650}>{index + 1} / {photos.length}</Typography>
       <IconButton aria-label={transform.scale > 1 ? '缩小照片' : '放大照片'} onClick={() => zoomTo(transform.scale > 1 ? 1 : 2)}
         sx={{ color: '#fff' }}>{transform.scale > 1 ? <ZoomOutOutlined/> : <ZoomInOutlined/>}</IconButton>
-      {typeof navigator !== 'undefined' && typeof navigator.share === 'function' &&
+      {onlinePhotoActions && typeof navigator.share === 'function' &&
         <IconButton aria-label="分享照片" disabled={shareBusy} onClick={share} sx={{ color: '#fff' }}>
           {shareBusy ? <CircularProgress size={20} sx={{ color: '#fff' }}/> : <IosShareOutlined/>}
         </IconButton>}
-      <IconButton component="a" href={gardenPhoto(selected.id, 'original') + '?download=1'}
-        aria-label="下载原图" sx={{ color: '#fff' }}><DownloadOutlined/></IconButton>
+      {onlinePhotoActions && <IconButton component="a" href={gardenPhoto(selected.id, 'original') + '?download=1'}
+        aria-label="下载原图" sx={{ color: '#fff' }}><DownloadOutlined/></IconButton>}
     </Stack>}
     {shareError && <Typography color="#f5dcd8" textAlign="center" role="status" fontSize={12} px={2}>{shareError}</Typography>}
     <Box className="garden-viewer-stage" ref={stage} flex={1} minHeight={0}
@@ -196,25 +256,33 @@ export default function Viewer({ photos, current, onClose,
           background: '#0008', '&.Mui-disabled': { color: '#999' } }}>
         <ChevronLeft/>
       </IconButton>}
-      {imageError ? <Stack gap={1.5} alignItems="center" textAlign="center" px={2}>
-        <Typography color="#fff">无法显示照片，可能是图片格式不受当前设备支持。</Typography>
-        <Button variant="outlined" sx={{ color: '#fff', borderColor: '#fff' }} onClick={() => {
-          setImageError(false); setImageLoading(true); setVariant('preview'); setRetryCount(value => value + 1)
-        }}>重试加载</Button>
+      {imageError ? <Stack gap={1.5} alignItems="center" textAlign="center" px={2}
+        sx={{ maxWidth: 'min(100%, 460px)', overflowWrap: 'anywhere' }}>
+        <Typography color="#fff" role="status">
+          {!navigator.onLine
+            ? '离线且本机未保存这张照片的缩略图，联网后才能查看。'
+            : '照片无法加载，且本机没有可用的已缓存缩略图。请检查网络或图片格式。'}
+        </Typography>
+        {navigator.onLine && <Button variant="outlined" sx={{ color: '#fff', borderColor: '#fff' }}
+          onClick={retryImage}>重试加载</Button>}
       </Stack> : <>
         {imageLoading && <Stack gap={1} alignItems="center" sx={{ position: 'absolute', zIndex: 1, pointerEvents: 'none' }} role="status">
           <CircularProgress size={28} sx={{ color: '#fff' }}/>
-          <Typography color="#fff" fontSize={12}>{variant === 'preview' ? '正在加载照片…' : '正在加载原图…'}</Typography>
+          <Typography color="#fff" fontSize={12}>{variant === 'offline' ? '正在读取已保存的缩略图…' :
+            variant === 'preview' ? '正在加载照片…' : '正在加载原图…'}</Typography>
         </Stack>}
-        <img className="garden-large-photo"
-          src={gardenPhoto(selected.id, variant) + (retryCount ? '?retry=' + retryCount : '')}
-          alt={selected.name} draggable="false"
+        {imageSource && <img className="garden-large-photo"
+          src={imageSource} alt={selected.name} draggable="false"
           onLoad={() => setImageLoading(false)}
-          onError={() => { if (variant === 'preview') {
-            setVariant('original'); setImageLoading(true)
-          } else { setImageLoading(false); setImageError(true) } }}
+          onError={() => {
+            if (cachedUrl) { setImageError(true); setImageLoading(false); return }
+            if (variant === 'preview' && navigator.onLine) {
+              setVariant('original'); setImageLoading(true)
+            } else showCachedThumbnail()
+          }}
           style={{ transform: 'translate3d(' + transform.x + 'px,' + transform.y + 'px,0) scale(' + transform.scale + ')',
-            transformOrigin: 'center center' }}/>
+            transformOrigin: 'center center' }}/>}
+
       </>}
       {controls && <IconButton onClick={() => go(1)}
         aria-label="下一张" disabled={index === photos.length - 1}
@@ -223,6 +291,9 @@ export default function Viewer({ photos, current, onClose,
         <ChevronRight/>
       </IconButton>}
     </Box>
+    {cachedUrl && <Typography role="status" className="garden-viewer-offline-note">
+      仅显示本机已缓存缩略图；高清照片、原图下载与分享需联网。
+    </Typography>}
     {controls && <div className="garden-viewer-footer">{selected.name}
       {loadingMore && <span role="status"> · 正在加载更多照片…</span>}
     </div>}
