@@ -85,6 +85,55 @@ async function idbValue(page, key) {
   }), key)
 }
 
+
+async function inspectOfflineLayout(page, label) {
+  return page.evaluate(label => {
+    const viewport = window.innerWidth
+    const pane = document.querySelector('.app-page:not([hidden])')
+    const surfaces = [pane, document.querySelector('.app-shell'), document.querySelector('.app-content'),
+      ...document.querySelectorAll('.app-page:not([hidden]) .MuiAlert-root, .app-page:not([hidden]) .garden-root, .app-page:not([hidden]) .garden-calendar-panel, .app-page:not([hidden]) .schedule-screen, .app-page:not([hidden]) .garden-search, .app-page:not([hidden]) .garden-view-switch, .app-page:not([hidden]) .garden-list-header, .app-page:not([hidden]) .garden-offline-options, .MuiDialog-paper')]
+      .filter(Boolean)
+    const problems = []
+    for (const element of surfaces) {
+      const box = element.getBoundingClientRect()
+      if (box.width === 0 || box.height === 0) continue
+      if (box.left < -2 || box.right > viewport + 2) problems.push({
+        reason: 'out-of-viewport', element: element.className?.toString().slice(0, 75),
+        left: Math.round(box.left), right: Math.round(box.right), viewport,
+      })
+      if (element.scrollWidth > element.clientWidth + 2 && !['app-content','app-shell'].includes(element.className))
+        problems.push({ reason: 'horizontal-content-overflow',
+          element: element.className?.toString().slice(0, 75),
+          client: element.clientWidth, scroll: element.scrollWidth })
+    }
+    const warnings = [...document.querySelectorAll('.app-page:not([hidden]) .MuiAlert-root')].map(element => {
+      const rect = element.getBoundingClientRect()
+      const msg = element.querySelector('.MuiAlert-message')
+      return { text: element.textContent.trim().slice(0, 150), top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom), clipped: Boolean(msg && msg.scrollWidth > msg.clientWidth + 2) }
+    })
+    if (warnings.some(item => item.clipped)) problems.push({ reason: 'clipped-alert-text' })
+    const footer = document.querySelector('.app-footer:not([hidden])')?.getBoundingClientRect()
+    const shell = document.querySelector('.app-shell')?.getBoundingClientRect()
+    if (footer && shell && footer.bottom > shell.bottom + 2)
+      problems.push({ reason: 'footer-under-viewport', footerBottom: footer.bottom, shellBottom: shell.bottom })
+    return { label, viewport, height: innerHeight, problems, warnings,
+      pageText: pane?.innerText.slice(0, 300) || '' }
+  }, label)
+}
+async function sampleOfflineLayouts(page, tag, view, sizes, problems) {
+  for (const [width,height] of sizes) {
+    await page.setViewportSize({width,height})
+    const report = await inspectOfflineLayout(page, tag + '/' + view + '/' + width + 'x' + height)
+    console.log('OFFLINE-VISUAL-AUDIT ' + JSON.stringify(report))
+    for (const item of report.problems) problems.push({ at: report.label, ...item })
+    if (width === 320 || width === 390) {
+      const screenshot = 'test-results/offline-layout-' + tag + '-' + view + '-' + width + '.png'
+      await page.screenshot({ path: screenshot, fullPage: true }).catch(() => {})
+    }
+  }
+}
+
 async function verify(engine) {
   const browser = await engine.launch({ headless: true })
   const context = await browser.newContext({ viewport: { width: 390, height: 844 },
@@ -179,6 +228,33 @@ async function verify(engine) {
     await day.getByText('上次确认的排班快照', { exact: false }).waitFor()
     assert.equal(await day.getByRole('button', { name: '调整当天排班' }).isDisabled(), true)
     assert.equal(await day.locator('.calendar .day .shift').count(), 42)
+    const offlineLayoutProblems = []
+    const phoneSizes = [[320,700],[375,812],[390,844],[430,932],[812,375]]
+    await sampleOfflineLayouts(page, tag, 'calendar', phoneSizes, offlineLayoutProblems)
+    await day.getByRole('button', { name: '选择年月' }).click()
+    const monthDialog = page.getByRole('dialog', { name: '跳转年月' })
+    await monthDialog.waitFor()
+    await sampleOfflineLayouts(page, tag, 'month-dialog', [[320,700],[390,844]], offlineLayoutProblems)
+    await monthDialog.getByRole('button', { name: '取消' }).click()
+    await page.locator('footer button').filter({ hasText: '拼豆' }).click()
+    await page.getByText('库存总览').waitFor()
+    await sampleOfflineLayouts(page, tag, 'inventory', phoneSizes, offlineLayoutProblems)
+    if (!(await page.locator('section[data-view="拼豆"]').innerText()).includes('离线'))
+      offlineLayoutProblems.push({ at: tag + '/inventory', reason: 'missing-offline-explanation' })
+    await page.getByRole('button', { name: '历史', exact: true }).click()
+    await page.locator('.app-header .app-title').getByText('历史').waitFor()
+    await sampleOfflineLayouts(page, tag, 'history', [[320,700],[390,844]], offlineLayoutProblems)
+    if (!(await page.locator('section[data-view="历史"]').innerText()).includes('离线'))
+      offlineLayoutProblems.push({ at: tag + '/history', reason: 'missing-offline-explanation' })
+    await page.locator('.app-header').getByRole('button', { name: '返回库存' }).click()
+    await page.getByRole('button', { name: '补豆', exact: true }).click()
+    await sampleOfflineLayouts(page, tag, 'pindou-form', [[320,700],[390,844]], offlineLayoutProblems)
+    if (!(await page.locator('section[data-view="补豆"]').innerText()).includes('离线'))
+      offlineLayoutProblems.push({ at: tag + '/pindou-form', reason: 'missing-offline-safeguard' })
+    await page.locator('.app-header').getByRole('button', { name: '返回库存' }).click()
+    await page.locator('footer button').filter({ hasText: '日历' }).click()
+    assert.equal(await day.locator('.calendar .day .shift').count(), 42,
+      tag + ': navigating the cached offline shell preserves calendar')
     await reconnect(engine, context)
     await page.reload({ waitUntil: 'domcontentloaded' })
     await day.getByRole('button', { name: '调整当天排班' }).waitFor({ state: 'visible' })
@@ -233,10 +309,21 @@ async function verify(engine) {
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('仅显示上次离线保存的部分花园数据', { exact: false }).waitFor()
     assert.equal(await page.getByRole('button', { name: '添加花卉' }).isDisabled(), true)
+    await sampleOfflineLayouts(page, tag, 'garden-list', [[320,700],[375,812],[390,844],[430,932],[812,375]], offlineLayoutProblems)
+    await page.getByRole('tab', { name: '成长日历' }).click()
+    const growthCalendar = page.locator('.garden-calendar-panel')
+    await growthCalendar.waitFor()
+    await sampleOfflineLayouts(page, tag, 'garden-calendar', [[320,700],[390,844]], offlineLayoutProblems)
+    await growthCalendar.locator('.garden-calendar-day[aria-current="date"]').click()
+    await page.getByText('离线只读：仅包含', { exact: false }).waitFor()
+    await sampleOfflineLayouts(page, tag, 'garden-day', [[320,700],[390,844]], offlineLayoutProblems)
+    await page.getByRole('tab', { name: '花卉', exact: true }).click()
     await page.getByText(name, { exact: true }).click()
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
     assert.equal(await page.getByRole('button', { name: '记录成长' }).count(), 0,
       tag + ': offline detail is read-only')
+    await sampleOfflineLayouts(page, tag, 'garden-detail', [[320,700],[390,844]], offlineLayoutProblems)
+    assert.deepEqual(offlineLayoutProblems, [], tag + ': offline rendering must be safe and clearly labeled')
     await reconnect(engine, context)
     await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
     await page.getByText(name, { exact: true }).waitFor()
