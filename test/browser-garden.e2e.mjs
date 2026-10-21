@@ -58,6 +58,48 @@ async function waitForServer() {
   }
   throw new Error('Server did not become ready: ' + tail)
 }
+async function auditPindouLayout(page, tag, phase) {
+  const audit = await page.evaluate(() => {
+    const width = window.innerWidth
+    const main = document.querySelector('.app-page:not([hidden])')
+    const pageRoot = main?.querySelector('.pindou-page')
+    const nodes = [pageRoot,
+      ...document.querySelectorAll('.app-header, .app-footer:not([hidden]), .MuiDialog-paper'),
+      ...(pageRoot?.querySelectorAll(
+        '.pindou-inventory-header, .pindou-primary-actions, .pindou-filters,' +
+        '.pindou-history-card, .pindou-history-head, .pindou-history-meta,' +
+        '.pindou-history-actions, .pindou-history-media, .pindou-history-editor,' +
+        '.pindou-edit-field, .pindou-edit-item, .pindou-form-field,' +
+        '.pindou-file-row, .pindou-form-actions, .MuiAlert-root, input:not([type=file]), select'
+      ) || []),
+    ].filter(Boolean)
+    const problems = []
+    for (const element of nodes) {
+      const rect = element.getBoundingClientRect()
+      if (rect.width < 1 || rect.height < 1) continue
+      if (rect.left < -2 || rect.right > width + 2) problems.push({
+        type: 'horizontal-box-overflow', node: String(element.className).slice(0, 60),
+        left: rect.left, right: rect.right, width,
+      })
+      if (element.scrollWidth > element.clientWidth + 2 &&
+        !['pindou-form-color'].includes(element.className))
+        problems.push({ type: 'horizontal-text-overflow',
+          node: String(element.className).slice(0, 60),
+          scroll: element.scrollWidth, client: element.clientWidth })
+    }
+    const alerts = [...(pageRoot?.querySelectorAll('.MuiAlert-message') || [])]
+    if (alerts.some(el => el.scrollWidth > el.clientWidth + 2))
+      problems.push({ type: 'alert-text-clipped' })
+    return { width, height: window.innerHeight, problems, alerts: alerts.length }
+  })
+  console.log('PINDOU-UI-AUDIT ' + tag + '/' + phase + ' ' + JSON.stringify(audit))
+  assert.deepEqual(audit.problems, [], tag + '/' + phase + ': Pindou iOS width and text fit')
+  if (page.viewportSize().width <= 390) {
+    await page.screenshot({ path: 'test-results/pindou-' + tag + '-' + phase + '.png',
+      fullPage: phase !== 'image-preview' && phase !== 'delete-confirm' })
+  }
+}
+
 async function runBrowser(engine, viewport, colorScheme = 'light') {
   const browser = await engine.launch({ headless: true })
   const touchDevice = viewport.width < 500 || (viewport.height <= 480 && viewport.width < 1000)
@@ -212,6 +254,9 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     check(await rulesDialog.locator('.shift-legend').count() === 0 &&
       cycleLabels.length > 0 && cycleLabels.every(s => ['白班', '夜班', '休息', '备班'].includes(s)),
       tag + ': settings omit the legend without removing colored cycle labels')
+    check(await rulesDialog.locator('.shift-current-summary .shift-cycle-chip').evaluateAll(
+      els => els.every(el => getComputedStyle(el).color === 'rgb(255, 255, 255)')),
+      tag + ': schedule settings match the calendar white shift-label palette')
     await rulesDialog.getByRole('button', { name: '新增排班' }).click()
     const ruleEditor = page.locator('[role="dialog"][aria-labelledby="shift-rule-editor-title"]')
     await ruleEditor.waitFor()
@@ -223,6 +268,9 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await dayEditor.getByLabel('调整类型').selectOption('standby')
     check((await dayEditor.locator('.shift-preview-row').textContent()).includes('备班'),
       tag + ': standby preview remains text-based')
+    check(await dayEditor.locator('.shift-preview-row .shift-cycle-chip').evaluate(el =>
+      getComputedStyle(el).color === 'rgb(255, 255, 255)'),
+      tag + ': standby preview has high-contrast white text')
     await dayEditor.getByRole('button', { name: '取消' }).click()
     const discard = page.locator('[role="dialog"][aria-labelledby="shift-discard-title"]')
     await discard.getByRole('button', { name: '放弃更改' }).click()
@@ -230,6 +278,20 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     check(await page.locator('.app-shell').getAttribute('data-theme') === 'light',
       tag + ': Pindou remains light while Garden/Calendar may be dark')
     await page.getByText('库存总览').waitFor()
+    const shiftBadges = await calendarRoot.locator('.calendar .shift').evaluateAll(els =>
+      els.length > 0 && els.every(el => getComputedStyle(el).color === 'rgb(255, 255, 255)'))
+    check(shiftBadges, tag + ': all daily shift badges use white text')
+    await auditPindouLayout(page, tag, 'inventory')
+
+    // An actual MySQL-backed long-note record stresses History's narrow
+    // header, edit grid and destructive-action confirmation.
+    const pindouNote = '窄屏记录-' + tag + '-' + '这是很长的备注文字'.repeat(18)
+    const created = await page.request.post(url + '/api/reminders', { data: {
+      operation: '补豆', occurred_at: new Date().toISOString(),
+      items: [{ color: 'A1', count: 1 }], note: pindouNote,
+    } })
+    check(created.ok(), tag + ': setup history record via transactional API')
+
     await page.getByRole('button', { name: '历史', exact: true }).click()
     const historyTitle = page.locator('.app-header .app-title')
     await historyTitle.waitFor()
@@ -237,7 +299,40 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
       await page.getByText('补豆 / 消耗 历史', { exact: true }).count() === 0 &&
       await page.locator('section[data-view="历史"] button').filter({ hasText: '返回' }).count() === 0,
       tag + ': history has one title and one global back action')
+    const historyRow = page.locator('.pindou-history-card').filter({ hasText: pindouNote })
+    await historyRow.waitFor()
+    await auditPindouLayout(page, tag, 'history-long-note')
+    await historyRow.getByRole('button', { name: '编辑记录' }).click()
+    await historyRow.locator('.pindou-history-editor').waitFor()
+    await auditPindouLayout(page, tag, 'history-edit')
+    await historyRow.getByRole('button', { name: '取消' }).click()
+    await historyRow.getByRole('button', { name: '删除记录' }).click()
+    const deleteConfirm = page.locator('[role="dialog"][aria-labelledby="pindou-delete-title"]')
+    await deleteConfirm.waitFor()
+    await auditPindouLayout(page, tag, 'delete-confirm')
+    await deleteConfirm.getByRole('button', { name: '取消' }).click()
+    check(await historyRow.count() === 1, tag + ': cancelled delete leaves history intact')
     await page.getByRole('button', { name: '返回库存' }).click()
+    await page.getByText('库存总览').waitFor()
+
+    await page.getByRole('button', { name: '补豆', exact: true }).click()
+    await page.locator('section[data-view="补豆"] input[type="file"]').setInputFiles({
+      name: '很长的本地拼豆记录图片文件名称重复测试-' + tag + '.png',
+      mimeType: 'image/png', buffer: photo,
+    })
+    await page.locator('section[data-view="补豆"]').getByText('图片：', { exact: false }).waitFor()
+    await auditPindouLayout(page, tag, 'add-photo-draft')
+    await page.locator('section[data-view="补豆"]').getByRole('button', { name: '预览' }).click()
+    const pindouPreview = page.locator('[role="dialog"][aria-labelledby="pindou-preview-title"]')
+    await pindouPreview.waitFor()
+    await auditPindouLayout(page, tag, 'image-preview')
+    await pindouPreview.getByRole('button', { name: '关闭' }).click()
+    await page.locator('section[data-view="补豆"]').getByRole('button', { name: '取消' }).click()
+    await page.getByText('库存总览').waitFor()
+
+    await page.getByRole('button', { name: '消耗', exact: true }).click()
+    await auditPindouLayout(page, tag, 'consume-form')
+    await page.locator('section[data-view="消耗"]').getByRole('button', { name: '取消' }).click()
     await page.getByText('库存总览').waitFor()
     await page.locator('footer button').filter({ hasText: '花园' }).click()
     check(await page.locator('.app-shell').getAttribute('data-theme') === colorScheme, tag + ': garden restores preferred theme')
