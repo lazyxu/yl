@@ -6,8 +6,11 @@ const sequelize = require('../sequelize')
 // No accounts/sessions are introduced in this phase.
 const GardenSpecies = sequelize.define('GardenSpecies', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
-  name: { type: DataTypes.STRING(100), unique: true, allowNull: false },
-}, { tableName: 'garden_species', underscored: true })
+  name: { type: DataTypes.STRING(100), allowNull: false },
+}, { tableName: 'garden_species', underscored: true, indexes: [
+  // Explicit stable unique index prevents ALTER startup from adding name_2, name_3 ...
+  { name: 'name', unique: true, fields: ['name'] },
+] })
 
 const GardenPlant = sequelize.define('GardenPlant', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
@@ -17,7 +20,12 @@ const GardenPlant = sequelize.define('GardenPlant', {
   location: { type: DataTypes.STRING(200), allowNull: false, defaultValue: '' },
   notes: { type: DataTypes.TEXT, allowNull: false, defaultValue: '' },
   status: { type: DataTypes.STRING(16), allowNull: false, defaultValue: 'active' },
-}, { tableName: 'garden_plants', underscored: true, indexes: [{ fields: ['species_id', 'status'] }] })
+}, { tableName: 'garden_plants', underscored: true, indexes: [
+  { fields: ['species_id', 'status'] },
+  { fields: ['created_at', 'id'] },
+  { fields: ['status', 'created_at', 'id'] },
+  { fields: ['species_id', 'created_at', 'id'] },
+] })
 
 const GardenEntry = sequelize.define('GardenEntry', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
@@ -27,18 +35,26 @@ const GardenEntry = sequelize.define('GardenEntry', {
   local_date: { type: DataTypes.DATEONLY, allowNull: false },
   note: { type: DataTypes.TEXT, allowNull: false, defaultValue: '' },
   author_name: { type: DataTypes.STRING(60), allowNull: false, defaultValue: '' },
-}, { tableName: 'garden_entries', underscored: true, indexes: [{ fields: ['plant_id', 'observed_ts'] }, { fields: ['local_date'] }] })
+}, { tableName: 'garden_entries', underscored: true, indexes: [
+  { fields: ['plant_id', 'observed_ts'] },
+  { fields: ['local_date'] },
+  { fields: ['local_date', 'observed_ts', 'id'] },
+  { fields: ['plant_id', 'local_date'] },
+] })
 
 const GardenPhoto = sequelize.define('GardenPhoto', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
   entry_id: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
-  storage_name: { type: DataTypes.STRING(100), unique: true, allowNull: false },
+  storage_name: { type: DataTypes.STRING(100), allowNull: false },
   thumb_name: { type: DataTypes.STRING(100), allowNull: true },
   preview_name: { type: DataTypes.STRING(100), allowNull: true },
   original_name: { type: DataTypes.STRING(160), allowNull: false },
   mime: { type: DataTypes.STRING(40), allowNull: false },
   size_bytes: { type: DataTypes.BIGINT, allowNull: false },
-}, { tableName: 'garden_photos', underscored: true, indexes: [{ fields: ['entry_id'] }] })
+}, { tableName: 'garden_photos', underscored: true, indexes: [
+  { fields: ['entry_id'] },
+  { name: 'storage_name', unique: true, fields: ['storage_name'] },
+] })
 
 GardenPlant.belongsTo(GardenSpecies, { foreignKey: 'species_id', as: 'species', onDelete: 'SET NULL' })
 GardenSpecies.hasMany(GardenPlant, { foreignKey: 'species_id', as: 'plants' })

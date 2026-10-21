@@ -12,6 +12,8 @@ const PindouReminder = sequelize.define('PindouReminder', {
   tableName: 'pindou_reminders',
   underscored: true,
   timestamps: true,
+  // Serve latest-200 ledger reads without sorting 100k historical records.
+  indexes: [{ fields: ['occurred_at'] }],
 });
 
 module.exports = PindouReminder;

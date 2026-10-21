@@ -152,3 +152,35 @@ sql-performance-e2e:
     paths:
       - test-results/sql-performance-baseline.json
     expire_in: 14 days
+
+
+# Manual extreme-size audit: 100k per SQL-heavy core table, never production DB.
+sql-performance-100k-e2e:
+  stage: verify
+  rules:
+    - when: manual
+      allow_failure: true
+  services:
+    - name: mysql:8.4
+      alias: mysql
+  variables:
+    MYSQL_ROOT_PASSWORD: ci-only-password
+    MYSQL_ROOT_HOST: '%'
+    BACKUP_TEST_MYSQL: '1'
+    BACKUP_TEST_HOST: mysql
+    BACKUP_TEST_PASSWORD: ci-only-password
+  script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends default-mysql-client
+    - npm ci --legacy-peer-deps
+    - bash scripts/wait-for-mysql.sh
+    - npm install --prefix server --omit=dev --package-lock=false
+    - SQL_PERF_OUTPUT=test-results/sql-performance-100k.json node test/sql-performance-100k.e2e.cjs
+    - SQL_PERF_SCENARIO=all-hot SQL_PERF_DESTRUCTIVE=1 SQL_PERF_OUTPUT=test-results/sql-performance-100k-all-hot.json node test/sql-performance-100k.e2e.cjs
+    - SQL_PERF_SCHEMA_RESTART=1 SQL_PERF_OUTPUT=test-results/sql-performance-100k-schema.json node test/sql-performance-100k.e2e.cjs
+    - SQL_PERF_BACKUP_RESTORE=1 SQL_PERF_OUTPUT=test-results/sql-performance-100k-backup.json node test/sql-performance-100k.e2e.cjs
+    - node --test test/garden.integration.cjs test/pindou-stock.integration.cjs test/settings.integration.cjs test/backup.integration.cjs
+  artifacts:
+    when: always
+    paths:
+      - test-results/sql-performance-100k*.json
+    expire_in: 14 days

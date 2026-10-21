@@ -44,14 +44,21 @@ function pageParams(query, legacyLimit, defaultLimit, mode) {
 async function summarizePlants(plants) {
   if (!plants.length) return []
   const ids = plants.map(p => p.id)
+  // Count photo-bearing entries for the page in a single grouped pass, then
+  // find the highest photo ID at the newest photo-bearing timestamp.
+  // Equivalent to the old (observed_ts DESC, photo_id DESC) window ranking,
+  // without sorting 60k individual photo rows on each plant detail request.
   const sql = [
-    'SELECT ranked.plant_id, ranked.photo_count, ranked.id AS latest_photo_id',
+    'SELECT stats.plant_id, stats.photo_count, MAX(p.id) AS latest_photo_id',
     'FROM (',
-    ' SELECT e.plant_id, p.id, COUNT(*) OVER (PARTITION BY e.plant_id) AS photo_count,',
-    ' ROW_NUMBER() OVER (PARTITION BY e.plant_id ORDER BY e.observed_ts DESC, p.id DESC) AS rownum',
-    ' FROM garden_photos p JOIN garden_entries e ON p.entry_id = e.id',
-    ' WHERE e.plant_id IN (:ids)',
-    ') ranked WHERE ranked.rownum = 1',
+    ' SELECT e.plant_id, COUNT(*) AS photo_count, MAX(e.observed_ts) AS latest_observed_ts',
+    ' FROM garden_entries e JOIN garden_photos p ON p.entry_id = e.id',
+    ' WHERE e.plant_id IN (:ids) GROUP BY e.plant_id',
+    ') stats',
+    'JOIN garden_entries e ON e.plant_id = stats.plant_id',
+    ' AND e.observed_ts = stats.latest_observed_ts',
+    'JOIN garden_photos p ON p.entry_id = e.id',
+    'GROUP BY stats.plant_id, stats.photo_count',
   ].join(' ')
   const rows = await sequelize.query(sql, { type: QueryTypes.SELECT, replacements: { ids } })
   const summaries = new Map(rows.map(row => [Number(row.plant_id), row]))
