@@ -90,3 +90,36 @@ browser-e2e:
     paths:
       - test-results/
     expire_in: 7 days
+
+# True read-only PWA offline rendering audit, using disposable MySQL and
+# both Chromium network-offline and WebKit origin-outage scenarios.
+pwa-offline-e2e:
+  stage: verify
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: on_success
+    - when: manual
+      allow_failure: true
+  services:
+    - name: mysql:8.4
+      alias: mysql
+  variables:
+    MYSQL_ROOT_PASSWORD: ci-only-password
+    MYSQL_ROOT_HOST: '%'
+    BACKUP_TEST_HOST: mysql
+    BACKUP_TEST_PASSWORD: ci-only-password
+    E2E_MYSQL: '1'
+  script:
+    - apt-get update -qq && apt-get install -y --no-install-recommends default-mysql-client
+    - npm ci --legacy-peer-deps
+    - bash scripts/wait-for-mysql.sh
+    - npm install --prefix server --omit=dev --package-lock=false
+    - npm install --no-save --legacy-peer-deps --package-lock=false playwright@1.56.1
+    - npx playwright install --with-deps chromium webkit
+    - npm run build
+    - node test/browser-pwa-offline.e2e.mjs
+  artifacts:
+    when: always
+    paths:
+      - test-results/
+    expire_in: 7 days
