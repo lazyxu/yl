@@ -181,3 +181,10 @@
 - SQL 微基准与包含真实 MySQL 的 Node 集成/备份测试，以及 Chromium/WebKit 浏览器 E2E **分别统计**；浏览器截图、浏览器安装、Service Worker、图片解码、MySQL 初始化和备份子进程时间不是单次 SQL 查询耗时。对慢链路先查 SQL 次数、索引与 EXPLAIN 再考虑改代码。
 - 完整回归须包含 `test/garden.integration.cjs`、`test/pindou-stock.integration.cjs`、`test/settings.integration.cjs`、`test/backup.integration.cjs`、`test/upload.integration.cjs`、`test/garden-media.test.cjs` 与 `test/browser-garden.e2e.mjs`、`test/browser-pwa-offline.e2e.mjs`；用独立测试数据库。GitLab `sql-performance-e2e` 是手动/稳定标签专项，不使常规 MR 因压力测试变慢。
 - 对 p95 超过 100 ms、较同条件基线显著上升，或 SQL 次数随花卉、日记、历史条数线性增长的项目优先调查；该 100 ms 仅是排查阈值而非生产 SLA。GitHub 共享 runner 的数字不得冒充 iPhone Safari、NAS 或生产 MySQL 实测。
+
+## 100k MySQL SQL E2E 专项
+
+- 使用 `test/sql-performance-100k.e2e.cjs` 在隔离 MySQL 8.4 内各构造 10 万株花卉/日记/照片 metadata/拼豆历史（合计 40 万核心行），另测单株 10 万、单日 10 万极端热点；必须记录同数据规模的优化前后 HTTP p50/p95、SQL 次数和 EXPLAIN，区分首次历史物化与常规 GET。
+- 花园分页、图像汇总、拼豆历史及班次读写包括真实 HTTP E2E；照片 multipart 实例仅用生成的小 PNG，不能据此推导大文件/HEIC/真实文件 IO 性能。全热点删除与备份/恢复、实际浏览器、远端磁盘另作专项，不得冒充单 SQL p95。
+- 在已有 100k 数据的表上连续执行两次 `sequelize.sync({alter:true})`，核对数据行数与 `information_schema.STATISTICS` 索引清单不变；`garden_species.name` / `garden_photos.storage_name` 以显式命名 UNIQUE index 维护，不得退回匿名字段 `unique:true`，避免重复生成 `name_2` / `storage_name_2`。
+- 长期 GitLab `sql-performance-100k-e2e` 仅手动启动，不阻塞普通 MR；结果保留到 `test-results/sql-performance-100k*.json`。详见 `docs/sql-e2e-performance-100k-2026-10-21.md`；不要求无法接触的生产环境验收，明确标记“按用户决定跳过（未验收）”。
