@@ -21,6 +21,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   const [offlineReadOnly, setOfflineReadOnly] = useState(false)
   const [offlineSavedAt, setOfflineSavedAt] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [detailError, setDetailError] = useState('')
   const [showSkeleton, setShowSkeleton] = useState(false)
   useEffect(() => {
     if (!loading || plant) { setShowSkeleton(false); return }
@@ -50,6 +51,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     controllerRef.current = controller
     setMoreBusy(false)
     paging.current = false
+    setDetailError('')
     try {
       const [p, list] = await Promise.all([
         gardenRequest('/plants/' + id, { signal: controller.signal }),
@@ -68,7 +70,15 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
           setHasMore(false)
           setOfflineReadOnly(true)
           setOfflineSavedAt(cached.savedAt)
-        } else notify(err.message, true)
+        } else if (!controller.signal.aborted) {
+          const unavailable = !navigator.onLine || err instanceof TypeError ||
+            /failed to fetch|load failed|networkerror|network connection/i.test(err.message)
+          setDetailError(unavailable
+            ? '当前无法连接服务器，本机也没有这株花的已保存离线详情。请联网后再试。'
+            : /不存在|未找到|not found|404/i.test(err.message)
+              ? '花卉不存在或已被删除。'
+              : '无法读取花卉详情：' + (err.message || '服务器暂不可用'))
+        }
       }
     } finally {
       if (version === requestVersion.current) setLoading(false)
@@ -139,10 +149,17 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     aria-label="正在加载花卉档案">
     {showSkeleton && <div className="garden-loading-card" style={{ aspectRatio: '16/10' }} />}
   </div>
-  if (!plant) return <Alert severity="warning">
-    花卉不存在、已删除，或没有保存过这株花的离线详情。
-    <Button onClick={onBack}>返回花园</Button>
-  </Alert>
+  if (!plant) return <div className="garden-detail garden-detail-error">
+    <header className="garden-detail-header">
+      <Button className="garden-detail-back" startIcon={<ArrowBackIosNew fontSize="small" />}
+        onClick={onBack}>花园</Button>
+    </header>
+    <Alert severity="warning" role="status" sx={{ my: 2, overflowWrap: 'anywhere' }}
+      action={navigator.onLine && !/不存在|已被删除/.test(detailError) ?
+        <Button color="inherit" onClick={load}>重试</Button> : undefined}>
+      {detailError || '当前无法查看这株花卉，请返回花园或联网后重试。'}
+    </Alert>
+  </div>
 
   return <div className="garden-detail">
     <header className="garden-detail-header">
