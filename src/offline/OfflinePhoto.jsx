@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { cachedThumbnail, rememberThumbnail, gardenOfflineEnabled } from './data'
 
 // A retry query changes the network request, not the identity of a consented
@@ -12,12 +12,12 @@ export default function OfflinePhoto({ src, alt, onError, ...props }) {
   const generation = useRef(0)
   const pendingFailure = useRef(0)
 
-  const replaceObjectURL = blob => {
+  const replaceObjectURL = useCallback(blob => {
     const next = URL.createObjectURL(blob)
     if (localRef.current) URL.revokeObjectURL(localRef.current)
     localRef.current = next
     setLocal(next)
-  }
+  }, [])
 
   useEffect(() => {
     const current = ++generation.current
@@ -36,7 +36,7 @@ export default function OfflinePhoto({ src, alt, onError, ...props }) {
       if (localRef.current) URL.revokeObjectURL(localRef.current)
       localRef.current = ''
     }
-  }, [src])
+  }, [src, replaceObjectURL])
 
   async function fail() {
     if (local) { onError?.(); return }
