@@ -23,7 +23,6 @@ export default function ShiftSettings({ open, settings, onClose, onSaved, onRelo
         <div className="shift-settings-toolbar">
           <Button variant="contained" disableElevation onClick={() => edit()}
             disabled={settings.rules.length >= 100}>新增排班</Button>
-          <span>更改只有确认保存后才会生效</span>
         </div>
         {active && <div className="shift-current-summary" aria-label="当前生效排班">
           <span className="shift-current-eyebrow">当前生效</span>
@@ -33,8 +32,6 @@ export default function ShiftSettings({ open, settings, onClose, onSaved, onRelo
             <span className="shift-cycle-chip" style={shiftStyle(shift)}>{shift}</span>
           </span>)}</div>
         </div>}
-        <div className="shift-legend" aria-label="班次颜色">{['白班', '夜班', '休息', '备班'].map(shift =>
-          <span key={shift} className="shift-legend-item"><i style={shiftStyle(shift)} />{shift}</span>)}</div>
         <h3 className="shift-settings-section-title">排班生效时间线</h3>
         <div className="shift-timeline">{ordered.map((rule, index) => <section key={rule.startDate} data-start-date={rule.startDate} className={`shift-timeline-rule ${rule === active ? 'shift-rule-active' : ''}`}>
           <div className="shift-rule-header"><div><div className="shift-rule-date">{moment(rule.startDate).format('YYYY.MM.DD')}<span className="shift-rule-status">{rule === active ? '当前生效' : rule.startDate > today ? '待生效' : '历史排班'}</span></div><div className="shift-rule-interval">{interval(index)} · {rule.shifts.length} 天循环</div></div><Button onClick={() => edit(rule)}>编辑</Button></div>

@@ -52,6 +52,8 @@ test('顶部不重复展示班次标题和颜色图例，日期仍显示完整�
   expect(host.textContent).not.toContain('班次安排')
   expect(host.querySelector('.schedule-legend')).toBeNull()
   expect(host.querySelector('.schedule-topbar button[aria-label="排班设置"]')).not.toBeNull()
+  expect(host.querySelector('.selected-date-heading').textContent).not.toContain('本月日期')
+  expect(host.querySelector('.selected-date-heading h3').textContent).toMatch(/^2026年10月\d+日 星期/)
   expect(host.querySelectorAll('.calendar button.day')).toHaveLength(42)
   const shiftLabels = [...host.querySelectorAll('.calendar .shift')].map(element => element.textContent)
   expect(new Set(shiftLabels)).toEqual(new Set(['白班', '夜班', '休息', '备班']))

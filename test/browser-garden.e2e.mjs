@@ -103,6 +103,7 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     check(await page.getByText('正在生长', { exact: true }).count() === 0, tag + ': no active/archive filter')
     check(await page.getByText('已归档', { exact: true }).count() === 0, tag + ': no archive filter')
     check(await page.getByRole('button', { name: '添加花卉' }).count() === 1, tag + ': single add-plant entry')
+    check(await page.locator('.garden-subtitle').count() === 0, tag + ': garden header omits decorative subtitle')
     await page.getByRole('button', { name: '添加花卉' }).click()
     const modal = page.getByRole('dialog')
     await modal.getByLabel('给这株花起个名字').fill(name)
@@ -110,6 +111,8 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText(name, { exact: true }).click()
     await page.getByRole('button', { name: '记录成长' }).waitFor()
+    check((await page.locator('.garden-detail h1').textContent()) === name,
+      tag + ': flower name is the unique detail heading')
     check(await page.getByRole('button', { name: '归档或恢复' }).count() === 0, tag + ': no archive button')
     await page.getByRole('button', { name: '更多花卉操作' }).click()
     await page.getByRole('menuitem', { name: '删除花卉' }).waitFor()
@@ -193,8 +196,8 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     check(enlargedCalendar.enlargedDateSize > enlargedCalendar.initialDateSize &&
       enlargedCalendar.shiftSize === '10px' && enlargedCalendar.horizontalOverflow <= 1,
       tag + ': large date text preserves the exact shift chip font and page width')
-    check((await calendarRoot.locator('.schedule-legend').textContent()).includes('备班'),
-      tag + ': standby is in the four-shift legend')
+    check(await calendarRoot.locator('.schedule-legend').count() === 0,
+      tag + ': redundant calendar color legend is absent')
     const scheduleCell = await calendarRoot.locator('.calendar .day').first().boundingBox()
     check(scheduleCell && scheduleCell.width >= 44 && scheduleCell.height >= 44,
       tag + ': calendar date must have a 44x44 CSS-pixel target')
@@ -205,7 +208,10 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await calendarRoot.getByRole('button', { name: '排班设置' }).click()
     const rulesDialog = page.locator('[role="dialog"][aria-labelledby="shift-settings-title"]')
     await rulesDialog.waitFor()
-    check((await rulesDialog.locator('.shift-legend').textContent()).includes('备班'), tag + ': settings retain the standby label')
+    const cycleLabels = await rulesDialog.locator('.shift-current-summary .shift-cycle-chip').allTextContents()
+    check(await rulesDialog.locator('.shift-legend').count() === 0 &&
+      cycleLabels.length > 0 && cycleLabels.every(s => ['白班', '夜班', '休息', '备班'].includes(s)),
+      tag + ': settings omit the legend without removing colored cycle labels')
     await rulesDialog.getByRole('button', { name: '新增排班' }).click()
     const ruleEditor = page.locator('[role="dialog"][aria-labelledby="shift-rule-editor-title"]')
     await ruleEditor.waitFor()
@@ -223,6 +229,15 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.locator('footer button').filter({ hasText: '拼豆' }).click()
     check(await page.locator('.app-shell').getAttribute('data-theme') === 'light',
       tag + ': Pindou remains light while Garden/Calendar may be dark')
+    await page.getByText('库存总览').waitFor()
+    await page.getByRole('button', { name: '历史', exact: true }).click()
+    const historyTitle = page.locator('.app-header .app-title')
+    await historyTitle.waitFor()
+    check((await historyTitle.textContent()) === '历史' &&
+      await page.getByText('补豆 / 消耗 历史', { exact: true }).count() === 0 &&
+      await page.locator('section[data-view="历史"] button').filter({ hasText: '返回' }).count() === 0,
+      tag + ': history has one title and one global back action')
+    await page.getByRole('button', { name: '返回库存' }).click()
     await page.getByText('库存总览').waitFor()
     await page.locator('footer button').filter({ hasText: '花园' }).click()
     check(await page.locator('.app-shell').getAttribute('data-theme') === colorScheme, tag + ': garden restores preferred theme')

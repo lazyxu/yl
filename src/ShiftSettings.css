@@ -13,11 +13,7 @@
 .shift-settings-dialog .MuiIconButton-root { width: 44px; height: 44px; flex: none; }
 .shift-settings-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .shift-settings-toolbar > .MuiButton-root { padding-inline: 20px; border-radius: 10px; }
-.shift-settings-toolbar > span { font-size: 13px; color: #526279; }
 .shift-settings-toolbar > .shift-sync-error { color: #a53c38; }
-.shift-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: #526279; margin-bottom: 22px; }
-.shift-legend-item { display: inline-flex; align-items: center; gap: 6px; }
-.shift-legend-item i { width: 12px; height: 12px; border-radius: 4px; }
 .shift-settings-error { margin-bottom: 20px; }
 .shift-settings-error .MuiAlert-message { min-width: 0; }
 .shift-settings-error .MuiAlert-action { align-items: center; }
@@ -90,7 +86,6 @@
   color: var(--shift-ink);
   -webkit-overflow-scrolling: touch;
 }
-.shift-settings-dialog .shift-settings-toolbar > span,
 .shift-settings-dialog .shift-rule-interval,
 .shift-settings-dialog .shift-edit-hint,
 .shift-settings-dialog .shift-day-number,
@@ -117,8 +112,6 @@
 .shift-settings-dialog .shift-rule-active .shift-rule-header {
   background: var(--shift-paper); border: 1px solid var(--shift-border); padding: 8px; border-radius: 12px;
 }
-.shift-settings-dialog .shift-legend { gap: 8px 18px; justify-content: flex-start; }
-.shift-settings-dialog .shift-legend-item { white-space: nowrap; }
 .shift-editor-toolbar {
   display: flex !important; gap: 8px; align-items: center;
   padding-inline: 12px !important;

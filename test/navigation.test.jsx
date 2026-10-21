@@ -113,6 +113,16 @@ test('日历与拼豆主页不重复显示顶部标题栏，子页保留返回�
   expect(button('返回库存')).toBeTruthy()
 })
 
+test('历史记录页不再重复标题与返回入口，保留全局返回库存', async () => {
+  await mount('历史')
+  const page = document.querySelector('[data-view="历史"]')
+  expect(page).not.toBeNull()
+  expect(document.querySelector('.app-header .app-title').textContent).toBe('历史')
+  expect(page.textContent).not.toContain('补豆 / 消耗 历史')
+  expect([...page.querySelectorAll('button')].some(el => el.textContent.trim() === '返回')).toBe(false)
+  expect(button('返回库存')).toBeTruthy()
+})
+
 test('库存筛选和排序在跨模块切换后保留', async () => {
   global.fetch = jest.fn(async url => ({
     ok: true, status: 200, statusText: 'OK',
@@ -322,6 +332,8 @@ test('花园是第三个一级模块，默认仍为日历，切回拼豆保持�
   await click('花园')
   expect(button('花园').getAttribute('aria-current')).toBe('page')
   expect(document.querySelector('[data-view="花园"]')).not.toBeNull()
+  expect(document.querySelector('.garden-header .garden-heading')?.textContent).toBe('我的花园')
+  expect(document.querySelector('[data-view="花园"]').textContent).not.toContain('记录每一株花的成长')
   await click('拼豆')
   expect(button('拼豆').getAttribute('aria-current')).toBe('page')
   await click('花园')

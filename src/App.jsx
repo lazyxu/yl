@@ -151,7 +151,7 @@ function App() {
         <main className="app-content">
           {(visited.has('日历') || view === '日历') && <Page name="日历" active={view === '日历'} positions={positions}><Calendar active={view === '日历'} /></Page>}
           {(visited.has('拼豆') || view === '拼豆') && <Page name="拼豆" active={view === '拼豆'} positions={positions}><Inventory active={view === '拼豆'} onAction={openPindouWith} refreshKey={inventoryRefreshKey} onNavigate={navigateToView} /></Page>}
-          {(visited.has('历史') || view === '历史') && <Page name="历史" active={view === '历史'} positions={positions}><History active={view === '历史'} onNavigate={navigateToView} refreshKey={inventoryRefreshKey} /></Page>}
+          {(visited.has('历史') || view === '历史') && <Page name="历史" active={view === '历史'} positions={positions}><History active={view === '历史'} refreshKey={inventoryRefreshKey} /></Page>}
           {(visited.has('花园') || view === '花园') && <Page name="花园" active={view === '花园'} positions={positions}><Garden active={view === '花园'} /></Page>}
           {isForm && <Page key={view} name={view} active positions={positions}>
             <PindouConsume initialOperation={view} draft={drafts[view]}
