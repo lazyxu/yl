@@ -1,10 +1,41 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="43" fill="#456d56"/>
-  <path d="M96 147V91" stroke="#e5f0df" stroke-width="11" stroke-linecap="round"/>
-  <path d="M96 124C73 120 56 105 52 82c22-3 42 9 44 42ZM96 108c25-4 40-20 45-42-24-2-45 13-45 42Z" fill="#bdd8ad"/>
-  <ellipse cx="96" cy="47" rx="14" ry="21" fill="#f7e9d4"/>
-  <ellipse cx="117" cy="66" rx="21" ry="14" fill="#b9d6ef"/>
-  <ellipse cx="96" cy="85" rx="14" ry="21" fill="#f4c4cb"/>
-  <ellipse cx="75" cy="66" rx="21" ry="14" fill="#f2e1ad"/>
-  <circle cx="96" cy="66" r="12" fill="#e7b760"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="悦亮·晨光花园">
+  <defs>
+    <linearGradient id="cream" x2="0" y2="1"><stop stop-color="#fff9e8"/><stop offset="1" stop-color="#ffe4cf"/></linearGradient>
+    <linearGradient id="red" x2="0" y2="1"><stop stop-color="#ff867a"/><stop offset="1" stop-color="#f24f49"/></linearGradient>
+    <linearGradient id="rings" x2="0" y2="1"><stop stop-color="#ff8070"/><stop offset="1" stop-color="#c72025"/></linearGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#91c44e"/><stop offset="1" stop-color="#0c6c3f"/></linearGradient>
+    <linearGradient id="pink" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0e6"/><stop offset=".4" stop-color="#ffb9ac"/><stop offset="1" stop-color="#fa8188"/></linearGradient>
+    <filter id="lift" x="-20%" y="-30%" width="160%" height="170%"><feGaussianBlur stdDeviation="2"/></filter>
+  </defs>
+  <!-- Full-bleed cream background: iOS applies its native icon mask. -->
+  <rect width="192" height="192" fill="url(#cream)"/>
+  <rect x="28" y="38" width="138" height="116" rx="18" fill="#b69174" opacity=".18" filter="url(#lift)"/>
+  <rect x="27" y="32" width="138" height="122" rx="19" fill="#fff9f3"/>
+  <rect x="27" y="32" width="138" height="49" rx="19" fill="url(#red)"/>
+  <path d="M27 55h138v18H27z" fill="url(#red)"/>
+  <rect x="27" y="66" width="138" height="88" rx="17" fill="#fffaf6"/>
+  <path d="M27 80V75q0-9 9-9h120q9 0 9 9v6z" fill="#fffaf6"/>
+  <g fill="#fff0d9"><circle cx="65" cy="39" r="10"/><circle cx="127" cy="39" r="10"/></g>
+  <g fill="url(#rings)"><rect x="59" y="14" width="12" height="32" rx="6"/><rect x="121" y="14" width="12" height="32" rx="6"/></g>
+  <g>
+    <rect x="43" y="79" width="20" height="20" rx="4" fill="#f3d5c3"/>
+    <rect x="69" y="79" width="20" height="20" rx="4" fill="#ffe9d6"/>
+    <rect x="95" y="79" width="20" height="20" rx="4" fill="#ff9090"/>
+    <rect x="121" y="79" width="20" height="20" rx="4" fill="#fff0df"/>
+    <rect x="43" y="106" width="20" height="20" rx="4" fill="#f3d5c3"/>
+    <rect x="69" y="106" width="20" height="20" rx="4" fill="#92be55"/>
+    <rect x="95" y="106" width="20" height="20" rx="4" fill="#ffe5cf"/>
+  </g>
+  <path d="M160 180C173 151 185 110 181 89c-24 6-48 38-42 67z" fill="url(#leaf)"/>
+  <path d="M98 179C63 177 28 161 20 136c38-14 68-2 88 27z" fill="url(#leaf)"/>
+  <path d="M125 185c32 2 49-18 53-41-23-6-47 8-58 27z" fill="#075d3b"/>
+  <g fill="url(#pink)">
+    <ellipse cx="116" cy="126" rx="33" ry="20" transform="rotate(-37 116 126)"/>
+    <ellipse cx="148" cy="117" rx="19" ry="32" transform="rotate(-8 148 117)"/>
+    <ellipse cx="159" cy="143" rx="31" ry="19" transform="rotate(-32 159 143)"/>
+    <ellipse cx="125" cy="167" rx="18" ry="30" transform="rotate(19 125 167)"/>
+    <ellipse cx="103" cy="152" rx="29" ry="18" transform="rotate(-10 103 152)"/>
+  </g>
+  <ellipse cx="134" cy="145" rx="10" ry="12" fill="#f3a63e"/>
+  <g fill="#ffd460"><ellipse cx="133" cy="137" rx="4" ry="8"/><ellipse cx="139" cy="142" rx="4" ry="7"/><ellipse cx="127" cy="142" rx="3" ry="6"/><circle cx="134" cy="148" r="5"/></g>
 </svg>

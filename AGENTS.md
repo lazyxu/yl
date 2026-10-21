@@ -143,3 +143,12 @@
 - **P2 花园可选离线浏览**：默认关闭，`花园 → 离线浏览设置` 中明确用户同意；仅存储已浏览的前 200 株摘要、最多 30 个详情、每株前 100 条成长记录及最多 60 张、12 MiB 的 /thumb 照片。仅用于只读；不可在离线编辑/删除；显示“部分记录、可能已过期”标识。用户关闭/清除需撤销同意、删除花园 IndexedDB 元数据及专用 Cache Storage，不得删除已确认的日历快照。避免关闭期间的异步保存继续回写离线数据；普通浏览器 HTTP 图片缓存独立管理。
 - 所有用户数据仍以 Express/MySQL 为真实来源；没有离线排班编辑队列、花园上传队列或静默批量预下载。换设备/清理 Safari 数据后可以丢失离线快照，绝不能作为唯一数据源。
 - CI 应覆盖离线冷启动/恢复联网、排班版本与禁用编辑、花园主动许可/清除、缩略图容量约束、缓存头、等待更新与旧 JS 回退。Chrome 用真正的 Playwright 网络离线模拟；Playwright WebKit 在 `setOffline(true)` + SW 页面导航有已知模拟缺陷时可改用**停止隔离源站**的故障测试，须如实标注两种测试范围，不得将此标注为 iPhone 真机验收。
+
+
+## 晨光花园 PWA 图标与 Windows 打包约束
+
+- 用户选定「方案 1 · 晨光花园」，图标保持奶油色满幅背景、红色月历、粉色花朵与绿色叶片；日历/花园的业务 UI 配色和每日班次文字不随图标修改。
+- `public/app-icon.svg` 和 `scripts/generate-pwa-icons.mjs` 是同一设计方向的可再生源文件，192/512 PNG 通过 `npm run build` 的 `prebuild` 在 public 自动生成，Vite 将它们复制到 dist。
+- `scripts/build-pwa-shell.mjs` 必须在 dist/icon-192.png 或 dist/icon-512.png 不存在时自动补齐；禁止直接对缺失 PNG 调用 statSync 导致 Windows ENOENT。
+- 不依赖外部图片 URL、额外 npm/native 绘图库、字体文件或手工 git 忽略文件；保持 `node scripts/generate-pwa-icons.mjs [output_dir]` 能在 Node 22 的 Windows/Linux/macOS 运行。
+- `node --test test/pwa.test.cjs` 必须包括删除 dist 两个图标后单独调用 PWA cache builder 并核对重生成 PNG 与预缓存清单；PR CI 同时在 Windows 与 Linux 执行 Vite build + PWA test。

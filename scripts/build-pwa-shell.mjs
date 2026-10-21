@@ -1,8 +1,20 @@
 import { createHash } from 'node:crypto'
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 
 const root = resolve('dist')
+// A direct build-pwa-shell invocation (or a Vite build that skipped npm's
+// prebuild hook) may not contain the generated PWA PNG icons. Generate them
+// from the same brand source without requiring the user to copy files or
+// repair paths manually on Windows.
+const requiredIcons = [192, 512]
+if (requiredIcons.some(size => !existsSync(join(root, 'icon-' + size + '.png')))) {
+  if (!existsSync(join(root, 'index.html'))) {
+    throw new Error('PWA build requires dist/index.html; run npm run build first')
+  }
+  const { generatePWAIcons } = await import('./generate-pwa-icons.mjs')
+  generatePWAIcons(root)
+}
 const candidates = []
 function collect(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -23,6 +35,8 @@ collect(join(root, 'assets'))
 for (const name of ['index.html', 'pwa-theme-init.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'app-icon.svg']) {
   const path = join(root, name)
+  if (!existsSync(path)) throw new Error('PWA required static file missing: ' + name +
+    '. Check the Vite public directory and icon generator.')
   candidates.push({ url: '/' + name, bytes: statSync(path).size, file: path })
 }
 candidates.sort((a, b) => a.url.localeCompare(b.url))
