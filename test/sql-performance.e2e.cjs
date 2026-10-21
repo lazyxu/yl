@@ -200,6 +200,62 @@ async function main() {
         overrideVersion = response.data.version
         return response
       },5)
+
+      // Complete the SQL-facing CRUD coverage (without synthetic media I/O).
+      // Each mutation samples the actual Express route; direct SQL fixture
+      // seeding happens outside the timed request.
+      await probe('garden.species.get', () => rawRequest('/api/garden/species'))
+      let speciesSerial = 0
+      await probe('garden.species.post', () => rawRequest('/api/garden/species',
+        asJSON({ name: 'Benchmark Species ' + ++speciesSerial })), 5)
+      await probe('garden.species.patch', () => rawRequest('/api/garden/species/' + species.id,
+        asJSON({ name: 'Perf Roses' }, 'PATCH')), 5)
+      const speciesToDelete = await GardenSpecies.bulkCreate(
+        Array.from({ length: 6 }, (_, i) => ({ name: 'Discardable Species ' + i })))
+      let speciesDeleteIndex = 0
+      await probe('garden.species.delete', () => rawRequest('/api/garden/species/' +
+        speciesToDelete[speciesDeleteIndex++].id, { method: 'DELETE' }), 5)
+
+      let plantSerial = 0
+      await probe('garden.plants.post', () => rawRequest('/api/garden/plants',
+        asJSON({ name: 'Benchmark Plant ' + ++plantSerial, species_id: species.id,
+          status: 'active', location: 'Performance Bench', notes: '' })), 5)
+      await probe('garden.plants.patch', () => rawRequest('/api/garden/plants/' + plantId,
+        asJSON({ name: 'Main Perf Plant', species_id: species.id,
+          status: 'active', location: 'Performance Bench', notes: '' }, 'PATCH')), 5)
+      const plantsToDelete = await GardenPlant.bulkCreate(
+        Array.from({ length: 6 }, (_,i) => ({ name:'Discardable Plant '+i, status:'active' })))
+      let plantDeleteIndex = 0
+      await probe('garden.plants.delete', () => rawRequest('/api/garden/plants/' +
+        plantsToDelete[plantDeleteIndex++].id, { method:'DELETE' }), 5)
+      await probe('garden.calendar.byPlant', () =>
+        rawRequest('/api/garden/calendar?plant_id='+plantId))
+
+      const detailEntry = entries[0]
+      await probe('garden.entries.patch', () => rawRequest('/api/garden/entries/' + detailEntry.id,
+        asJSON({ observed_at: detailEntry.observed_at, local_date: detailEntry.local_date,
+          note:'SQL perf diary edit', author_name:'Perf' },'PATCH')), 5)
+      const entriesToDelete = await GardenEntry.bulkCreate(
+        Array.from({ length: 6 }, (_,i) => {
+          const ms=Date.UTC(2026,10,1,12,0,i)
+          return { plant_id:plantId, observed_at:new Date(ms), observed_ts:ms,
+            local_date:'2026-11-01', note:'Disposable Entry '+i, author_name:'Perf' }
+        }))
+      let entryDeleteIndex = 0
+      await probe('garden.entries.delete', () => rawRequest('/api/garden/entries/' +
+        entriesToDelete[entryDeleteIndex++].id, { method:'DELETE' }), 5)
+      await probe('garden.photos.metadata', async () => {
+        const photo = await GardenPhoto.findByPk(1)
+        assert(photo)
+        return { bytes:0 }
+      })
+      let ruleVersion = stored.data.version
+      await probe('shifts.rules.large.put', async () => {
+        const response = await rawRequest('/api/settings/shifts',
+          asJSON({rules,version:ruleVersion},'PUT'))
+        ruleVersion = response.data.version
+        return response
+      }, 5)
     } finally {
       sequelize.options.logging = formerLogger
       sequelize.options.benchmark = false
