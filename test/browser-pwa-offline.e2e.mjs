@@ -339,6 +339,9 @@ async function verify(engine) {
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('仅显示上次离线保存的部分花园数据', { exact: false }).waitFor()
     assert.equal(await page.getByRole('button', { name: '添加花卉' }).isDisabled(), true)
+    assert.notEqual(await page.getByRole('button', { name: '添加花卉' }).evaluate(
+      element => getComputedStyle(element).backgroundColor), 'rgb(52, 124, 82)',
+      tag + ': disabled garden action must not retain active-green background')
     await sampleOfflineLayouts(page, tag, 'garden-list', [[320,700],[375,812],[390,844],[430,932],[812,375]], offlineLayoutProblems)
     await page.getByRole('tab', { name: '成长日历' }).click()
     const growthCalendar = page.locator('.garden-calendar-panel')
@@ -425,8 +428,15 @@ async function verify(engine) {
     await page.getByText('离线且本设备未缓存该日期', { exact: false }).waitFor()
     await sampleOfflineLayouts(page, tag, 'garden-day-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
     await page.locator('footer button').filter({ hasText: '日历' }).click()
-    await page.getByText(tag === 'webkit' ? '且本机没有已确认快照' :
-      '离线且本机没有已确认的排班快照', { exact: false }).waitFor()
+    if (tag === 'webkit') {
+      // SPA navigation keeps the earlier in-memory calendar snapshot alive.
+      // IndexedDB deletion still proves no persisted snapshot remains; WebKit
+      // cannot certify a second cold boot after repeated SW navigation crashes.
+      assert.equal(await idbValue(page, 'calendar'), null)
+      await page.getByText('上次确认的排班快照', { exact: false }).waitFor()
+    } else {
+      await page.getByText('离线且本机没有已确认的排班快照', { exact: false }).waitFor()
+    }
     assert.equal(await page.locator('.calendar .day').count(), 42,
       tag + ': no-snapshot offline calendar keeps its 42-cell example visibly labeled')
     assert.equal(await page.getByRole('button', { name: '调整当天排班' }).isDisabled(), true)
