@@ -78,6 +78,13 @@ body { overflow: hidden; }
 /* Calendar and Garden apply the safe area once at their content root. */
 .app-page[data-view="日历"], .app-page[data-view="花园"] { padding-inline: 0; }
 .app-page[hidden], .app-footer[hidden] { display: none; }
+/* Keep offline/error messages legible on iPhone instead of clipping action buttons. */
+.app-page .MuiAlert-root { max-width: 100%; min-width: 0; align-items: flex-start; overflow-wrap: anywhere; }
+.app-page .MuiAlert-message { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 359px) {
+  .app-page .MuiAlert-root { flex-wrap: wrap; }
+  .app-page .MuiAlert-action { padding-top: 4px; margin-left: auto; margin-right: 0; }
+}
 .app-footer {
   position: relative;
   z-index: 9;
