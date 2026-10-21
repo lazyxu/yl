@@ -9,8 +9,18 @@ import OfflinePhoto from '../offline/OfflinePhoto'
 export function Cover({ id, height = 178, label = '花卉照片', className = '' }) {
   const [failed, setFailed] = useState(false)
   const [retry, setRetry] = useState(0)
+  const [online, setOnline] = useState(() => navigator.onLine)
   useEffect(() => { setFailed(false); setRetry(0) }, [id])
-  const retryable = Boolean(id && failed)
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine)
+    window.addEventListener('online', update)
+    window.addEventListener('offline', update)
+    return () => {
+      window.removeEventListener('online', update)
+      window.removeEventListener('offline', update)
+    }
+  }, [])
+  const retryable = Boolean(id && failed && online)
   const onRetry = event => {
     if (!retryable) return
     event.preventDefault()
@@ -29,7 +39,9 @@ export function Cover({ id, height = 178, label = '花卉照片', className = ''
         {retryable
           ? <BrokenImageOutlined aria-hidden="true" sx={{ fontSize: 42, color: '#83a68c' }}/>
           : <LocalFloristOutlined aria-hidden="true" sx={{ fontSize: 54, color: '#83a68c' }}/>}
-        {retryable && <span className="garden-cover-failure">照片加载失败 · 轻触重试</span>}
+        {id && failed && <span className="garden-cover-failure">
+          {online ? '照片加载失败 · 轻触重试' : '离线未保存照片缩略图'}
+        </span>}
       </Box>}
   </Box>
 }

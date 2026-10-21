@@ -9,10 +9,13 @@ export default function GrowthTimeline({ entries, photos, onEdit, onDelete, onOp
   const [menuState, setMenuState] = useState(null)
   const indices = useMemo(() => new Map(photos.map((photo, index) => [photo.id, index])), [photos])
   let previousMonth = ''
-  if (!entries.length) return <div className="garden-empty">
+  if (!entries.length) return <div className="garden-empty" role="status">
     <YardOutlined sx={{ fontSize: 46, color: '#91b59b' }}/>
-    <Typography fontWeight={750}>还没有成长日记</Typography>
-    <Typography variant="body2" color="text.secondary">记录第一次发芽或开花的瞬间吧。</Typography>
+    <Typography fontWeight={750}>{readOnly ? '本机没有可查看的成长记录' : '还没有成长日记'}</Typography>
+    <Typography variant="body2" color="text.secondary">
+      {readOnly ? '离线数据可能不完整，不代表这株花没有成长日记；联网后可查看最新内容。' :
+        '记录第一次发芽或开花的瞬间吧。'}
+    </Typography>
   </div>
   return <div aria-label="成长日记列表">
     {entries.map(entry => {
