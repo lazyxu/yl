@@ -11,17 +11,26 @@ export default function OfflineOptions({ items, total, species, query, notify })
 
   async function toggle(checked) {
     if (working) return
+    // Reflect the tap immediately. Clearing IndexedDB/Cache Storage may be
+    // asynchronous, especially on iOS; roll back if updating the preference
+    // fails instead of leaving the switch visibly on during deletion.
+    setEnabled(checked)
     setWorking(true)
     try {
       const ok = await setGardenOfflineEnabled(checked)
-      if (!ok) { notify('此浏览器无法保存离线数据', true); return }
-      setEnabled(checked)
+      if (!ok) {
+        setEnabled(!checked)
+        notify('此浏览器无法保存离线数据', true)
+        return
+      }
       if (checked && !query && items.length) {
         await saveGardenIndex({ items, total, species })
       }
       notify(checked ? '已开启离线缓存' : '已关闭并清除花园离线缓存')
-    } catch (error) { notify(error.message || '离线设置失败', true) }
-    finally { setWorking(false) }
+    } catch (error) {
+      setEnabled(!checked)
+      notify(error.message || '离线设置失败', true)
+    } finally { setWorking(false) }
   }
 
   async function clear() {
