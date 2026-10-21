@@ -87,7 +87,33 @@
 - SQL 写入尖峰须复核中位数与慢 SQL 内容：最终某轮拼豆 POST p50 **3.49ms**、p95 **228.34ms**，慢点是 COMMIT 226ms；另一轮 p95 **3.84ms**。同条件未持续复现，不能据此增加索引或改写事务。
 - 带 `100 × 366` 班次规则的 JSON 读写（约 333KB）在表中独立测量，不能与普通简短设置数据混淆。
 - 保留严格索引唯一性：`garden_species.name` 与 `garden_photos.storage_name` 改为模型 `indexes` 中的显式命名 UNIQUE，连续两次 `sync({alter:true})` 不再增生额外索引。已有环境遗留重复索引仍需在维护窗口经单独审核后处理，不能直接全自动删除。
-- 真实 MySQL CRUD/分页/并发与备份恢复集成测试 **4/4 通过**；备份恢复样例并非 100k。没有完成 100k 体量的实际 `mysqldump`/恢复、真实 iPhone Safari 100k 页面、生产 NAS/存储设备 IO 或 100k 个实际媒体文件的验收。
+- 真实 MySQL CRUD/分页/并发与小规模备份恢复集成测试 **4/4 通过**；另已完成 **100k 数据的完整 `mysqldump`、归档校验与恢复**（见专项记录）。仍未完成真实 iPhone Safari 100k 页面、生产 NAS/存储设备 IO 或 100k 个实际媒体文件的验收。
+
+## 100k 真实 MySQL 全量备份 / 校验 / 恢复 E2E
+
+新增 `SQL_PERF_BACKUP_RESTORE=1` 使用项目既有 `scripts/data-backup.mjs`，在随机隔离 MySQL 8.4.11、已装载 100k/表数据后执行完整备份→verify→人为修改 SQL 与测试文件→带恢复前安全备份的 restore→逐表校验。这是**备份/恢复端到端耗时**，包含 `mysqldump`、压缩、SHA256 校验、再次安全备份和 MySQL 导入，**不得与单次 SQL p95 比较**。
+
+首次独立 CI：[GitHub Actions #39576016798](https://github.com/lazyxu/yl/actions/runs/39576016798)。
+
+| 环节 | 首轮耗时 |
+|---|---:|
+| 备份（内部包含归档校验） | **3,062.28 ms** |
+| 单独 `verify` | **660.69 ms** |
+| 恢复（包括事前安全备份） | **11,115.19 ms** |
+| 生成的压缩归档 | **4,553,523 字节（约 4.55 MB）** |
+
+备份前实际表记录（性能测试已经执行若干业务 POST）：
+
+| 表 | 恢复记录数量 | 主键范围 |
+|---|---:|---|
+| `garden_plants` | 100,006 | 1–100006 |
+| `garden_entries` | 100,000 | 1–100000 |
+| `garden_photos` | 100,000 | 1–100000 |
+| `pindou_reminders` | 100,006 | 1–100006 |
+
+备份后故意删除一条拼豆历史、添加仅存在于备份之后的表、覆盖已备份的测试文件；restore 后四表数量/主键边界恢复一致，新增表消失，测试文件内容恢复。原有小数据全量备份集成覆盖权限、校验损坏等异常路径，此次关注真实 100k 恢复耗时与数据正确性。
+
+**结论**：隔离 CI + 合成 metadata 的 100k SQL 完整备份约 3 秒、全量恢复约 11 秒，在该环境和体量下没有异常；不能外推到真实 100k 张原图/缩略图的文件备份、远端网络、NAS 磁盘 IO 或生产恢复窗口。
 
 ## 保留与运行方式
 
@@ -99,6 +125,7 @@
 BACKUP_TEST_MYSQL=1 BACKUP_TEST_HOST=127.0.0.1 BACKUP_TEST_PASSWORD=ci-only-password node test/sql-performance-100k.e2e.cjs
 SQL_PERF_SCENARIO=all-hot SQL_PERF_DESTRUCTIVE=1 BACKUP_TEST_MYSQL=1 BACKUP_TEST_HOST=127.0.0.1 BACKUP_TEST_PASSWORD=ci-only-password node test/sql-performance-100k.e2e.cjs
 SQL_PERF_SCHEMA_RESTART=1 BACKUP_TEST_MYSQL=1 BACKUP_TEST_HOST=127.0.0.1 BACKUP_TEST_PASSWORD=ci-only-password node test/sql-performance-100k.e2e.cjs
+SQL_PERF_BACKUP_RESTORE=1 BACKUP_TEST_MYSQL=1 BACKUP_TEST_HOST=127.0.0.1 BACKUP_TEST_PASSWORD=ci-only-password node test/sql-performance-100k.e2e.cjs
 ```
 
 长期验证使用 GitLab 手动 `sql-performance-100k-e2e`，不增加普通 MR/每日 CI 负荷。源码/CI 级功能和安全测试继续执行；不可接触的真实生产环境验收**按用户决定跳过（未验收）**，不作为代码/PR 合并门槛。
