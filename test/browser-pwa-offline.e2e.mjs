@@ -339,8 +339,21 @@ async function verify(engine) {
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('仅显示上次离线保存的部分花园数据', { exact: false }).waitFor()
     assert.equal(await page.getByRole('button', { name: '添加花卉' }).isDisabled(), true)
-    assert.notEqual(await page.getByRole('button', { name: '添加花卉' }).evaluate(
-      element => getComputedStyle(element).backgroundColor), 'rgb(52, 124, 82)',
+    // WebKit may sample a previous CSS background during a short button state
+    // transition; require the settled disabled presentation as well as the
+    // disabled DOM state instead of capturing an intermediate frame.
+    await page.waitForFunction(() => {
+      const button = document.querySelector('.garden-add-btn')
+      return Boolean(button?.disabled && getComputedStyle(button).backgroundColor !== 'rgb(52, 124, 82)')
+    }, null, { timeout: 3500 })
+    const addVisual = await page.getByRole('button', { name: '添加花卉' }).evaluate(element => ({
+      background: getComputedStyle(element).backgroundColor,
+      foreground: getComputedStyle(element).color,
+      disabled: element.disabled,
+      classes: element.className,
+    }))
+    console.log('OFFLINE-DISABLED-BUTTON ' + tag + ' ' + JSON.stringify(addVisual))
+    assert.notEqual(addVisual.background, 'rgb(52, 124, 82)',
       tag + ': disabled garden action must not retain active-green background')
     await sampleOfflineLayouts(page, tag, 'garden-list', [[320,700],[375,812],[390,844],[430,932],[812,375]], offlineLayoutProblems)
     await page.getByRole('tab', { name: '成长日历' }).click()
