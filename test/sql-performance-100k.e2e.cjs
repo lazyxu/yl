@@ -371,6 +371,36 @@ async function main() {
       }))})
       console.log('SQL-PERF-PLAN ' + JSON.stringify(result.explain[result.explain.length-1]))
     }
+    // Measure the production startup schema-sync path with an already-populated
+    // 100k database. Fresh CREATE TABLE timing is *not* a substitute for
+    // sequelize.sync({ alter: true }) on existing rows/indexes.
+    if (process.env.SQL_PERF_SCHEMA_RESTART === '1') {
+      const indexSnapshot = async () => {
+        const [rows] = await admin.query(
+          'SELECT TABLE_NAME, INDEX_NAME, COUNT(*) AS columns_count FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? GROUP BY TABLE_NAME, INDEX_NAME ORDER BY TABLE_NAME, INDEX_NAME',
+          [dbName])
+        return rows.map(row=>[row.TABLE_NAME, row.INDEX_NAME, Number(row.columns_count)])
+      }
+      const beforeIndexes = await indexSnapshot()
+      const syncRuns = []
+      for (let i = 0; i < 2; i++) {
+        const start = performance.now()
+        await sequelize.sync({ alter: true })
+        const ms = Math.round((performance.now()-start)*100)/100
+        const count = await Promise.all([
+          GardenPlant.count(), GardenEntry.count(), GardenPhoto.count(), Reminder.count(),
+        ])
+        assert.deepEqual(count, [100_000,100_000,100_000,100_000],
+          'Startup schema sync must preserve 100k data rows')
+        syncRuns.push({ms,indexes:await indexSnapshot()})
+        console.log('SQL-PERF-SCHEMA '+JSON.stringify({run:i+1,ms,indexes:syncRuns[i].indexes.length}))
+      }
+      assert.deepEqual(syncRuns[0].indexes,beforeIndexes,
+        'Startup schema sync unexpectedly altered existing index definitions')
+      assert.deepEqual(syncRuns[1].indexes,syncRuns[0].indexes,
+        'Repeated startup schema sync must not create duplicate indexes')
+      result.cold.schema_sync_existing_100k_ms = syncRuns.map(x=>x.ms)
+    }
     // Worst-case destructive paths are single-shot timings, not p95. The
     // photo fixture contains *metadata only*, so unlink failures are expected
     // and cleanup time cannot be presented as real filesystem throughput.
