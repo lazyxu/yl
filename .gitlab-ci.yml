@@ -177,6 +177,7 @@ sql-performance-100k-e2e:
     - SQL_PERF_OUTPUT=test-results/sql-performance-100k.json node test/sql-performance-100k.e2e.cjs
     - SQL_PERF_SCENARIO=all-hot SQL_PERF_DESTRUCTIVE=1 SQL_PERF_OUTPUT=test-results/sql-performance-100k-all-hot.json node test/sql-performance-100k.e2e.cjs
     - SQL_PERF_SCHEMA_RESTART=1 SQL_PERF_OUTPUT=test-results/sql-performance-100k-schema.json node test/sql-performance-100k.e2e.cjs
+    - SQL_PERF_BACKUP_RESTORE=1 SQL_PERF_OUTPUT=test-results/sql-performance-100k-backup.json node test/sql-performance-100k.e2e.cjs
     - node --test test/garden.integration.cjs test/pindou-stock.integration.cjs test/settings.integration.cjs test/backup.integration.cjs
   artifacts:
     when: always

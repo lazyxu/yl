@@ -465,6 +465,88 @@ async function main() {
         '/api/garden/species/'+species.id, {method:'DELETE'}))
       assert.equal(await GardenPlant.count({where:{species_id:species.id}}),0)
     }
+    // 100k full backup/restore E2E is independent of SQL API p95.  The
+    // fixture uses metadata-only gallery rows, not 100k physical photos.
+    if (process.env.SQL_PERF_BACKUP_RESTORE === '1') {
+      assert.notEqual(process.env.SQL_PERF_DESTRUCTIVE, '1',
+        'Destructive hotspot scenario is incompatible with full backup benchmark')
+      const os = require('node:os')
+      const { spawnSync } = require('node:child_process')
+      const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'yl-100k-backup-'))
+      const base = path.join(temporary, 'app')
+      const backups = path.join(temporary, 'backups')
+      const pathsToCount = ['garden_plants','garden_entries','garden_photos','pindou_reminders']
+      const snapshotCounts = async () => {
+        const counts = []
+        for (const table of pathsToCount) {
+          const [rows] = await admin.query('SELECT COUNT(*) AS total, MIN(id) AS first_id, MAX(id) AS last_id FROM \`' +
+            dbName + '\`.\`' + table + '\`')
+          counts.push([table,Number(rows[0].total),Number(rows[0].first_id),Number(rows[0].last_id)])
+        }
+        return counts
+      }
+      try {
+        fs.mkdirSync(base,{recursive:true})
+        fs.mkdirSync(path.join(base,'uploads'),{recursive:true})
+        fs.symlinkSync(path.resolve(__dirname,'../server/node_modules'),path.join(base,'node_modules'),'dir')
+        // Credentials and backup destination belong to the disposable CI-only
+        // MySQL instance created by this process, never a production database.
+        fs.writeFileSync(path.join(base,'.env'),
+          'DB_HOST='+dbHost+'\nDB_PORT=3306\nDB_USER='+dbUser+'\nDB_PASSWORD='+dbPassword+
+          '\nDB_NAME='+dbName+'\n', {mode:0o600})
+        const uploadName=path.join(base,'uploads','sql-100k-backup-proof.bin')
+        const proof=Buffer.from('owned-fixture-100k-backup')
+        fs.writeFileSync(uploadName,proof)
+        const before=await snapshotCounts()
+        assert(before.every(([,n])=>n>=100_000),'Backup must include real 100k test table rows')
+        // mysql/mysqldump are external child processes; always record command
+        // wall time separately, including archive compression / SHA checks.
+        const script=path.resolve(__dirname,'../scripts/data-backup.mjs')
+        const run=(action,args)=>{
+          const tick=performance.now()
+          const proc=spawnSync(process.execPath,[script,action,...args],{
+            encoding:'utf8',maxBuffer:8*1024*1024,timeout:600_000,
+          })
+          if(proc.error)throw proc.error
+          assert.equal(proc.status,0,
+            action+' failed: '+(proc.stderr||'').slice(-2000))
+          return {ms:Math.round((performance.now()-tick)*100)/100,
+            stdout:proc.stdout}
+        }
+        const common=['--local','--base',base,'--backup-dir',backups]
+        const backup=run('backup',common)
+        const directories=fs.readdirSync(backups)
+        assert.equal(directories.length,1,'Initial backup directory must exist exactly once')
+        const saved=path.join(backups,directories[0])
+        const archiveBytes=fs.statSync(path.join(saved,'data.tar.gz')).size
+        const verify=run('verify',[saved,...common])
+        // Simulate changes after snapshot. Full RESTORE must recover ledger and
+        // remove newer tables rather than merely keeping same total count.
+        await admin.query('DELETE FROM \`'+dbName+'\`.\`pindou_reminders\` WHERE id = (SELECT last_id FROM (SELECT MAX(id) AS last_id FROM \`'+dbName+'\`.\`pindou_reminders\`) x)')
+        await admin.query('CREATE TABLE \`'+dbName+'\`.\`post_backup_sentinel\`(id INT PRIMARY KEY) ENGINE=InnoDB')
+        fs.writeFileSync(uploadName,'changed-since-backup')
+        assert.notDeepEqual(await snapshotCounts(),before)
+        // No pending API requests may use the DB across DROP+RESTORE.
+        if(server){await new Promise(resolve=>server.close(resolve));server=null}
+        if(sequelize){await sequelize.close();sequelize=null}
+        const restore=run('restore',[saved,...common,'--apply','--no-pm2'])
+        const after=await snapshotCounts()
+        assert.deepEqual(after,before,'100k full restore must reproduce each table row count and id range')
+        const [extra]=await admin.query('SELECT COUNT(*) AS count FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME=?',
+          [dbName,'post_backup_sentinel'])
+        assert.equal(Number(extra[0].count),0,'Full restore must remove post-snapshot table')
+        assert.deepEqual(fs.readFileSync(uploadName),proof,
+          'Full restore must recover files alongside MySQL rows')
+        result.cold.backup_restore_100k={
+          tables:before, archive_bytes:archiveBytes,
+          backup_ms:backup.ms, verify_ms:verify.ms, restore_ms:restore.ms,
+          includes_safety_backup:true, file_count:1,
+        }
+        console.log('SQL-PERF-BACKUP '+JSON.stringify(result.cold.backup_restore_100k))
+      } finally {
+        fs.rmSync(temporary,{recursive:true,force:true})
+      }
+    }
     const outfile = process.env.SQL_PERF_OUTPUT ||
       path.join('test-results','sql-performance-100k.json')
     fs.mkdirSync(path.dirname(outfile), { recursive: true })

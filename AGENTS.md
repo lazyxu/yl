@@ -188,3 +188,5 @@
 - 花园分页、图像汇总、拼豆历史及班次读写包括真实 HTTP E2E；照片 multipart 实例仅用生成的小 PNG，不能据此推导大文件/HEIC/真实文件 IO 性能。全热点删除与备份/恢复、实际浏览器、远端磁盘另作专项，不得冒充单 SQL p95。
 - 在已有 100k 数据的表上连续执行两次 `sequelize.sync({alter:true})`，核对数据行数与 `information_schema.STATISTICS` 索引清单不变；`garden_species.name` / `garden_photos.storage_name` 以显式命名 UNIQUE index 维护，不得退回匿名字段 `unique:true`，避免重复生成 `name_2` / `storage_name_2`。
 - 长期 GitLab `sql-performance-100k-e2e` 仅手动启动，不阻塞普通 MR；结果保留到 `test-results/sql-performance-100k*.json`。详见 `docs/sql-e2e-performance-100k-2026-10-21.md`；不要求无法接触的生产环境验收，明确标记“按用户决定跳过（未验收）”。
+
+- 100k 完整 MySQL 备份/恢复专项：`SQL_PERF_BACKUP_RESTORE=1` 在同规模随机隔离测试库调用真实 `data-backup.mjs` backup/verify/restore（含安全备份），核对 4 张主要表的计数/主键边界、备份后额外表被删除以及上传文件恢复，保存 archive bytes、backup/verify/restore wall time；与单次 SQL API p95 严格区分。只有合成小文件，不能代表生产 100k 张实体照片 IO。
