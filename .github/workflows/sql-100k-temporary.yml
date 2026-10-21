@@ -1,0 +1,41 @@
+name: SQL 100k E2E Audit (temporary)
+on:
+  push:
+    branches:
+      - perf/sql-100k-e2e-20261021
+jobs:
+  mysql-100k:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-only-password"
+          --health-interval=10s --health-timeout=5s --health-retries=30
+    env:
+      BACKUP_TEST_MYSQL: "1"
+      BACKUP_TEST_HOST: "127.0.0.1"
+      BACKUP_TEST_USER: "root"
+      BACKUP_TEST_PASSWORD: "ci-only-password"
+      SQL_PERF_OUTPUT: test-results/sql-performance-100k.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci --legacy-peer-deps
+      - run: npm install --prefix server --omit=dev --package-lock=false
+      - name: Execute 100k SQL E2E and EXPLAIN
+        run: node test/sql-performance-100k.e2e.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sql-100k-results
+          path: test-results/
+          if-no-files-found: ignore
