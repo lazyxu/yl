@@ -174,7 +174,7 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
       <Box className="pindou-page pindou-form">
         {serverReachable === false && <Alert severity="warning" role="status"
           action={navigator.onLine ? <Button color="inherit" onClick={() => setCheckKey(value => value + 1)}>重试</Button> : undefined}>
-          离线或服务器暂不可用：可继续填写草稿，但联网验证前不能提交。刷新网页会丢失草稿。
+          离线或服务器暂不可用：可以继续填写本页草稿，但联网确认前不能提交；刷新网页会丢失草稿。
         </Alert>}
         {formMessage && <Alert severity="error" role="alert"
           action={<Button color="inherit" onClick={() => setFormMessage('')}>关闭</Button>}>
