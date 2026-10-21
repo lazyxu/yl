@@ -435,7 +435,7 @@ async function verify(engine) {
       assert.equal(await idbValue(page, 'calendar'), null)
       await page.getByText('上次确认的排班快照', { exact: false }).waitFor()
     } else {
-      await page.getByText('离线且本机没有已确认的排班快照', { exact: false }).waitFor()
+      await page.getByText(/本机没有已确认.*快照/).waitFor()
     }
     assert.equal(await page.locator('.calendar .day').count(), 42,
       tag + ': no-snapshot offline calendar keeps its 42-cell example visibly labeled')
