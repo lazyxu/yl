@@ -81,8 +81,9 @@ async function auditPindouLayout(page, tag, phase) {
         type: 'horizontal-box-overflow', node: String(element.className).slice(0, 60),
         left: rect.left, right: rect.right, width,
       })
-      if (element.scrollWidth > element.clientWidth + 2 &&
-        !['pindou-form-color'].includes(element.className))
+      // Native inputs deliberately scroll their text inside the control.
+      if (!element.matches?.('input, select, textarea') &&
+        element.scrollWidth > element.clientWidth + 2)
         problems.push({ type: 'horizontal-text-overflow',
           node: String(element.className).slice(0, 60),
           scroll: element.scrollWidth, client: element.clientWidth })
