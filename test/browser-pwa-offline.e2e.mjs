@@ -314,8 +314,12 @@ async function verify(engine) {
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
     await page.locator('.garden-detail-back').click()
     await page.getByText(name, { exact: true }).waitFor()
-    await page.getByText('离线浏览设置', { exact: true }).click()
-    await page.getByLabel('开启花园离线浏览').check()
+    await page.getByText('离线缓存', { exact: true }).click()
+    assert.equal(await page.getByLabel('开启花园离线浏览').isChecked(), true,
+      tag + ': garden offline browsing is enabled by default')
+    for (const copy of ['仅限只读：最多', '本地离线内容可能被使用此设备', '浏览器报告的本站点总存储'])
+      assert.equal(await page.getByText(copy, { exact: false }).count(), 0,
+        tag + ': long explanatory copy is removed')
     await page.getByText(name, { exact: true }).click()
     const plantId = await page.evaluate(() => Number(new URLSearchParams(location.search).get('plant')))
     assert(Number.isSafeInteger(plantId) && plantId > 0,
