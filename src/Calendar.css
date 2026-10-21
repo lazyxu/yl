@@ -16,11 +16,9 @@
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
 }
 .schedule-screen .schedule-topbar {
-  display: flex; align-items: flex-start; justify-content: space-between;
+  display: flex; align-items: center; justify-content: flex-end;
   gap: 12px; margin: 8px 0 16px;
 }
-.schedule-screen .schedule-heading { min-width: 0; }
-.schedule-screen .schedule-eyebrow { color: var(--schedule-muted); font-size: 12px; letter-spacing: .4px; }
 .schedule-screen .schedule-page-title {
   font-size: clamp(27px, 7.3vw, 36px); font-weight: 770; letter-spacing: -.6px; line-height: 1.3;
 }
@@ -35,15 +33,6 @@
 }
 .schedule-screen .header .MuiIconButton-root { width: 44px; height: 44px; flex-shrink: 0; }
 .schedule-screen .schedule-today-button { min-width: 60px; padding: 6px 8px; }
-.schedule-screen .schedule-legend {
-  display: flex; justify-content: space-around; align-items: center;
-  gap: 5px; padding: 9px 4px 13px; color: var(--schedule-muted);
-}
-.schedule-screen .schedule-legend-item {
-  display: inline-flex; align-items: center; justify-content: center;
-  gap: 5px; font-size: 12px; white-space: nowrap;
-}
-.schedule-screen .schedule-legend-item i { width: 9px; height: 9px; display: inline-block; border-radius: 3px; flex-shrink: 0; }
 .schedule-screen .schedule-loading { display: block; min-height: 24px; }
 .schedule-screen .calendar {
   background: var(--schedule-card);
@@ -177,7 +166,6 @@
 @media (max-height: 470px) and (orientation: landscape) {
   .schedule-screen { padding-block: 4px 12px; }
   .schedule-screen .schedule-topbar { margin: 0 0 4px; }
-  .schedule-screen .schedule-legend { padding-block: 2px 5px; }
   .schedule-screen .calendar { grid-template-rows: 23px repeat(6, minmax(44px, 1fr)); padding-block: 3px; }
   .schedule-screen .calendar button.day { min-height: 44px; }
 }
