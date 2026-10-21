@@ -5,6 +5,7 @@ import IconButton from '@mui/material/IconButton'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import Button from '@mui/material/Button'
+import Alert from '@mui/material/Alert'
 import ColorSwatch from './ColorSwatch'
 import InventoryGrid from './InventoryGrid'
 import MARD from './colorPalettes/mard.json'
@@ -16,6 +17,10 @@ import { toDatetimeLocal, fromDatetimeLocal } from './dateTime'
 export default function History({ active = true, refreshKey }){
   const [records, setRecords] = useState([])
   const [recordsLoading, setRecordsLoading] = useState(false)
+  const [recordsReady, setRecordsReady] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [online, setOnline] = useState(() => navigator.onLine)
+  const [retryKey, setRetryKey] = useState(0)
   const [editingId, setEditingId] = useState(null)
   const [editData, setEditData] = useState(null)
 
@@ -29,23 +34,36 @@ export default function History({ active = true, refreshKey }){
 
   async function fetchReminders(signal){
     setRecordsLoading(true)
+    setLoadError('')
     try{
       const res = await fetch('/api/reminders', { signal })
       const data = await res.json()
-      if (!signal.aborted) setRecords(Array.isArray(data) ? data : [])
+      if (!res.ok || !Array.isArray(data)) throw new Error('历史记录暂时无法获取')
+      if (!signal.aborted) { setRecords(data); setRecordsReady(true) }
     }catch(err){
-      if (err.name !== 'AbortError') console.error(err)
+      if (err.name !== 'AbortError' && !signal.aborted) setLoadError('历史记录无法连接服务器')
     }finally{ if (!signal.aborted) setRecordsLoading(false) }
   }
 
+  useEffect(() => {
+    const disconnected = () => setOnline(false)
+    const reconnected = () => { setOnline(true); setRetryKey(key => key + 1) }
+    window.addEventListener('offline', disconnected)
+    window.addEventListener('online', reconnected)
+    return () => {
+      window.removeEventListener('offline', disconnected)
+      window.removeEventListener('online', reconnected)
+    }
+  }, [])
   useEffect(() => {
     if (!active) return
     const controller = new AbortController()
     fetchReminders(controller.signal)
     return () => controller.abort()
-  }, [active, refreshKey])
+  }, [active, refreshKey, retryKey])
 
   async function handleDeleteRecord(id){
+    if (!online || loadError) return
     if (!window.confirm('确认删除该历史记录？该操作不可恢复。')) return;
     setRecordsLoading(true)
     try{
@@ -99,7 +117,7 @@ export default function History({ active = true, refreshKey }){
   function updateOccurredAt(value){ setEditData(prev => ({ ...prev, occurred_at: value })) }
 
   async function saveEdit(){
-    if (!editData || !editingId) return
+    if (!editData || !editingId || !online || loadError) return
     setRecordsLoading(true)
     try{
       // validate items: must be non-empty and counts positive integers
@@ -126,8 +144,13 @@ export default function History({ active = true, refreshKey }){
 
   return (
     <Box sx={{ p:1 }}>
+      {(!online || loadError) && <Alert severity="warning" role="status" sx={{ mb: 1, overflowWrap: 'anywhere' }}
+        action={online ? <Button color="inherit" onClick={() => setRetryKey(key => key + 1)}>重试</Button> : undefined}>
+        {recordsReady ? '离线或服务器暂不可用：以下为本次页面先前读取的记录，不保证最新，编辑和删除已停用。' :
+          '离线或服务器暂不可用：无法获取历史记录，这不代表没有记录，请联网后重试。'}
+      </Alert>}
       {recordsLoading && <Typography>加载中...</Typography>}
-      {!recordsLoading && records.length === 0 && <Typography>暂无历史记录</Typography>}
+      {!recordsLoading && recordsReady && records.length === 0 && <Typography>暂无历史记录</Typography>}
       {!recordsLoading && records.length > 0 && (
         <Box sx={{ display:'flex', flexDirection:'column', gap:1 }}>
           {records.map(r => (
@@ -148,10 +171,10 @@ export default function History({ active = true, refreshKey }){
                     </Box>
                   )}
                   {r.note && <Typography variant="caption" sx={{ color:'#333' }}>{r.note}</Typography>}
-                  <IconButton size="small" onClick={() => startEdit(r)} aria-label="编辑记录">
+                  <IconButton size="small" disabled={!online || Boolean(loadError)} onClick={() => startEdit(r)} aria-label="编辑记录">
                     <EditIcon fontSize="small" />
                   </IconButton>
-                  <IconButton size="small" onClick={() => handleDeleteRecord(r.id)} aria-label="删除记录">
+                  <IconButton size="small" disabled={!online || Boolean(loadError)} onClick={() => handleDeleteRecord(r.id)} aria-label="删除记录">
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </Box>
@@ -190,7 +213,7 @@ export default function History({ active = true, refreshKey }){
                       </Box>
                     </Box>
                     <Box sx={{ display:'flex', gap:1, mt:1 }}>
-                      <Button size="small" variant="contained" onClick={saveEdit}>保存</Button>
+                      <Button size="small" variant="contained" disabled={!online || Boolean(loadError)} onClick={saveEdit}>保存</Button>
                       <Button size="small" variant="outlined" onClick={cancelEdit}>取消</Button>
                     </Box>
                   </Box>
