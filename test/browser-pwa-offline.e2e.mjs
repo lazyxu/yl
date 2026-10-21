@@ -127,12 +127,25 @@ async function inspectOfflineLayout(page, label) {
 async function sampleOfflineLayouts(page, tag, view, sizes, problems) {
   for (const [width,height] of sizes) {
     await page.setViewportSize({width,height})
+    if (view === 'garden-photo-viewer') {
+      // The Dialog Fade is still animating when its content first becomes
+      // queryable. Inspect the settled, fully opaque paper after each resize.
+      await page.waitForFunction(() => {
+        const paper = document.querySelector('.MuiDialog-paper.garden-viewer')
+        const container = paper?.closest('.MuiDialog-container')
+        if (!paper || !container) return false
+        const rect = paper.getBoundingClientRect()
+        return getComputedStyle(container).opacity === '1' &&
+          getComputedStyle(paper).backgroundColor === 'rgb(9, 12, 10)' &&
+          rect.width >= innerWidth - 2 && rect.height >= innerHeight - 2
+      }, null, { timeout: 6000 })
+    }
     const report = await inspectOfflineLayout(page, tag + '/' + view + '/' + width + 'x' + height)
     console.log('OFFLINE-VISUAL-AUDIT ' + JSON.stringify(report))
     for (const item of report.problems) problems.push({ at: report.label, ...item })
     if (width === 320 || width === 390) {
       const screenshot = 'test-results/offline-layout-' + tag + '-' + view + '-' + width + '.png'
-      await page.screenshot({ path: screenshot, fullPage: true }).catch(() => {})
+      await page.screenshot({ path: screenshot, fullPage: view !== 'garden-photo-viewer' }).catch(() => {})
     }
   }
 }
