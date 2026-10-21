@@ -35,7 +35,8 @@ export default function useGardenPlants(active, notify) {
     } catch (err) {
       const cached = await readGardenIndex()
       if (cached) { speciesRef.current = cached.species; setSpecies(cached.species) }
-      else if (err.name !== 'AbortError') notify(err.message, true)
+      else if (err.name !== 'AbortError' && !(err instanceof TypeError) && navigator.onLine)
+        notify(err.message, true)
     }
   }, [notify])
 

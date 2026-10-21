@@ -13,7 +13,15 @@
   margin: 0 auto;
   color: var(--garden-ink);
 }
-.garden-root .MuiButton-containedSuccess { background: #347c52; color: #fff; }
+.garden-root .MuiButton-containedSuccess:not(.Mui-disabled) { background: #347c52; color: #fff; }
+/* Offline/read-only must look disabled, not like an actionable green CTA. */
+.garden-root .garden-add-btn:disabled,
+.garden-root .garden-add-btn.Mui-disabled {
+  background-color: var(--garden-tint) !important;
+  color: var(--garden-muted) !important;
+  box-shadow: none !important;
+  transition: none !important;
+}
 .garden-root .MuiButton-root { font-weight: 650; }
 .garden-header {
   position: relative;
@@ -188,6 +196,10 @@
 }
 .garden-detail-skeleton { min-height: 460px; padding-top: 18px; }
 .garden-calendar-panel { background: var(--garden-card); border: 1px solid var(--garden-border); border-radius: 20px; padding: 14px; }
+.garden-calendar-offline-note {
+  font-size: 12px; line-height: 1.5; margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
 .garden-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

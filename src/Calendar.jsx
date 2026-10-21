@@ -411,19 +411,25 @@ export default function Calendar({ active = true }) {
       </div>
 
       {snapshotAt && (!serverRulesReady || !serverOverridesReady || !online) &&
-        <Alert severity="warning" className="schedule-unverified" role="status">
-          {online ? '正在核对服务器，暂时显示' : '离线只读：当前显示'}上次确认的排班快照
+        <Alert severity="warning" className="schedule-unverified" role="status"
+          action={online && (settingsError || dayShiftsError) ?
+            <Button color="inherit" onClick={() => { reloadSettings(); reloadDayShifts() }}>重试</Button> : undefined}>
+          {settingsError || dayShiftsError ? '无法读取排班设置或单日调整，当前显示' :
+            online ? '正在核对服务器，暂时显示' : '离线只读：当前显示'}上次确认的排班快照
           （{new Date(snapshotAt).toLocaleString('zh-CN')}）。
           可能不是最新排班，联网核实前不允许修改。
         </Alert>}
-      {!snapshotAt && !confirmed && showPending &&
-        <Alert severity="info" className="schedule-unverified" role="status">
-          {online ? '尚未核对服务器排班' : '尚无已保存的排班快照'}；当前仅显示内置示例，不能修改。
+      {!snapshotAt && !confirmed && (!online || showPending || settingsError || dayShiftsError) &&
+        <Alert severity={!online || settingsError || dayShiftsError ? 'warning' : 'info'}
+          className="schedule-unverified" role="status"
+          action={online && (settingsError || dayShiftsError) ?
+            <Button color="inherit" onClick={() => { reloadSettings(); reloadDayShifts() }}>重试</Button> : undefined}>
+          {settingsError || dayShiftsError ? '无法读取排班设置或单日调整，且本机没有已确认快照' :
+            online ? '尚未核对服务器排班' : '离线且本机没有已确认的排班快照'}；
+          当前仅显示内置示例，不能修改。
         </Alert>}
       {confirmed && showPending && (loadingSettings || loadingDayShifts) && !settingsError && !dayShiftsError &&
         <Typography variant="caption" color="text.secondary" className="schedule-loading">正在核对最新排班…</Typography>}
-      {settingsError && online && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadSettings()}>重新加载</Button>}>{settingsError}</Alert>}
-      {dayShiftsError && online && <Alert severity="warning" action={<Button color="inherit" onClick={() => reloadDayShifts()}>重新加载单日调整</Button>}>{dayShiftsError}</Alert>}
 
       <div className="calendar" role="group" aria-label={currentMonth.format('YYYY年MM月') + '排班月历，方向键可移动日期'}
         ref={calendarRef} onKeyDown={onCalendarKeyDown}

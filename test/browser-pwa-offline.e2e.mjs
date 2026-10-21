@@ -85,12 +85,66 @@ async function idbValue(page, key) {
   }), key)
 }
 
+
+async function inspectOfflineLayout(page, label) {
+  return page.evaluate(label => {
+    const viewport = window.innerWidth
+    const pane = document.querySelector('.app-page:not([hidden])')
+    const surfaces = [pane, document.querySelector('.app-shell'), document.querySelector('.app-content'),
+      ...document.querySelectorAll('.app-page:not([hidden]) .MuiAlert-root, .app-page:not([hidden]) .garden-root, .app-page:not([hidden]) .garden-calendar-panel, .app-page:not([hidden]) .schedule-screen, .app-page:not([hidden]) .garden-search, .app-page:not([hidden]) .garden-view-switch, .app-page:not([hidden]) .garden-list-header, .app-page:not([hidden]) .garden-offline-options, .MuiDialog-paper')]
+      .filter(Boolean)
+    const problems = []
+    for (const element of surfaces) {
+      const box = element.getBoundingClientRect()
+      if (box.width === 0 || box.height === 0) continue
+      if (box.left < -2 || box.right > viewport + 2) problems.push({
+        reason: 'out-of-viewport', element: element.className?.toString().slice(0, 75),
+        left: Math.round(box.left), right: Math.round(box.right), viewport,
+      })
+      if (element.matches?.('.MuiDialog-paper') && (box.top < -2 || box.bottom > innerHeight + 2))
+        problems.push({ reason: 'dialog-vertical-overflow',
+          top: Math.round(box.top), bottom: Math.round(box.bottom), height: innerHeight })
+      if (element.scrollWidth > element.clientWidth + 2 && !['app-content','app-shell'].includes(element.className))
+        problems.push({ reason: 'horizontal-content-overflow',
+          element: element.className?.toString().slice(0, 75),
+          client: element.clientWidth, scroll: element.scrollWidth })
+    }
+    const warnings = [...document.querySelectorAll('.app-page:not([hidden]) .MuiAlert-root')].map(element => {
+      const rect = element.getBoundingClientRect()
+      const msg = element.querySelector('.MuiAlert-message')
+      return { text: element.textContent.trim().slice(0, 150), top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom), clipped: Boolean(msg && msg.scrollWidth > msg.clientWidth + 2) }
+    })
+    if (warnings.some(item => item.clipped)) problems.push({ reason: 'clipped-alert-text' })
+    const footer = document.querySelector('.app-footer:not([hidden])')?.getBoundingClientRect()
+    const shell = document.querySelector('.app-shell')?.getBoundingClientRect()
+    if (footer && shell && footer.bottom > shell.bottom + 2)
+      problems.push({ reason: 'footer-under-viewport', footerBottom: footer.bottom, shellBottom: shell.bottom })
+    return { label, viewport, height: innerHeight, problems, warnings,
+      pageText: pane?.innerText.slice(0, 300) || '' }
+  }, label)
+}
+async function sampleOfflineLayouts(page, tag, view, sizes, problems) {
+  for (const [width,height] of sizes) {
+    await page.setViewportSize({width,height})
+    const report = await inspectOfflineLayout(page, tag + '/' + view + '/' + width + 'x' + height)
+    console.log('OFFLINE-VISUAL-AUDIT ' + JSON.stringify(report))
+    for (const item of report.problems) problems.push({ at: report.label, ...item })
+    if (width === 320 || width === 390) {
+      const screenshot = 'test-results/offline-layout-' + tag + '-' + view + '-' + width + '.png'
+      await page.screenshot({ path: screenshot, fullPage: true }).catch(() => {})
+    }
+  }
+}
+
 async function verify(engine) {
   const browser = await engine.launch({ headless: true })
   const context = await browser.newContext({ viewport: { width: 390, height: 844 },
     isMobile: true, hasTouch: true, locale: 'zh-CN', timezoneId: 'Asia/Tokyo' })
   const page = await context.newPage()
   const tag = engine.name()
+  const pageErrors = []
+  page.on('pageerror', error => pageErrors.push(String(error)))
   try {
     await page.goto(origin + '/?view=日历', { waitUntil: 'domcontentloaded' })
     const day = page.locator('section[data-view="日历"]:not([hidden])')
@@ -179,6 +233,49 @@ async function verify(engine) {
     await day.getByText('上次确认的排班快照', { exact: false }).waitFor()
     assert.equal(await day.getByRole('button', { name: '调整当天排班' }).isDisabled(), true)
     assert.equal(await day.locator('.calendar .day .shift').count(), 42)
+    const offlineLayoutProblems = []
+    const phoneSizes = [[320,700],[375,812],[390,844],[430,932],[812,375]]
+    await sampleOfflineLayouts(page, tag, 'calendar', phoneSizes, offlineLayoutProblems)
+    await day.getByRole('button', { name: '选择年月' }).click()
+    const monthDialog = page.getByRole('dialog', { name: '跳转年月' })
+    await monthDialog.waitFor()
+    // A visible Dialog is not yet fully opaque during MUI's Fade transition.
+    // Inspect the settled sheet, never a translucent intermediate frame.
+    await page.waitForFunction(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-labelledby="schedule-month-picker-title"]')
+      const transition = dialog?.closest('.MuiDialog-container')
+      return Boolean(dialog && (!transition || getComputedStyle(transition).opacity === '1'))
+    })
+    await sampleOfflineLayouts(page, tag, 'month-dialog', [[320,700],[390,844]], offlineLayoutProblems)
+    await monthDialog.getByRole('button', { name: '取消' }).click()
+    await page.locator('footer button').filter({ hasText: '拼豆' }).click()
+    await page.getByText('库存总览').waitFor()
+    await page.getByText('库存未能读取', { exact: false }).waitFor()
+    await sampleOfflineLayouts(page, tag, 'inventory', phoneSizes, offlineLayoutProblems)
+    assert.equal(await page.locator('section[data-view="拼豆"] [role="listitem"]').count(), 0,
+      tag + ': never render unverified inventory as verified zero-count color entries')
+    if (!(await page.locator('section[data-view="拼豆"]').innerText()).includes('离线'))
+      offlineLayoutProblems.push({ at: tag + '/inventory', reason: 'missing-offline-explanation' })
+    await page.getByRole('button', { name: '历史', exact: true }).click()
+    await page.locator('.app-header .app-title').getByText('历史').waitFor()
+    await page.getByText('无法获取历史记录', { exact: false }).waitFor()
+    await sampleOfflineLayouts(page, tag, 'history', [[320,700],[390,844]], offlineLayoutProblems)
+    assert.equal(await page.locator('section[data-view="历史"]').getByText('暂无历史记录').count(), 0,
+      tag + ': unavailable records must not show a verified empty state')
+    if (!(await page.locator('section[data-view="历史"]').innerText()).includes('离线'))
+      offlineLayoutProblems.push({ at: tag + '/history', reason: 'missing-offline-explanation' })
+    await page.locator('.app-header').getByRole('button', { name: '返回库存' }).click()
+    await page.getByRole('button', { name: '补豆', exact: true }).click()
+    await page.getByText('可以继续填写本页草稿', { exact: false }).waitFor()
+    await sampleOfflineLayouts(page, tag, 'pindou-form', [[320,700],[390,844]], offlineLayoutProblems)
+    assert.equal(await page.locator('section[data-view="补豆"]').getByRole('button', { name: '补豆', exact: true }).isDisabled(), true,
+      tag + ': offline form save is blocked')
+    if (!(await page.locator('section[data-view="补豆"]').innerText()).includes('离线'))
+      offlineLayoutProblems.push({ at: tag + '/pindou-form', reason: 'missing-offline-safeguard' })
+    await page.locator('.app-header').getByRole('button', { name: '返回库存' }).click()
+    await page.locator('footer button').filter({ hasText: '日历' }).click()
+    assert.equal(await day.locator('.calendar .day .shift').count(), 42,
+      tag + ': navigating the cached offline shell preserves calendar')
     await reconnect(engine, context)
     await page.reload({ waitUntil: 'domcontentloaded' })
     await day.getByRole('button', { name: '调整当天排班' }).waitFor({ state: 'visible' })
@@ -229,16 +326,64 @@ async function verify(engine) {
       return (await cache.keys()).length > 0
     }, { timeout: 10000 })
     await disconnect(engine, context)
-    await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    if (tag === 'webkit') {
+      // Linux Playwright WebKit can crash on a second SW-backed top-level
+      // navigation during an origin outage; the cached Calendar reload
+      // above already tests that path. Exercise Garden via SPA navigation.
+      await page.locator('.garden-detail-back').click()
+      await page.locator('footer button').filter({ hasText: '拼豆' }).click()
+      await page.locator('footer button').filter({ hasText: '花园' }).click()
+    } else {
+      await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    }
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('仅显示上次离线保存的部分花园数据', { exact: false }).waitFor()
     assert.equal(await page.getByRole('button', { name: '添加花卉' }).isDisabled(), true)
+    // WebKit may sample a previous CSS background during a short button state
+    // transition; require the settled disabled presentation as well as the
+    // disabled DOM state instead of capturing an intermediate frame.
+    await page.waitForFunction(() => {
+      const button = document.querySelector('.garden-add-btn')
+      return Boolean(button?.disabled && getComputedStyle(button).backgroundColor !== 'rgb(52, 124, 82)')
+    }, null, { timeout: 3500 })
+    const addVisual = await page.getByRole('button', { name: '添加花卉' }).evaluate(element => ({
+      background: getComputedStyle(element).backgroundColor,
+      foreground: getComputedStyle(element).color,
+      disabled: element.disabled,
+      classes: element.className,
+    }))
+    console.log('OFFLINE-DISABLED-BUTTON ' + tag + ' ' + JSON.stringify(addVisual))
+    assert.notEqual(addVisual.background, 'rgb(52, 124, 82)',
+      tag + ': disabled garden action must not retain active-green background')
+    await sampleOfflineLayouts(page, tag, 'garden-list', [[320,700],[375,812],[390,844],[430,932],[812,375]], offlineLayoutProblems)
+    await page.getByRole('tab', { name: '成长日历' }).click()
+    const growthCalendar = page.locator('.garden-calendar-panel')
+    await growthCalendar.waitFor()
+    await sampleOfflineLayouts(page, tag, 'garden-calendar', [[320,700],[390,844]], offlineLayoutProblems)
+    await growthCalendar.locator('.garden-calendar-day[aria-current="date"]').click()
+    await page.getByText('离线只读：仅包含', { exact: false }).waitFor()
+    await sampleOfflineLayouts(page, tag, 'garden-day', [[320,700],[390,844]], offlineLayoutProblems)
+    const otherDate = growthCalendar.locator('.garden-calendar-day').first()
+    await otherDate.click()
+    await page.getByText('不代表当天没有记录', { exact: false }).waitFor()
+    await page.getByRole('tab', { name: '花卉', exact: true }).click()
     await page.getByText(name, { exact: true }).click()
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
     assert.equal(await page.getByRole('button', { name: '记录成长' }).count(), 0,
       tag + ': offline detail is read-only')
+    await sampleOfflineLayouts(page, tag, 'garden-detail', [[320,700],[390,844]], offlineLayoutProblems)
+    assert.deepEqual(offlineLayoutProblems, [], tag + ': offline rendering must be safe and clearly labeled')
     await reconnect(engine, context)
-    await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    if (tag === 'webkit') {
+      // Keep the existing WebKit page alive: on Linux Playwright, repeated
+      // top-level SW navigations can crash even after the origin is restored.
+      // Switching modules still requires a fresh backend read on activation.
+      await page.locator('.garden-detail-back').click()
+      await page.locator('footer button').filter({ hasText: '拼豆' }).click()
+      await page.locator('footer button').filter({ hasText: '花园' }).click()
+    } else {
+      await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    }
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('离线浏览设置', { exact: true }).click()
     // Clearing IndexedDB and Cache Storage is async: wait until the switch
@@ -260,6 +405,65 @@ async function verify(engine) {
     assert(await idbValue(page, 'calendar'), tag + ': garden erasure preserves schedule snapshot')
     assert(!(await page.evaluate(() => caches.keys())).includes('yl-garden-thumbs-v1'),
       tag + ': revoke consent erases offline thumbnails')
+
+    // With consent revoked and no calendar snapshot, a cold offline boot must
+    // not masquerade as an empty garden or authoritative default shift cycle.
+    await page.evaluate(async () => {
+      await new Promise((resolve, reject) => {
+        const request = indexedDB.open('yl-offline-readonly', 1)
+        request.onerror = reject
+        request.onsuccess = () => {
+          const tx = request.result.transaction('snapshots', 'readwrite')
+          tx.objectStore('snapshots').delete('calendar')
+          tx.oncomplete = resolve
+          tx.onerror = reject
+        }
+      })
+    })
+    await disconnect(engine, context)
+    if (tag === 'webkit') {
+      await page.locator('footer button').filter({ hasText: '日历' }).click()
+      await page.locator('footer button').filter({ hasText: '花园' }).click()
+    } else {
+      await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    }
+    const staleCardCount = await page.locator('.garden-card').count()
+    if (staleCardCount) {
+      await page.getByText('本次页面之前加载的花卉列表', { exact: false }).waitFor()
+    } else {
+      await page.getByText('本设备尚无可用的已保存快照', { exact: false }).waitFor()
+    }
+    assert.equal(await page.getByRole('button', { name: '添加花卉' }).isDisabled(), true,
+      tag + ': garden mutation is blocked even if WebKit reports online during an origin outage')
+    const offlineError = await page.locator('.garden-error').boundingBox()
+    const gardenTabs = await page.locator('.garden-segments').boundingBox()
+    assert(offlineError && gardenTabs && offlineError.y + offlineError.height <= gardenTabs.y + 2,
+      tag + ': offline data error must appear above the garden tabs, not buried below filters')
+    await sampleOfflineLayouts(page, tag, 'garden-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
+    await page.getByRole('tab', { name: '成长日历' }).click()
+    await page.locator('.garden-calendar-grid').waitFor()
+    // Garden keeps the user's last viewed month across tabs. Recenter the
+    // month before requiring today's marker instead of assuming it is visible.
+    await page.locator('.garden-calendar-panel').getByRole('button', { name: '今天', exact: true }).click()
+    await page.locator('.garden-calendar-day[aria-current="date"]').click()
+    await page.getByText('离线且本设备未缓存该日期', { exact: false }).waitFor()
+    await sampleOfflineLayouts(page, tag, 'garden-day-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
+    await page.locator('footer button').filter({ hasText: '日历' }).click()
+    if (tag === 'webkit') {
+      // SPA navigation keeps the earlier in-memory calendar snapshot alive.
+      // IndexedDB deletion still proves no persisted snapshot remains; WebKit
+      // cannot certify a second cold boot after repeated SW navigation crashes.
+      assert.equal(await idbValue(page, 'calendar'), null)
+      await page.getByText('上次确认的排班快照', { exact: false }).waitFor()
+    } else {
+      await page.getByText(/本机没有已确认.*快照/).waitFor()
+    }
+    assert.equal(await page.locator('.calendar .day').count(), 42,
+      tag + ': no-snapshot offline calendar keeps its 42-cell example visibly labeled')
+    assert.equal(await page.getByRole('button', { name: '调整当天排班' }).isDisabled(), true)
+    await sampleOfflineLayouts(page, tag, 'calendar-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
+    assert.deepEqual(offlineLayoutProblems, [], tag + ': all offline views fit within the viewport')
+    assert.deepEqual(pageErrors, [], tag + ': no uncaught rendering errors')
     console.log('PASS PWA offline/read-only: ' + tag +
       (tag === 'webkit' ? ' (origin outage, not Playwright setOffline)' : ' (network offline emulation)'))
   } catch (error) {

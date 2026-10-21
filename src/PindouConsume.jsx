@@ -3,6 +3,7 @@ import Box from '@mui/material/Box'
 import TextField from '@mui/material/TextField'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
+import Alert from '@mui/material/Alert'
 import ColorCodeSelect from './ColorCodeSelect'
  
 import Input from '@mui/material/Input'
@@ -26,6 +27,31 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
   const setLoading = onBusyChange
   const submitting = useRef(false)
   const [imgPreview, setImgPreview] = useState(null)
+  const [serverReachable, setServerReachable] = useState(() => navigator.onLine ? null : false)
+  const [checkKey, setCheckKey] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController()
+    const recheck = async () => {
+      if (!navigator.onLine) { setServerReachable(false); return }
+      setServerReachable(null)
+      try {
+        const response = await fetch('/api/inventory', { signal: controller.signal, cache: 'no-store' })
+        if (!controller.signal.aborted) setServerReachable(response.ok)
+      } catch {
+        if (!controller.signal.aborted) setServerReachable(false)
+      }
+    }
+    const offline = () => { controller.abort(); setServerReachable(false) }
+    const online = () => setCheckKey(value => value + 1)
+    window.addEventListener('offline', offline)
+    window.addEventListener('online', online)
+    recheck()
+    return () => {
+      controller.abort()
+      window.removeEventListener('offline', offline)
+      window.removeEventListener('online', online)
+    }
+  }, [checkKey])
   const hasDraft = selectedCodes.length > 0 || applyCount !== '' || note !== '' || imgFile || Object.values(itemsMap).some(count => count > 0)
 
   const allCodes = useMemo(()=>{
@@ -75,7 +101,7 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
   }
 
   async function handleSubmit(){
-    if (loading || submitting.current || !canSubmit) return
+    if (loading || submitting.current || !canSubmit || serverReachable !== true) return
     // 如果有填写“应用到所选”的数量，则先在提交数据中应用该数量（但不依赖 setState 异步）
     let submitMap = { ...itemsMap }
     if (canApplyToSelected) {
@@ -141,6 +167,10 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
   return (
     <>
     <Box sx={{ p:1 }}>
+      {serverReachable === false && <Alert severity="warning" role="status" sx={{ mb: 1, overflowWrap: 'anywhere' }}
+        action={navigator.onLine ? <Button color="inherit" onClick={() => setCheckKey(value => value + 1)}>重试</Button> : undefined}>
+        离线或服务器暂不可用：可以继续填写本页草稿，但不能提交补豆或消耗。联网确认后才能保存；刷新网页会丢失草稿。
+      </Alert>}
       <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1, flexWrap:'wrap' }}>
           <Box sx={{ minWidth:240 }}>
             <ColorCodeSelect options={allCodes} value={selectedCodes} disabled={loading} onChange={handleSelectChange} sx={{ minWidth: 240 }} />
@@ -176,7 +206,7 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
       </Box>
 
       <Box sx={{ display:'flex', gap:1, mt:0, mb:1 }}>
-        <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || loading}>{loading ? '正在保存…' : initialOperation}</Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || loading || serverReachable !== true}>{loading ? '正在保存…' : initialOperation}</Button>
         <Button onClick={onClose} disabled={loading}>取消</Button>
       </Box>
       {hasDraft && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>切换页面会保留填写内容；刷新或关闭网页会清空。</Typography>}
