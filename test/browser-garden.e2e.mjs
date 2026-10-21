@@ -59,6 +59,21 @@ async function waitForServer() {
   throw new Error('Server did not become ready: ' + tail)
 }
 async function auditPindouLayout(page, tag, phase) {
+  if (phase === 'delete-confirm' || phase === 'image-preview') {
+    // MUI dialog content is queryable while Fade is still translucent. Wait
+    // for the actual final frame before taking screenshots or claiming the
+    // bottom sheet is correctly positioned.
+    await page.waitForFunction(() => {
+      const paper = document.querySelector('.MuiDialog-paper.pindou-image-preview, .pindou-confirm-dialog .MuiDialog-paper')
+      if (!paper) return false
+      const container = paper.closest('.MuiDialog-container')
+      const rect = paper.getBoundingClientRect()
+      return Boolean(container && getComputedStyle(container).opacity === '1' &&
+        rect.width > 50 && rect.height > 40 &&
+        rect.left >= -2 && rect.right <= innerWidth + 2 &&
+        rect.top >= -2 && rect.bottom <= innerHeight + 2)
+    }, null, { timeout: 6000 })
+  }
   const audit = await page.evaluate(() => {
     const width = window.innerWidth
     const main = document.querySelector('.app-page:not([hidden])')
@@ -317,6 +332,10 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await auditPindouLayout(page, tag, 'delete-confirm')
     await deleteConfirm.getByRole('button', { name: '取消' }).click()
     check(await historyRow.count() === 1, tag + ': cancelled delete leaves history intact')
+    await historyRow.getByRole('button', { name: '删除记录' }).click()
+    await deleteConfirm.getByRole('button', { name: '确认删除' }).click()
+    await historyRow.waitFor({ state: 'detached' })
+    check(await historyRow.count() === 0, tag + ': confirm deletes only its own record')
     await page.getByRole('button', { name: '返回库存' }).click()
     await page.getByText('库存总览').waitFor()
 
