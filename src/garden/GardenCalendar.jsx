@@ -111,7 +111,8 @@ export default function GardenCalendar({ active, selectPlant, notify,
         setLoadedDay(selected)
         setPartialOffline(true)
         setError('')
-      } else setError(err.message)
+      } else setError(!navigator.onLine || err instanceof TypeError
+        ? '离线且本设备未缓存该日期的成长记录，联网后可查看。' : err.message)
     }).finally(() => {
       if (generation === dayRequestGeneration.current && !controller.signal.aborted) setDayLoading(false)
     })
