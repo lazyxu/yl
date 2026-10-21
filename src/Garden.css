@@ -13,7 +13,12 @@
   margin: 0 auto;
   color: var(--garden-ink);
 }
-.garden-root .MuiButton-containedSuccess { background: #347c52; color: #fff; }
+.garden-root .MuiButton-containedSuccess:not(.Mui-disabled) { background: #347c52; color: #fff; }
+/* Offline/read-only must look disabled, not like an actionable green CTA. */
+.garden-root .MuiButton-containedSuccess.Mui-disabled {
+  background: var(--garden-tint);
+  color: var(--garden-muted);
+}
 .garden-root .MuiButton-root { font-weight: 650; }
 .garden-header {
   position: relative;
