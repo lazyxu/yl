@@ -295,6 +295,8 @@ async function verify(engine) {
     await page.waitForFunction(() => !document.querySelector('.schedule-unverified'))
 
     await page.locator('footer button').filter({ hasText: '花园' }).click()
+    assert.equal(await page.evaluate(() => localStorage.getItem('yl-garden-offline-optin-v1')), null,
+      tag + ': fresh devices start with no explicit preference')
     await page.getByRole('button', { name: '添加花卉' }).click()
     const name = '离线验证月季-' + tag
     const editor = page.getByRole('dialog', { name: '添加花卉' })
