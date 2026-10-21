@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Box, Button, CircularProgress, Dialog, IconButton, Stack, Typography } from '@mui/material'
 import { ChevronLeft, ChevronRight, Close, DownloadOutlined, IosShareOutlined,
   ZoomInOutlined, ZoomOutOutlined, VisibilityOutlined } from '@mui/icons-material'
@@ -16,7 +16,7 @@ export default function Viewer({ photos, current, onClose,
   const [imageError, setImageError] = useState(false)
   const [imageLoading, setImageLoading] = useState(true)
   const [variant, setVariant] = useState(() => navigator.onLine ? 'preview' : 'offline')
-  const [cachedUrl, setCachedUrl] = useState('')
+  const [cachedMedia, setCachedMedia] = useState(null)
   const [retryCount, setRetryCount] = useState(0)
   const [controls, setControls] = useState(true)
   const [shareBusy, setShareBusy] = useState(false)
@@ -31,6 +31,7 @@ export default function Viewer({ photos, current, onClose,
   const offlineRequest = useRef(0)
   const offlinePending = useRef(false)
   const selected = photos[index]
+  const cachedUrl = cachedMedia?.id === selected?.id ? cachedMedia.url : ''
 
   // Only explicitly opted-in /thumb media can be viewed without a server.
   // Previews and originals are never placed into the offline Cache Storage.
@@ -47,7 +48,7 @@ export default function Viewer({ photos, current, onClose,
       if (generation !== offlineRequest.current) { URL.revokeObjectURL(url); return }
       if (cachedObjectURL.current) URL.revokeObjectURL(cachedObjectURL.current)
       cachedObjectURL.current = url
-      setCachedUrl(url)
+      setCachedMedia({ id: selected.id, url })
       setImageError(false)
       setImageLoading(true)
     } catch {
@@ -94,12 +95,12 @@ export default function Viewer({ photos, current, onClose,
       onEndReached?.()
     }
   }, [hasMore, loadingMore, index, photos.length, onEndReached])
-  useEffect(() => {
+  useLayoutEffect(() => {
     ++offlineRequest.current
     offlinePending.current = false
     if (cachedObjectURL.current) URL.revokeObjectURL(cachedObjectURL.current)
     cachedObjectURL.current = ''
-    setCachedUrl('')
+    setCachedMedia(null)
     const identity = { scale: 1, x: 0, y: 0 }
     pendingTransform.current = identity
     setTransform(identity)
@@ -222,7 +223,7 @@ export default function Viewer({ photos, current, onClose,
     offlinePending.current = false
     if (cachedObjectURL.current) URL.revokeObjectURL(cachedObjectURL.current)
     cachedObjectURL.current = ''
-    setCachedUrl('')
+    setCachedMedia(null)
     setImageError(false)
     setImageLoading(true)
     setVariant('preview')
@@ -275,7 +276,14 @@ export default function Viewer({ photos, current, onClose,
           src={imageSource} alt={selected.name} draggable="false"
           onLoad={() => setImageLoading(false)}
           onError={() => {
-            if (cachedUrl) { setImageError(true); setImageLoading(false); return }
+            if (cachedUrl) {
+              if (cachedObjectURL.current) URL.revokeObjectURL(cachedObjectURL.current)
+              cachedObjectURL.current = ''
+              setCachedMedia(null)
+              setImageError(true)
+              setImageLoading(false)
+              return
+            }
             if (variant === 'preview' && navigator.onLine) {
               setVariant('original'); setImageLoading(true)
             } else showCachedThumbnail()
