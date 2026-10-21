@@ -6,8 +6,11 @@ const sequelize = require('../sequelize')
 // No accounts/sessions are introduced in this phase.
 const GardenSpecies = sequelize.define('GardenSpecies', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
-  name: { type: DataTypes.STRING(100), unique: true, allowNull: false },
-}, { tableName: 'garden_species', underscored: true })
+  name: { type: DataTypes.STRING(100), allowNull: false },
+}, { tableName: 'garden_species', underscored: true, indexes: [
+  // Explicit stable unique index prevents ALTER startup from adding name_2, name_3 ...
+  { name: 'name', unique: true, fields: ['name'] },
+] })
 
 const GardenPlant = sequelize.define('GardenPlant', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
@@ -42,13 +45,16 @@ const GardenEntry = sequelize.define('GardenEntry', {
 const GardenPhoto = sequelize.define('GardenPhoto', {
   id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
   entry_id: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false },
-  storage_name: { type: DataTypes.STRING(100), unique: true, allowNull: false },
+  storage_name: { type: DataTypes.STRING(100), allowNull: false },
   thumb_name: { type: DataTypes.STRING(100), allowNull: true },
   preview_name: { type: DataTypes.STRING(100), allowNull: true },
   original_name: { type: DataTypes.STRING(160), allowNull: false },
   mime: { type: DataTypes.STRING(40), allowNull: false },
   size_bytes: { type: DataTypes.BIGINT, allowNull: false },
-}, { tableName: 'garden_photos', underscored: true, indexes: [{ fields: ['entry_id'] }] })
+}, { tableName: 'garden_photos', underscored: true, indexes: [
+  { fields: ['entry_id'] },
+  { name: 'storage_name', unique: true, fields: ['storage_name'] },
+] })
 
 GardenPlant.belongsTo(GardenSpecies, { foreignKey: 'species_id', as: 'species', onDelete: 'SET NULL' })
 GardenSpecies.hasMany(GardenPlant, { foreignKey: 'species_id', as: 'plants' })
