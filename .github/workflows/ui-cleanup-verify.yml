@@ -1,0 +1,52 @@
+name: Temporary UI cleanup verification
+on:
+  push:
+    branches:
+      - ui/compact-redundant-copy-20261021
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npx eslint src/History.jsx src/App.jsx src/Calendar.jsx src/ShiftSettings.jsx src/garden/GardenScreen.jsx src/garden/FlowerDetail.jsx
+      - run: node --test test/pindou-datetime.test.cjs
+      - run: npm test -- --runInBand --testPathIgnorePatterns=recognize.image.test.js
+      - run: node --test test/deployment.test.cjs test/deployment-rollback.test.cjs test/garden-validation.test.cjs
+      - run: npm run build
+      - run: node --test test/pwa.test.cjs
+  mysql-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+          MYSQL_ROOT_HOST: '%'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-only-password"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      BACKUP_TEST_MYSQL: '1'
+      BACKUP_TEST_HOST: 127.0.0.1
+      BACKUP_TEST_USER: root
+      BACKUP_TEST_PASSWORD: ci-only-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm install --prefix server --omit=dev --package-lock=false
+      - run: node --test test/backup.integration.cjs test/settings.integration.cjs test/garden.integration.cjs test/upload.integration.cjs test/pindou-stock.integration.cjs test/garden-media.test.cjs
