@@ -140,6 +140,8 @@ async function verify(engine) {
     isMobile: true, hasTouch: true, locale: 'zh-CN', timezoneId: 'Asia/Tokyo' })
   const page = await context.newPage()
   const tag = engine.name()
+  const pageErrors = []
+  page.on('pageerror', error => pageErrors.push(String(error)))
   try {
     await page.goto(origin + '/?view=日历', { waitUntil: 'domcontentloaded' })
     const day = page.locator('section[data-view="日历"]:not([hidden])')
@@ -238,17 +240,26 @@ async function verify(engine) {
     await monthDialog.getByRole('button', { name: '取消' }).click()
     await page.locator('footer button').filter({ hasText: '拼豆' }).click()
     await page.getByText('库存总览').waitFor()
+    await page.getByText('库存未能读取', { exact: false }).waitFor()
     await sampleOfflineLayouts(page, tag, 'inventory', phoneSizes, offlineLayoutProblems)
+    assert.equal(await page.locator('section[data-view="拼豆"] [role="listitem"]').count(), 0,
+      tag + ': never render unverified inventory as verified zero-count color entries')
     if (!(await page.locator('section[data-view="拼豆"]').innerText()).includes('离线'))
       offlineLayoutProblems.push({ at: tag + '/inventory', reason: 'missing-offline-explanation' })
     await page.getByRole('button', { name: '历史', exact: true }).click()
     await page.locator('.app-header .app-title').getByText('历史').waitFor()
+    await page.getByText('无法获取历史记录', { exact: false }).waitFor()
     await sampleOfflineLayouts(page, tag, 'history', [[320,700],[390,844]], offlineLayoutProblems)
+    assert.equal(await page.locator('section[data-view="历史"]').getByText('暂无历史记录').count(), 0,
+      tag + ': unavailable records must not show a verified empty state')
     if (!(await page.locator('section[data-view="历史"]').innerText()).includes('离线'))
       offlineLayoutProblems.push({ at: tag + '/history', reason: 'missing-offline-explanation' })
     await page.locator('.app-header').getByRole('button', { name: '返回库存' }).click()
     await page.getByRole('button', { name: '补豆', exact: true }).click()
+    await page.getByText('可以继续填写本页草稿', { exact: false }).waitFor()
     await sampleOfflineLayouts(page, tag, 'pindou-form', [[320,700],[390,844]], offlineLayoutProblems)
+    assert.equal(await page.locator('section[data-view="补豆"]').getByRole('button', { name: '补豆', exact: true }).isDisabled(), true,
+      tag + ': offline form save is blocked')
     if (!(await page.locator('section[data-view="补豆"]').innerText()).includes('离线'))
       offlineLayoutProblems.push({ at: tag + '/pindou-form', reason: 'missing-offline-safeguard' })
     await page.locator('.app-header').getByRole('button', { name: '返回库存' }).click()
@@ -317,6 +328,9 @@ async function verify(engine) {
     await growthCalendar.locator('.garden-calendar-day[aria-current="date"]').click()
     await page.getByText('离线只读：仅包含', { exact: false }).waitFor()
     await sampleOfflineLayouts(page, tag, 'garden-day', [[320,700],[390,844]], offlineLayoutProblems)
+    const otherDate = growthCalendar.locator('.garden-calendar-day').first()
+    await otherDate.click()
+    await page.getByText('不代表当天没有记录', { exact: false }).waitFor()
     await page.getByRole('tab', { name: '花卉', exact: true }).click()
     await page.getByText(name, { exact: true }).click()
     await page.locator('.garden-timeline-note').filter({ hasText: '离线保存的成长日记' }).waitFor()
@@ -347,6 +361,42 @@ async function verify(engine) {
     assert(await idbValue(page, 'calendar'), tag + ': garden erasure preserves schedule snapshot')
     assert(!(await page.evaluate(() => caches.keys())).includes('yl-garden-thumbs-v1'),
       tag + ': revoke consent erases offline thumbnails')
+
+    // With consent revoked and no calendar snapshot, a cold offline boot must
+    // not masquerade as an empty garden or authoritative default shift cycle.
+    await page.evaluate(async () => {
+      await new Promise((resolve, reject) => {
+        const request = indexedDB.open('yl-offline-readonly', 1)
+        request.onerror = reject
+        request.onsuccess = () => {
+          const tx = request.result.transaction('snapshots', 'readwrite')
+          tx.objectStore('snapshots').delete('calendar')
+          tx.oncomplete = resolve
+          tx.onerror = reject
+        }
+      })
+    })
+    await disconnect(engine, context)
+    await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    await page.getByText('本设备尚无可用的已保存快照', { exact: false }).waitFor()
+    const offlineError = await page.locator('.garden-error').boundingBox()
+    const gardenTabs = await page.locator('.garden-segments').boundingBox()
+    assert(offlineError && gardenTabs && offlineError.y + offlineError.height <= gardenTabs.y + 2,
+      tag + ': offline data error must appear above the garden tabs, not buried below filters')
+    await sampleOfflineLayouts(page, tag, 'garden-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
+    await page.getByRole('tab', { name: '成长日历' }).click()
+    await page.locator('.garden-calendar-grid').waitFor()
+    await page.locator('.garden-calendar-day[aria-current="date"]').click()
+    await page.getByText('离线且本设备未缓存该日期', { exact: false }).waitFor()
+    await sampleOfflineLayouts(page, tag, 'garden-day-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
+    await page.locator('footer button').filter({ hasText: '日历' }).click()
+    await page.getByText('离线且本机没有已确认的排班快照', { exact: false }).waitFor()
+    assert.equal(await page.locator('.calendar .day').count(), 42,
+      tag + ': no-snapshot offline calendar keeps its 42-cell example visibly labeled')
+    assert.equal(await page.getByRole('button', { name: '调整当天排班' }).isDisabled(), true)
+    await sampleOfflineLayouts(page, tag, 'calendar-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
+    assert.deepEqual(offlineLayoutProblems, [], tag + ': all offline views fit within the viewport')
+    assert.deepEqual(pageErrors, [], tag + ': no uncaught rendering errors')
     console.log('PASS PWA offline/read-only: ' + tag +
       (tag === 'webkit' ? ' (origin outage, not Playwright setOffline)' : ' (network offline emulation)'))
   } catch (error) {
