@@ -414,7 +414,12 @@ async function verify(engine) {
     } else {
       await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
     }
-    await page.getByText('本设备尚无可用的已保存快照', { exact: false }).waitFor()
+    const staleCardCount = await page.locator('.garden-card').count()
+    if (staleCardCount) {
+      await page.getByText('本次页面之前加载的花卉列表', { exact: false }).waitFor()
+    } else {
+      await page.getByText('本设备尚无可用的已保存快照', { exact: false }).waitFor()
+    }
     assert.equal(await page.getByRole('button', { name: '添加花卉' }).isDisabled(), true,
       tag + ': garden mutation is blocked even if WebKit reports online during an origin outage')
     const offlineError = await page.locator('.garden-error').boundingBox()
@@ -424,6 +429,9 @@ async function verify(engine) {
     await sampleOfflineLayouts(page, tag, 'garden-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
     await page.getByRole('tab', { name: '成长日历' }).click()
     await page.locator('.garden-calendar-grid').waitFor()
+    // Garden keeps the user's last viewed month across tabs. Recenter the
+    // month before requiring today's marker instead of assuming it is visible.
+    await page.locator('.garden-calendar-panel').getByRole('button', { name: '今天', exact: true }).click()
     await page.locator('.garden-calendar-day[aria-current="date"]').click()
     await page.getByText('离线且本设备未缓存该日期', { exact: false }).waitFor()
     await sampleOfflineLayouts(page, tag, 'garden-day-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
