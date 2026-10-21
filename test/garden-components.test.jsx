@@ -144,6 +144,9 @@ test('花卉详情仅展示正序成长时间线，跨页照片仍能查看和�
     await act(async () => root.render(<FlowerDetail id={7} active species={[]}
       onBack={() => {}} onChange={() => {}} onSpecies={() => {}} notify={() => {}} />))
     expect(host.textContent).toContain('成长时间线')
+    expect(host.querySelector('.garden-detail h1')?.textContent).toBe('月季')
+    expect(host.textContent).not.toContain('花卉档案')
+    expect(host.querySelector('.garden-detail-back')).not.toBeNull()
     expect(host.textContent).not.toContain('成长对比')
     expect(host.querySelector('[aria-label="归档或恢复"]')).toBeNull()
     expect(host.querySelector('[aria-label="更多花卉操作"]')).not.toBeNull()
