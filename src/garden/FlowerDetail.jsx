@@ -147,7 +147,6 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
   return <div className="garden-detail">
     <header className="garden-detail-header">
       <Button className="garden-detail-back" startIcon={<ArrowBackIosNew fontSize="small" />} onClick={onBack}>花园</Button>
-      <Typography fontWeight={680} fontSize={15} component="h1">花卉档案</Typography>
       <IconButton aria-label="更多花卉操作" disabled={offlineReadOnly || !navigator.onLine}
         onClick={event => setMenuAnchor(event.currentTarget)}><MoreHoriz/></IconButton>
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
@@ -162,7 +161,7 @@ export default function FlowerDetail({ id, active, species, onBack, onChange, on
     <section className="garden-detail-hero">
       <Cover id={plant.latest_photo_id} height={null} className="garden-detail-cover" label={plant.name}/>
       <div className="garden-detail-info">
-        <Typography component="h2" className="garden-detail-title">{plant.name}</Typography>
+        <Typography component="h1" className="garden-detail-title">{plant.name}</Typography>
         <div className="garden-detail-description">{plant.species_name || '未分类'}{plant.location ? ' · ' + plant.location : ''}</div>
         <Typography variant="body2" sx={{ color: 'var(--garden-green, #347c52)', mt: 1 }}>
           {plantedDays(plant.planted_on) ? '种植第 ' + plantedDays(plant.planted_on) + ' 天 · ' : ''}{plant.photo_count} 张成长照片
