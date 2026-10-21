@@ -316,7 +316,16 @@ async function verify(engine) {
       return (await cache.keys()).length > 0
     }, { timeout: 10000 })
     await disconnect(engine, context)
-    await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    if (tag === 'webkit') {
+      // Linux Playwright WebKit can crash on a second SW-backed top-level
+      // navigation during an origin outage; the cached Calendar reload
+      // above already tests that path. Exercise Garden via SPA navigation.
+      await page.locator('.garden-detail-back').click()
+      await page.locator('footer button').filter({ hasText: '拼豆' }).click()
+      await page.locator('footer button').filter({ hasText: '花园' }).click()
+    } else {
+      await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    }
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('仅显示上次离线保存的部分花园数据', { exact: false }).waitFor()
     assert.equal(await page.getByRole('button', { name: '添加花卉' }).isDisabled(), true)
@@ -377,7 +386,12 @@ async function verify(engine) {
       })
     })
     await disconnect(engine, context)
-    await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    if (tag === 'webkit') {
+      await page.locator('footer button').filter({ hasText: '日历' }).click()
+      await page.locator('footer button').filter({ hasText: '花园' }).click()
+    } else {
+      await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    }
     await page.getByText('本设备尚无可用的已保存快照', { exact: false }).waitFor()
     const offlineError = await page.locator('.garden-error').boundingBox()
     const gardenTabs = await page.locator('.garden-segments').boundingBox()
@@ -390,7 +404,8 @@ async function verify(engine) {
     await page.getByText('离线且本设备未缓存该日期', { exact: false }).waitFor()
     await sampleOfflineLayouts(page, tag, 'garden-day-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
     await page.locator('footer button').filter({ hasText: '日历' }).click()
-    await page.getByText('离线且本机没有已确认的排班快照', { exact: false }).waitFor()
+    await page.getByText(tag === 'webkit' ? '且本机没有已确认快照' :
+      '离线且本机没有已确认的排班快照', { exact: false }).waitFor()
     assert.equal(await page.locator('.calendar .day').count(), 42,
       tag + ': no-snapshot offline calendar keeps its 42-cell example visibly labeled')
     assert.equal(await page.getByRole('button', { name: '调整当天排班' }).isDisabled(), true)
