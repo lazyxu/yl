@@ -78,7 +78,7 @@ export default function GardenCalendar({ active, selectPlant, notify,
       if (!controller.signal.aborted) setCounts(data)
     }).catch(err => {
       if (err.name !== 'AbortError' && !controller.signal.aborted)
-        setCountsError('成长日历的在线统计不可用；离线时仅能查看之前保存过的部分记录')
+        setCountsError(!navigator.onLine || err instanceof TypeError ? 'offline' : 'server')
     })
     return () => controller.abort()
   }, [active, countsRetry])
@@ -236,10 +236,14 @@ export default function GardenCalendar({ active, selectPlant, notify,
         setMonth(firstOfMonth(today)); setSelected(todayKey)
       }}>今天</Button>
     </Stack>
-    {countsError && <Alert severity="warning" sx={{ mb: 1 }}
-      action={<Button onClick={() => setCountsRetry(value => value + 1)}>重试</Button>}>
-      成长日历标记未更新：{countsError}
-    </Alert>}
+    {countsError && !partialOffline && (countsError === 'offline' ?
+      <Typography component="p" role="status" className="garden-calendar-offline-note" color="text.secondary">
+        离线：日期标记和记录数尚未验证。
+      </Typography> :
+      <Alert severity="warning" sx={{ mb: 1 }}
+        action={<Button onClick={() => setCountsRetry(value => value + 1)}>重试</Button>}>
+        成长日历在线标记暂时不可用，请重试。
+      </Alert>)}
     <div className="garden-calendar-grid" ref={grid} role="group"
       aria-label="成长日历日期，左右箭头可移动日期"
       onKeyDown={keyDown} onTouchStart={touchStart} onTouchMove={touchMove}
@@ -251,7 +255,8 @@ export default function GardenCalendar({ active, selectPlant, notify,
         const count = countsMap.get(key) || 0
         return <button key={key} type="button" data-garden-date={key}
           className={'garden-calendar-day' + (!inMonth ? ' other-month' : '')}
-          aria-label={key + ' ' + weekday[day.getDay()] + (count ? '，' + count + ' 条成长记录' : '，没有成长记录') +
+          aria-label={key + ' ' + weekday[day.getDay()] + (countsError === 'offline' ?
+            '，记录数尚未验证' : count ? '，' + count + ' 条成长记录' : '，没有成长记录') +
             (key === todayKey ? '，今天' : '') + (key === selected ? '，已选中' : '')}
           aria-pressed={key === selected}
           aria-current={key === todayKey ? 'date' : undefined}
@@ -266,7 +271,8 @@ export default function GardenCalendar({ active, selectPlant, notify,
       {partialOffline && <Alert severity="warning" sx={{ mb: 1 }}>
         离线只读：仅包含已保存过的花卉成长记录，不代表当天全部记录数。
       </Alert>}
-      <Typography fontWeight={720} mb={1}>{selected} · {ready ? dayTotal : (countsMap.get(selected) || 0)} 条记录</Typography>
+      <Typography fontWeight={720} mb={1}>{selected} · {partialOffline ?
+        '本机已缓存 ' + items.length + ' 条' : ready ? dayTotal + ' 条记录' : '记录数待确认'}</Typography>
       {dayLoading && <Box sx={{ py: 2, minHeight: 50 }} role="status" aria-busy="true">
         {showDayLoading && <Typography variant="body2" color="text.secondary">正在读取当天记录…</Typography>}
       </Box>}
@@ -288,7 +294,9 @@ export default function GardenCalendar({ active, selectPlant, notify,
             </CardActionArea>
           </Card>)}
         </Stack>
-        {items.length === 0 && <Typography variant="body2" color="text.secondary" py={1.5}>这一天还没有成长记录。</Typography>}
+        {items.length === 0 && <Typography variant="body2" color="text.secondary" py={1.5}>
+          {partialOffline ? '本机没有缓存这一天的成长记录，不代表当天没有记录。' : '这一天还没有成长记录。'}
+        </Typography>}
         {dayHasMore && <Stack alignItems="center" my={2}>
           <Button variant="outlined" disabled={dayLoadingMore} onClick={loadMoreDay}>
             {dayLoadingMore ? '加载中…' : '加载更多成长记录'}
