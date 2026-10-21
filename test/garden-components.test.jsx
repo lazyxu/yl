@@ -289,3 +289,35 @@ test('照片分享优先传递原图文件而不是私有照片链接', async ()
     else delete navigator.canShare
   }
 })
+
+
+test('花卉详情在离线且无授权快照时显示就地错误与返回，不误报已删除', async () => {
+  global.IS_REACT_ACT_ENVIRONMENT = true
+  const oldFetch = global.fetch
+  const oldOnline = Object.getOwnPropertyDescriptor(navigator, 'onLine')
+  Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+  global.fetch = jest.fn(async () => { throw new TypeError('Failed to fetch') })
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  const root = createRoot(host)
+  const goBack = jest.fn(), notify = jest.fn()
+  try {
+    await act(async () => root.render(<FlowerDetail id={984321} active species={[]}
+      onBack={goBack} onChange={() => {}} onSpecies={() => {}} notify={notify} />))
+    const warning = host.querySelector('.garden-detail-error [role="status"]')
+    expect(warning).not.toBeNull()
+    expect(warning.textContent).toContain('没有这株花的已保存离线详情')
+    expect(warning.textContent).not.toContain('已被删除')
+    expect(host.querySelectorAll('.garden-detail-back')).toHaveLength(1)
+    expect(notify).not.toHaveBeenCalled()
+    await act(async () => host.querySelector('.garden-detail-back')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    expect(goBack).toHaveBeenCalledTimes(1)
+  } finally {
+    await act(async () => root.unmount())
+    host.remove()
+    global.fetch = oldFetch
+    if (oldOnline) Object.defineProperty(navigator, 'onLine', oldOnline)
+    else delete navigator.onLine
+  }
+})
