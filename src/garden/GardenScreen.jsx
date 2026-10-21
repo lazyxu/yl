@@ -166,8 +166,10 @@ export default function Garden({ active = true }) {
         {error && <Alert severity="warning" role="status" className="garden-error"
           action={online ? <Button onClick={refresh}>重试</Button> : undefined}>
           {!online || /failed to fetch|networkerror|load failed|fetch failed/i.test(error)
-            ? '当前处于离线状态，无法读取花园；本设备尚无可用的已保存快照。请联网后重试，或联网时开启花园离线浏览。'
-            : '花园加载失败：' + error}
+            ? plants.length
+              ? '无法连接服务器；以下仅显示本次页面之前加载的花卉列表，可能已过期，详情可能无法离线打开。'
+              : '当前处于离线状态，无法读取花园；本设备尚无可用的已保存快照。请联网后重试，或联网时开启花园离线浏览。'
+            : (plants.length ? '花园刷新失败，以下为之前加载的结果：' : '花园加载失败：') + error}
         </Alert>}
         <div className="garden-segments" role="tablist" aria-label="花园视图">
           <button type="button" id="garden-plants-tab" className="garden-segment" role="tab"
