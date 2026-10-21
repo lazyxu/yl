@@ -160,10 +160,13 @@ test('编辑弹窗在键盘压缩视口时跟随可见高度', async () => {
   } finally { window.matchMedia = originalMatch; Object.defineProperty(window, 'visualViewport', { configurable: true, value: originalViewport }) }
 })
 
-test('排班规则页突出当前规则，保留四种班次的文字图例与键盘排序入口', async () => {
+test('排班规则页保留班次文字和排序入口，不重复展示颜色图例与提示', async () => {
   await mount()
   expect(timeline().querySelector('.shift-current-summary').textContent).toContain('当前生效')
-  expect(timeline().querySelector('.shift-legend').textContent).toContain('备班')
+  expect(timeline().querySelector('.shift-legend')).toBeNull()
+  expect(timeline().querySelector('.shift-settings-toolbar').textContent).not.toContain('更改只有确认保存后才会生效')
+  expect([...timeline().querySelectorAll('.shift-current-summary .shift-cycle-chip')].map(el => el.textContent))
+    .toEqual(['白班', '夜班', '休息'])
   await edit('2026-10-05')
   expect(button('下移第1天', editor())).toBeTruthy()
   expect(button('上移第2天', editor())).toBeTruthy()
