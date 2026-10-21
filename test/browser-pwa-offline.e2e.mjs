@@ -101,6 +101,9 @@ async function inspectOfflineLayout(page, label) {
         reason: 'out-of-viewport', element: element.className?.toString().slice(0, 75),
         left: Math.round(box.left), right: Math.round(box.right), viewport,
       })
+      if (element.matches?.('.MuiDialog-paper') && (box.top < -2 || box.bottom > innerHeight + 2))
+        problems.push({ reason: 'dialog-vertical-overflow',
+          top: Math.round(box.top), bottom: Math.round(box.bottom), height: innerHeight })
       if (element.scrollWidth > element.clientWidth + 2 && !['app-content','app-shell'].includes(element.className))
         problems.push({ reason: 'horizontal-content-overflow',
           element: element.className?.toString().slice(0, 75),
@@ -236,6 +239,13 @@ async function verify(engine) {
     await day.getByRole('button', { name: '选择年月' }).click()
     const monthDialog = page.getByRole('dialog', { name: '跳转年月' })
     await monthDialog.waitFor()
+    // A visible Dialog is not yet fully opaque during MUI's Fade transition.
+    // Inspect the settled sheet, never a translucent intermediate frame.
+    await page.waitForFunction(() => {
+      const dialog = document.querySelector('[role="dialog"][aria-labelledby="schedule-month-picker-title"]')
+      const transition = dialog?.closest('.MuiDialog-container')
+      return Boolean(dialog && (!transition || getComputedStyle(transition).opacity === '1'))
+    })
     await sampleOfflineLayouts(page, tag, 'month-dialog', [[320,700],[390,844]], offlineLayoutProblems)
     await monthDialog.getByRole('button', { name: '取消' }).click()
     await page.locator('footer button').filter({ hasText: '拼豆' }).click()
@@ -348,7 +358,16 @@ async function verify(engine) {
     await sampleOfflineLayouts(page, tag, 'garden-detail', [[320,700],[390,844]], offlineLayoutProblems)
     assert.deepEqual(offlineLayoutProblems, [], tag + ': offline rendering must be safe and clearly labeled')
     await reconnect(engine, context)
-    await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    if (tag === 'webkit') {
+      // Keep the existing WebKit page alive: on Linux Playwright, repeated
+      // top-level SW navigations can crash even after the origin is restored.
+      // Switching modules still requires a fresh backend read on activation.
+      await page.locator('.garden-detail-back').click()
+      await page.locator('footer button').filter({ hasText: '拼豆' }).click()
+      await page.locator('footer button').filter({ hasText: '花园' }).click()
+    } else {
+      await page.goto(origin + '/?view=花园', { waitUntil: 'domcontentloaded' })
+    }
     await page.getByText(name, { exact: true }).waitFor()
     await page.getByText('离线浏览设置', { exact: true }).click()
     // Clearing IndexedDB and Cache Storage is async: wait until the switch
