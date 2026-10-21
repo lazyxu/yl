@@ -8,6 +8,7 @@ import App from '../src/App'
 jest.setTimeout(30000)
 
 jest.mock('../src/App.css', () => ({}))
+jest.mock('../src/Pindou.css', () => ({}))
 jest.mock('../src/Garden.css', () => ({}))
 jest.mock('../src/Calendar.css', () => ({}))
 jest.mock('../src/ShiftSettings.css', () => ({}))
