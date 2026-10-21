@@ -46,6 +46,17 @@ async function click(text) {
   }
 }
 
+test('顶部不重复展示班次标题和颜色图例，日期仍显示完整班次', async () => {
+  database.overrides['2026-10-12'] = { kind: 'standby', shift: '备班', partner: '', note: '' }
+  await mount()
+  expect(host.textContent).not.toContain('班次安排')
+  expect(host.querySelector('.schedule-legend')).toBeNull()
+  expect(host.querySelector('.schedule-topbar button[aria-label="排班设置"]')).not.toBeNull()
+  expect(host.querySelectorAll('.calendar button.day')).toHaveLength(42)
+  const shiftLabels = [...host.querySelectorAll('.calendar .shift')].map(element => element.textContent)
+  expect(new Set(shiftLabels)).toEqual(new Set(['白班', '夜班', '休息', '备班']))
+})
+
 test('长按日期打开弹窗，普通点击或滚动不触发改单日排班', async () => {
   await mount()
   await act(async () => { pointer('pointerdown', day('2026-10-13')); jest.advanceTimersByTime(100); pointer('pointerup', day('2026-10-13')) })
@@ -206,7 +217,6 @@ test('日历重设计保留每天的完整班次文字标签、固定六周和�
   expect(day('2026-10-13').querySelector('.shift').textContent).toBe('备班')
   expect([...host.querySelectorAll('.calendar .shift')].map(el => el.textContent)).toEqual(
     expect.arrayContaining(['白班', '夜班', '休息', '备班']))
-  expect(host.querySelector('.schedule-legend').textContent).toContain('备班')
   expect(host.querySelector('.selected-date-info').textContent).toContain('在一起第')
   expect([...host.querySelectorAll('button')].some(el => el.textContent.trim() === '今天')).toBe(true)
   const month = host.querySelector('.header h2')

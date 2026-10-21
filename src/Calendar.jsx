@@ -13,9 +13,6 @@ import CalendarDay from './CalendarDay'
 import DayShiftEditor from './DayShiftEditor'
 import { readCalendarSnapshot, saveCalendarSnapshot } from './offline/data'
 
-// Keep shift labels visible in every date cell, including standby. The palette
-// remains the single shared source for Calendar, Settings and Editors.
-const LEGEND = ['白班', '夜班', '休息', '备班']
 const WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 const dateKey = value => value.format('YYYY-MM-DD')
 const firstOfMonth = value => value.clone().startOf('month')
@@ -398,9 +395,6 @@ export default function Calendar({ active = true }) {
   return <Box className="schedule-screen" aria-label="排班日历">
     <div className="calendar-container">
       <header className="schedule-topbar">
-        <div className="schedule-heading">
-          <Typography component="p" className="schedule-eyebrow">班次安排</Typography>
-        </div>
         <Button startIcon={<SettingsOutlined />} onClick={() => setSettingsOpen(true)}
           disabled={!online || loadingSettings || !serverRulesReady}
           aria-label="排班设置">排班设置</Button>
@@ -414,12 +408,6 @@ export default function Calendar({ active = true }) {
         </button></h2>
         <IconButton onClick={handleSlideNext} aria-label="下个月"><ChevronRight /></IconButton>
         <Button startIcon={<TodayOutlined />} onClick={jumpToToday} variant="text" className="schedule-today-button">今天</Button>
-      </div>
-
-      <div className="schedule-legend" aria-label="班次颜色图例">
-        {LEGEND.map(shift => <span className="schedule-legend-item" key={shift}>
-          <i aria-hidden="true" style={shiftStyle(shift)} />{shift}
-        </span>)}
       </div>
 
       {snapshotAt && (!serverRulesReady || !serverOverridesReady || !online) &&
