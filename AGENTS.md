@@ -103,7 +103,7 @@
 ## 日历 iOS PWA 重设计（不可回退约定）
 
 - 一级「日历」和「花园 → 成长日历」不是同一模块；日历 UI 优先针对 iPhone Safari/独立 PWA 设计，保留日历/拼豆/花园主导航与本地排班计算。
-- **每一天必须可见完整「白班」「夜班」「休息」「备班」班次文字**，继续使用 src/shifts.js 的既有四色和相近的字号、留白。不得改成只有圆点、色条或文字被截断的视觉。小屏允许微调水平内边距，班次文字不能消失。
+- **每一天必须可见完整「白班」「夜班」「休息」「备班」班次文字**。颜色语义仍为红/蓝/绿/紫，但自本次 UI 更新起使用 **深色背景 + 纯白文字**，四色均须达到 WCAG AA 小字 4.5:1 对比度；日历格、选中详情、排班规则循环、单日编辑预览及原生 select 值共用 src/shifts.js。不得改成只有圆点、色条或文字被截断的视觉。小屏允许微调水平内边距，班次文字不能消失。
 - 月历持续显示 42 个日期按钮（六周）以稳定布局，320/375/390/430px 触控目标严格达到 44×44 CSS px；今天和选中日期单独标记，非本月日期明确降低视觉层级。
 - 保留原月历 requestAnimationFrame/translate3d 滑动，不允许在 touchmove 时改变 React 月历状态；长按排班、纵向滚动、Safari 屏幕边缘返回及触摸取消必须维持原有行为。
 - 禁止未说明修改 shift-rules、shift-day-overrides、默认排班、白/夜/休轮换或换班/备班业务语义。UI 编辑只在确认后写入，失败/冲突保留草稿、旧版本不会覆盖新版本。
@@ -132,7 +132,7 @@
 ## PWA first-paint and accessible typography acceptance
 
 - The pre-React theme initializer matches Calendar/Garden system dark appearance before the application mounts; Pindou stays light. The external script is local and deliberately contains no network calls, telemetry or inline CSP exceptions.
-- Dates, weekdays and non-shift Garden controls respect larger root text sizing with flexible layouts. **Never change the daily 白班/夜班/休息/备班 label 10px font size, colors or default padding.**
+- Dates, weekdays and non-shift Garden controls respect larger root text sizing with flexible layouts. **Preserve the daily 白班/夜班/休息/备班 label 10px font size and default padding**; the updated contrast-safe dark-red/blue/green/purple background with white text is the new canonical palette and must not silently regress.
 - Manifest background/theme values are static fallbacks for initial load and cannot represent every module's active system appearance. Real iPhone standalone status bar and Dynamic Island remain separate physical checks.
 
 ## PWA P0/P1/P2 本地化与安全更新（PR #22）
@@ -164,3 +164,11 @@
 - `scripts/build-pwa-shell.mjs` 必须在 dist/icon-192.png 或 dist/icon-512.png 不存在时自动补齐；禁止直接对缺失 PNG 调用 statSync 导致 Windows ENOENT。
 - 不依赖外部图片 URL、额外 npm/native 绘图库、字体文件或手工 git 忽略文件；保持 `node scripts/generate-pwa-icons.mjs [output_dir]` 能在 Node 22 的 Windows/Linux/macOS 运行。
 - `node --test test/pwa.test.cjs` 必须包括删除 dist 两个图标后单独调用 PWA cache builder 并核对重生成 PNG 与预缓存清单；PR CI 同时在 Windows 与 Linux 执行 Vite build + PWA test。
+
+## 拼豆 iOS PWA UI 验收（白字班次统一，PR #29）
+
+- 拼豆保留独立浅色主题，不影响日历/花园的亮暗模式；本模块 CSS 必须由 `.pindou-page` 或对应 view 范围限定，禁止全局污染其它两个一级模块。
+- 库存主操作保留「历史 / 补豆 / 消耗」，在 320/375/390/430px 和横屏下都必须满足 44px 触控高度，不出现横向隐藏或挤压；筛选、分组、颜色数值、排序行为保持不变。
+- 历史记录的照片、时间、长备注和编辑/删除操作应按宽度换行；时间、备注、色号与数量编辑框在 iPhone 使用自适应 Grid，原生输入至少 16px，删除必须经可访问的应用内确认弹窗，不使用阻塞 window.confirm。
+- 补豆/消耗使用明确的图片选择入口和应用内图片预览，图片预览不使用 window.open，上传失败在表单中就地显示并保留草稿；后台提交期间禁止重复提交与离开，离线或服务端不可达仍须禁止写入。
+- 使用真实 Chromium/WebKit + 一次性 MySQL 验证上述界面、对话框位置、备注和文件名长文本、safe area、横向溢出、禁用态与现有库存/历史事务功能；未做 iPhone Safari 真机/生产部署不可冒称已验收。

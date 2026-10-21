@@ -8,6 +8,7 @@ import App from '../src/App'
 jest.setTimeout(30000)
 
 jest.mock('../src/App.css', () => ({}))
+jest.mock('../src/Pindou.css', () => ({}))
 jest.mock('../src/Garden.css', () => ({}))
 jest.mock('../src/Calendar.css', () => ({}))
 jest.mock('../src/ShiftSettings.css', () => ({}))
@@ -412,7 +413,9 @@ test('图片上传失败时阻止写入拼豆记录并保留本次草稿', async
   expect(global.fetch.mock.calls.some(([url, args]) => url === '/api/reminders' && args?.method === 'POST')).toBe(false)
   expect(document.querySelector('[data-view="补豆"]').textContent).toContain('flower.jpg')
   expect(input('数量').value).toBe('23')
-  expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('图片格式不支持'))
+  expect(document.querySelector('[data-view="补豆"] .pindou-form [role="alert"]')?.textContent)
+    .toContain('图片格式不支持')
+  expect(alertSpy).not.toHaveBeenCalled()
 })
 
 test('已手动应用数量时清空批量数量输入仍然可以提交', async () => {

@@ -5,6 +5,11 @@ import IconButton from '@mui/material/IconButton'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import Button from '@mui/material/Button'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
+import DialogContentText from '@mui/material/DialogContentText'
+import DialogActions from '@mui/material/DialogActions'
 import Alert from '@mui/material/Alert'
 import ColorSwatch from './ColorSwatch'
 import InventoryGrid from './InventoryGrid'
@@ -23,6 +28,9 @@ export default function History({ active = true, refreshKey }){
   const [retryKey, setRetryKey] = useState(0)
   const [editingId, setEditingId] = useState(null)
   const [editData, setEditData] = useState(null)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const [mutationError, setMutationError] = useState('')
 
   function resolveImageUrl(imagePath){
     if (!imagePath) return null
@@ -62,15 +70,20 @@ export default function History({ active = true, refreshKey }){
     return () => controller.abort()
   }, [active, refreshKey, retryKey])
 
-  async function handleDeleteRecord(id){
-    if (!online || loadError) return
-    if (!window.confirm('确认删除该历史记录？该操作不可恢复。')) return;
-    setRecordsLoading(true)
+  async function handleDeleteRecord(){
+    const id = pendingDelete
+    if (id == null || deleting || !online || loadError) return
+    setDeleting(true)
+    setMutationError('')
     try{
       const res = await fetch(`/api/reminders/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('删除失败')
       setRecords(prev => prev.filter(r => r.id !== id))
-    }catch(err){ console.error(err); alert('删除失败') }finally{ setRecordsLoading(false) }
+      setPendingDelete(null)
+    }catch(err){
+      console.error(err)
+      setMutationError('删除失败，请确认网络连接后重试')
+    }finally{ setDeleting(false) }
   }
 
   function startEdit(rec){
@@ -139,50 +152,56 @@ export default function History({ active = true, refreshKey }){
       const updated = await res.json()
       setRecords(prev => prev.map(r => r.id === updated.id ? updated : r))
       cancelEdit()
-    }catch(err){ console.error(err); alert('保存失败') }finally{ setRecordsLoading(false) }
+    }catch(err){ console.error(err); setMutationError('保存失败，请检查填写内容与网络连接') }finally{ setRecordsLoading(false) }
   }
 
   return (
-    <Box sx={{ p:1 }}>
+    <>
+    <Box className="pindou-page pindou-history">
+      {mutationError && <Alert severity="error" role="alert"
+        action={<Button color="inherit" onClick={() => setMutationError('')}>关闭</Button>}>
+        {mutationError}
+      </Alert>}
       {(!online || loadError) && <Alert severity="warning" role="status" sx={{ mb: 1, overflowWrap: 'anywhere' }}
         action={online ? <Button color="inherit" onClick={() => setRetryKey(key => key + 1)}>重试</Button> : undefined}>
         {recordsReady ? '离线或服务器暂不可用：以下为本次页面先前读取的记录，不保证最新，编辑和删除已停用。' :
           '离线或服务器暂不可用：无法获取历史记录，这不代表没有记录，请联网后重试。'}
       </Alert>}
-      {recordsLoading && <Typography>加载中...</Typography>}
-      {!recordsLoading && recordsReady && records.length === 0 && <Typography>暂无历史记录</Typography>}
+      {recordsLoading && <Typography role="status" color="text.secondary" variant="body2">正在读取历史…</Typography>}
+      {!recordsLoading && recordsReady && records.length === 0 && <Typography className="pindou-empty-state" role="status">暂无历史记录</Typography>}
       {!recordsLoading && records.length > 0 && (
-        <Box sx={{ display:'flex', flexDirection:'column', gap:1 }}>
+        <Box className="pindou-history-list" sx={{ display:'flex', flexDirection:'column', gap:1.5 }}>
           {records.map(r => (
-            <Box key={r.id} sx={{ p:1, border:'1px solid #f0f0f0', borderRadius:1, display:'flex', flexDirection:'column' }}>
-              <Box sx={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:1 }}>
-                <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
-                  <Typography variant="body2" sx={{ fontWeight:700 }}>{r.operation}</Typography>
-                  <Typography variant="caption" sx={{ color:'#666' }}>{new Date(r.occurred_at).toLocaleString()}</Typography>
+            <Box key={r.id} className="pindou-history-card">
+              <Box className="pindou-history-head">
+                <Box className="pindou-history-meta">
+                  <Typography variant="body2" sx={{ fontWeight: 750 }}>{r.operation}</Typography>
+                  <Typography variant="caption" sx={{ color: '#617183' }}>
+                    {new Date(r.occurred_at).toLocaleString()}
+                  </Typography>
                 </Box>
-                <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
-                  {r.image_path && (
-                    <Box sx={{ display:'inline-block', mr:0.5 }}>
-                      <img
-                        src={resolveImageUrl(r.image_path)}
-                        alt="record"
-                        style={{ width:56, height:56, objectFit:'cover', borderRadius:6, border:'1px solid #eee', cursor:'pointer' }}
-                      />
-                    </Box>
-                  )}
-                  {r.note && <Typography variant="caption" sx={{ color:'#333' }}>{r.note}</Typography>}
-                  <IconButton size="small" disabled={!online || Boolean(loadError)} onClick={() => startEdit(r)} aria-label="编辑记录">
+                <Box className="pindou-history-actions">
+                  <IconButton disabled={!online || Boolean(loadError) || deleting}
+                    onClick={() => startEdit(r)} aria-label="编辑记录">
                     <EditIcon fontSize="small" />
                   </IconButton>
-                  <IconButton size="small" disabled={!online || Boolean(loadError)} onClick={() => handleDeleteRecord(r.id)} aria-label="删除记录">
+                  <IconButton disabled={!online || Boolean(loadError) || deleting}
+                    onClick={() => setPendingDelete(r.id)} aria-label="删除记录">
                     <DeleteIcon fontSize="small" />
                   </IconButton>
                 </Box>
               </Box>
+              {(r.image_path || r.note) && <Box className="pindou-history-media">
+                {r.image_path && <img src={resolveImageUrl(r.image_path)}
+                  alt="历史记录图片" loading="lazy" />}
+                {r.note && <Typography variant="body2" className="pindou-history-note">
+                  {r.note}
+                </Typography>}
+              </Box>}
               <Box sx={{ mt:0.5 }}>
                 {editingId === r.id && editData ? (
-                  <Box sx={{ p:1, border:'1px dashed #ddd', borderRadius:1, mb:1 }}>
-                    <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1 }}>
+                  <Box className="pindou-history-editor">
+                    <Box className="pindou-edit-field">
                       <Typography variant="body2">编辑时间：</Typography>
                       <input type="datetime-local" aria-label="编辑时间" value={toDatetimeLocal(editData.occurred_at)} onChange={e => {
                           const value = e.target.value
@@ -190,19 +209,20 @@ export default function History({ active = true, refreshKey }){
                           catch { updateOccurredAt('') }
                         }} />
                     </Box>
-                    <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1 }}>
+                    <Box className="pindou-edit-field">
                       <Typography variant="body2">备注：</Typography>
-                      <input style={{ flex:1 }} value={editData.note} onChange={e => updateNote(e.target.value)} />
+                      <input aria-label="编辑备注" value={editData.note} onChange={e => updateNote(e.target.value)} />
                     </Box>
                     <Box>
                       <Typography variant="body2" sx={{ mb:0.5 }}>项数量：</Typography>
                       {editData.items.map((it, idx) => (
-                        <Box key={idx} sx={{ display:'flex', alignItems:'center', gap:1, mb:0.5 }}>
+                        <Box key={idx} className="pindou-edit-item">
                           <ColorSwatch code={it.color} hex={findPalette(it.color)?.hex || '#fff'} />
-                          <select value={it.color} onChange={e => updateItemColor(idx, e.target.value)}>
+                          <select aria-label={`第${idx + 1}项色号`} value={it.color} onChange={e => updateItemColor(idx, e.target.value)}>
                             {MARD.map(p => <option key={p.code} value={p.code}>{p.code}</option>)}
                           </select>
-                          <input type="number" value={it.count} min={0} onChange={e => updateItemCount(idx, e.target.value)} />
+                          <input type="number" aria-label={`第${idx + 1}项数量`} value={it.count} min={0} inputMode="numeric"
+                            onChange={e => updateItemCount(idx, e.target.value)} />
                           <IconButton size="small" onClick={() => removeItem(idx)} aria-label="删除项">
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -212,7 +232,7 @@ export default function History({ active = true, refreshKey }){
                         <Button size="small" onClick={addItem}>添加色号</Button>
                       </Box>
                     </Box>
-                    <Box sx={{ display:'flex', gap:1, mt:1 }}>
+                    <Box className="pindou-history-edit-actions">
                       <Button size="small" variant="contained" disabled={!online || Boolean(loadError)} onClick={saveEdit}>保存</Button>
                       <Button size="small" variant="outlined" onClick={cancelEdit}>取消</Button>
                     </Box>
@@ -235,5 +255,19 @@ export default function History({ active = true, refreshKey }){
         </Box>
       )}
     </Box>
+    <Dialog open={pendingDelete != null} className="pindou-confirm-dialog"
+      aria-labelledby="pindou-delete-title" aria-describedby="pindou-delete-copy"
+      onClose={() => { if (!deleting) setPendingDelete(null) }} fullWidth maxWidth="xs">
+      <DialogTitle id="pindou-delete-title">删除历史记录？</DialogTitle>
+      <DialogContent><DialogContentText id="pindou-delete-copy">
+        删除后会同步调整库存，且无法撤销。确认删除这条记录？
+      </DialogContentText></DialogContent>
+      <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button disabled={deleting} onClick={() => setPendingDelete(null)}>取消</Button>
+        <Button color="error" variant="contained" disabled={deleting || !online || Boolean(loadError)}
+          onClick={handleDeleteRecord}>{deleting ? '正在删除…' : '确认删除'}</Button>
+      </DialogActions>
+    </Dialog>
+    </>
   )
 }

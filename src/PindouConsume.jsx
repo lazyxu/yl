@@ -6,7 +6,9 @@ import Typography from '@mui/material/Typography'
 import Alert from '@mui/material/Alert'
 import ColorCodeSelect from './ColorCodeSelect'
  
-import Input from '@mui/material/Input'
+import Dialog from '@mui/material/Dialog'
+import DialogTitle from '@mui/material/DialogTitle'
+import DialogContent from '@mui/material/DialogContent'
 // use dynamic import for tesseract to handle different bundler export shapes
 import MARD from './colorPalettes/mard.json'
 import { findPalette } from './palette'
@@ -27,6 +29,9 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
   const setLoading = onBusyChange
   const submitting = useRef(false)
   const [imgPreview, setImgPreview] = useState(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [formMessage, setFormMessage] = useState('')
+  const filePicker = useRef(null)
   const [serverReachable, setServerReachable] = useState(() => navigator.onLine ? null : false)
   const [checkKey, setCheckKey] = useState(0)
   useEffect(() => {
@@ -92,7 +97,7 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
 
   function applyToSelected(){
     const n = Number(applyCount)
-    if (!Number.isInteger(n) || n <= 0) return alert('请输入正整数数量')
+    if (!Number.isInteger(n) || n <= 0) { setFormMessage('请输入正整数数量'); return }
     setItemsMap(prev => {
       const next = { ...prev }
       selectedCodes.forEach(code => { next[code] = n })
@@ -116,8 +121,9 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
     }
 
     const items = Object.entries(submitMap).filter(([, cnt]) => Number.isSafeInteger(Number(cnt)) && Number(cnt) > 0).map(([color, cnt]) => ({ color, count: Number(cnt) }))
-    if (items.length === 0) return alert('请先输入要' + initialOperation + '的数量')
+    if (items.length === 0) { setFormMessage('请先输入要' + initialOperation + '的数量'); return }
     submitting.current = true
+    setFormMessage('')
     setLoading(true)
     try{
       // 优先使用用户选择的文件上传为提交图片
@@ -137,11 +143,10 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
       const res = await fetch('/api/reminders', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) })
       if (!res.ok) throw new Error((await res.json()).error || res.statusText)
       const data = await res.json()
-      alert(initialOperation + '记录已保存')
       onAdded(data)
     }catch(err){
       console.error(err)
-      alert('保存失败：' + err.message)
+      setFormMessage('保存失败：' + (err.message || '网络暂不可用，请重试'))
     }finally{
       submitting.current = false
       setLoading(false)
@@ -166,56 +171,78 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
 
   return (
     <>
-    <Box sx={{ p:1 }}>
-      {serverReachable === false && <Alert severity="warning" role="status" sx={{ mb: 1, overflowWrap: 'anywhere' }}
-        action={navigator.onLine ? <Button color="inherit" onClick={() => setCheckKey(value => value + 1)}>重试</Button> : undefined}>
-        离线或服务器暂不可用：可以继续填写本页草稿，但不能提交补豆或消耗。联网确认后才能保存；刷新网页会丢失草稿。
-      </Alert>}
-      <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1, flexWrap:'wrap' }}>
-          <Box sx={{ minWidth:240 }}>
-            <ColorCodeSelect options={allCodes} value={selectedCodes} disabled={loading} onChange={handleSelectChange} sx={{ minWidth: 240 }} />
-          </Box>
+      <Box className="pindou-page pindou-form">
+        {serverReachable === false && <Alert severity="warning" role="status"
+          action={navigator.onLine ? <Button color="inherit" onClick={() => setCheckKey(value => value + 1)}>重试</Button> : undefined}>
+          离线或服务器暂不可用：可以继续填写本页草稿，但联网确认前不能提交；刷新网页会丢失草稿。
+        </Alert>}
+        {formMessage && <Alert severity="error" role="alert"
+          action={<Button color="inherit" onClick={() => setFormMessage('')}>关闭</Button>}>
+          {formMessage}
+        </Alert>}
+
+        <Box className="pindou-form-field pindou-form-color">
+          <ColorCodeSelect options={allCodes} value={selectedCodes}
+            disabled={loading} onChange={handleSelectChange} sx={{ width: '100%', minWidth: 0 }} />
+        </Box>
+
+        <Box className="pindou-form-field pindou-form-quantity">
+          <TextField size="small" label="数量" type="number" value={applyCount}
+            disabled={loading} onChange={event => setApplyCount(event.target.value)}
+            inputProps={{ inputMode: 'numeric', min: 1, step: 1 }} />
+          <Button variant="contained" size="small" onClick={applyToSelected}
+            disabled={!canApplyToSelected || loading}>应用到所选</Button>
+        </Box>
+
+        <Box className="pindou-form-field pindou-file-row">
+          <Button variant="outlined" onClick={() => filePicker.current?.click()}
+            disabled={loading} aria-label="选择图片">选择图片</Button>
+          <input ref={filePicker} className="pindou-hidden-input" type="file"
+            accept="image/*" aria-label="本次记录图片"
+            onChange={event => {
+              handleFileChange(event.target.files?.[0])
+              event.target.value = ''
+            }} />
+          {imgFile && <Typography variant="caption" className="pindou-file-name">
+            图片：{imgFile.name}
+          </Typography>}
+          {imgPreview && <img className="pindou-draft-photo"
+            src={imgPreview} alt="preview" />}
+          <Button size="small" variant="outlined" disabled={!imgPreview}
+            onClick={() => setPreviewOpen(true)}>预览</Button>
+        </Box>
+
+        <Box className="pindou-form-field">
+          <TextField fullWidth label="备注（可选）" size="small" value={note}
+            disabled={loading} onChange={event => setNote(event.target.value)}
+            inputProps={{ maxLength: 1000 }} />
+        </Box>
+
+        <Box className="pindou-form-actions">
+          <Button variant="contained" onClick={handleSubmit}
+            disabled={!canSubmit || loading || serverReachable !== true}>
+            {loading ? '正在保存…' : initialOperation}
+          </Button>
+          <Button variant="outlined" onClick={onClose} disabled={loading}>取消</Button>
+        </Box>
+        {hasDraft && <Typography variant="caption" color="text.secondary"
+          sx={{ display: 'block', mt: 1, mb: 1 }}>
+          切换页面会保留填写内容；刷新或关闭网页会清空。
+        </Typography>}
+        <Box className="pindou-inventory-sections" mt={2}>
+          <InventoryGrid groupedInventory={grouped} findPalette={findPalette} showZero={false} />
+        </Box>
       </Box>
 
-      <Box sx={{ display:'flex', gap:1, alignItems:'center', mb:1 }}>
-        <TextField size="small" label="数量" type="number" value={applyCount} disabled={loading} onChange={e=>setApplyCount(e.target.value)} sx={{ width:120 }} />
-        <Button variant="contained" size="small" onClick={applyToSelected} disabled={!canApplyToSelected || loading}>应用到所选</Button>
-      </Box>
-
-      <Box sx={{ mb:1, display:'flex', gap:1, alignItems:'center', flexWrap:'wrap' }}>
-        <Input
-          inputProps={{ accept: 'image/*' }}
-          type="file"
-          disabled={loading}
-          onChange={e => handleFileChange(e.target.files && e.target.files[0])}
-          sx={{ display: 'inline-flex' }}
-        />
-        {imgFile && <Typography variant="caption" sx={{ overflowWrap: 'anywhere' }}>图片：{imgFile.name}</Typography>}
-        
-        {/* 内联预览 */}
-        {imgPreview && (
-          <Box component="span" sx={{ ml:1, display:'inline-block', verticalAlign:'middle' }}>
-            <img src={imgPreview} alt="preview" style={{ maxWidth:120, maxHeight:90, borderRadius:4, border:'1px solid #eee' }} />
-          </Box>
-        )}
-        <Button size="small" onClick={() => { if (imgPreview) { const w = window.open('', '_blank', 'noopener'); if (w) { const el = w.document.createElement('img'); el.src = imgPreview; el.style.maxWidth = '100%'; w.document.body.appendChild(el) } } }}>预览</Button>
-      </Box>
-
-      <Box sx={{ mb:1 }}>
-        <TextField fullWidth label="备注（可选）" size="small" value={note} disabled={loading} onChange={e=>setNote(e.target.value)} />
-      </Box>
-
-      <Box sx={{ display:'flex', gap:1, mt:0, mb:1 }}>
-        <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || loading || serverReachable !== true}>{loading ? '正在保存…' : initialOperation}</Button>
-        <Button onClick={onClose} disabled={loading}>取消</Button>
-      </Box>
-      {hasDraft && <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>切换页面会保留填写内容；刷新或关闭网页会清空。</Typography>}
-
-      <InventoryGrid groupedInventory={grouped} findPalette={findPalette} showZero={false} />
-
-    </Box>
-
-    
+      <Dialog open={previewOpen && !!imgPreview} onClose={() => setPreviewOpen(false)}
+        fullWidth maxWidth="sm" aria-labelledby="pindou-preview-title"
+        PaperProps={{ className: 'pindou-image-preview', sx: { m: 1, maxWidth: 'calc(100% - 16px)' } }}>
+        <DialogTitle id="pindou-preview-title">图片预览</DialogTitle>
+        <DialogContent>
+          {imgPreview && <img src={imgPreview} alt={imgFile?.name || '本次记录图片'} />}
+          <Button fullWidth sx={{ mt: 2 }} onClick={() => setPreviewOpen(false)}>关闭</Button>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
