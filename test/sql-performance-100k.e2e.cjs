@@ -343,6 +343,40 @@ async function main() {
         ruleVersion = response.data.version
         return response
       }, 5)
+      // Real media INSERT/GET flows on a populated 100k dataset. Metadata-only
+      // fixtures cannot exercise the multipart route or thumbnail PK lookup.
+      // Report image processing separately from Sequelize statement timing.
+      const sharp = require('../server/node_modules/sharp')
+      const tinyPNG = await sharp({ create: {
+        width:16, height:16, channels:3, background:'#88aa66',
+      } }).png().toBuffer()
+      const uploadedIds = []
+      let uploadSerial = 0
+      await probe('garden.entries.post.photo', async () => {
+        const form = new FormData()
+        form.set('plant_id',String(plantId))
+        form.set('observed_at','2026-10-18T12:00:00Z')
+        form.set('local_date','2026-10-18')
+        form.set('note','100k upload '+(++uploadSerial))
+        form.set('author_name','Perf')
+        form.append('photos',new Blob([tinyPNG],{type:'image/png'}),'upload.png')
+        const response=await rawRequest('/api/garden/entries',{method:'POST',body:form})
+        uploadedIds.push(response.data.id)
+        return response
+      },5)
+      const media = await GardenPhoto.findOne({where:{entry_id:uploadedIds[0]}})
+      assert(media && media.thumb_name && media.storage_name)
+      const fetchMedia = async variant => {
+        const response = await fetch(origin+'/api/garden/photos/'+media.id+'/'+variant)
+        assert.equal(response.status,200)
+        return {bytes:(await response.arrayBuffer()).byteLength}
+      }
+      await probe('garden.photos.thumb.http',()=>fetchMedia('thumb'))
+      await probe('garden.photos.original.http',()=>fetchMedia('original'))
+      // Keep cardinalities unchanged for repeated schema-sync assertions.
+      for(const id of uploadedIds) {
+        await rawRequest('/api/garden/entries/'+id,{method:'DELETE'})
+      }
     } finally {
       sequelize.options.logging = formerLogger
       sequelize.options.benchmark = false
