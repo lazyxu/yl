@@ -13,33 +13,9 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup'
 // selection handled by clickable color block (IconButton)
 // Badge removed — using inline "x N" and selectable color block
 // removed color-blind controls
-import IconButton from '@mui/material/IconButton'
-import DeleteIcon from '@mui/icons-material/Delete'
-import ColorSwatch from './ColorSwatch'
 import InventoryGrid from './InventoryGrid'
 // use CSS Grid for auto-fill compact layout instead of MUI 12-col Grid
 // Card replaced by Box for more compact layout
-
-const ColorCard = React.memo(function ColorCard({ it, findPalette, threshold }){
-  const p = findPalette(it.color)
-  const hex = p ? p.hex : '#fff'
-  
-  const cnt = it.count || 0
-  const low = cnt <= threshold
-  return (
-    <Box sx={{ position: 'relative', p: 0 }}>
-      <Box role="listitem" aria-label={`${it.color}，${cnt} 颗`} sx={{ p:0, touchAction:'manipulation', border: 'none', borderRadius: 0, boxShadow: 'none' }}>
-        <Box sx={{ p:0 }}>
-          <Box sx={{ p:0, display:'flex', alignItems:'center', gap:0.4 }}>
-            <ColorSwatch code={it.color} hex={hex} />
-            <Box sx={{ ml:0.5, p:0, display:'flex', alignItems:'center', fontWeight:700, fontSize:{xs:'10px', sm:'11px'}, opacity: cnt === 0 ? 0.5 : 1 }} aria-hidden>{cnt}</Box>
-            <Box sx={{ flex:1, minWidth:0 }} />
-          </Box>
-        </Box>
-      </Box>
-    </Box>
-  )
-})
 
 // API base inlined as '/api'
 
@@ -49,14 +25,11 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
     const v = localStorage.getItem('pindou-threshold')
     return v ? Number(v) : 200
   })
-  const [bulkCountInput, setBulkCountInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [inventoryReady, setInventoryReady] = useState(false)
   const [inventoryError, setInventoryError] = useState('')
   const [online, setOnline] = useState(() => navigator.onLine)
   const [retryKey, setRetryKey] = useState(0)
-  const [records, setRecords] = useState([])
-  const [recordsLoading, setRecordsLoading] = useState(false)
   const [displayMode, setDisplayMode] = useState('all') // 'all' | 'low'
   const [sortOrder, setSortOrder] = useState('none') // 'none' | 'asc' | 'desc'
   // color-blind mode removed
@@ -142,30 +115,6 @@ function Inventory({ active = true, onAction, refreshKey, onNavigate = ()=>{} })
     } catch (err) {
       if (err.name !== 'AbortError' && !signal.aborted) setInventoryError('无法获取最新库存')
     } finally { if (!signal.aborted) setLoading(false) }
-  }
-
-  async function fetchReminders(){
-    setRecordsLoading(true)
-    try{
-      const res = await fetch('/api/reminders')
-      const data = await res.json()
-      setRecords(Array.isArray(data) ? data : [])
-    }catch(err){
-      console.error(err)
-    }finally{ setRecordsLoading(false) }
-  }
-
-  async function handleDeleteRecord(id){
-    if (!window.confirm('确认删除该历史记录？该操作不可恢复。')) return;
-    setRecordsLoading(true)
-    try{
-      const res = await fetch(`/api/reminders/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('删除失败')
-      setRecords(prev => prev.filter(r => r.id !== id))
-    }catch(err){
-      console.error(err)
-      alert('删除失败')
-    }finally{ setRecordsLoading(false) }
   }
 
   function saveThreshold(v){ localStorage.setItem('pindou-threshold', String(v)); setThreshold(v) }
