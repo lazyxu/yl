@@ -372,6 +372,18 @@ async function verify(engine) {
     assert.equal(await page.getByRole('button', { name: '记录成长' }).count(), 0,
       tag + ': offline detail is read-only')
     await sampleOfflineLayouts(page, tag, 'garden-detail', [[320,700],[390,844]], offlineLayoutProblems)
+    // Only consented /thumb blobs are cached. Full-screen offline viewing
+    // must use that thumbnail and must not offer nonfunctional originals.
+    await page.getByRole('button', { name: '查看照片：offline.png' }).click()
+    const offlineViewer = page.getByRole('dialog', { name: '照片查看器' })
+    await offlineViewer.getByText('仅显示本机已缓存缩略图', { exact: false }).waitFor({ timeout: 15000 })
+    const viewerSource = await offlineViewer.locator('.garden-large-photo').getAttribute('src')
+    assert(viewerSource?.startsWith('blob:'), tag + ': offline viewer uses local thumbnail Object URL')
+    assert.equal(await offlineViewer.locator('[aria-label="下载原图"]').count(), 0,
+      tag + ': offline thumbnail viewer cannot download unavailable originals')
+    await sampleOfflineLayouts(page, tag, 'garden-photo-viewer',
+      [[320,700],[390,844],[812,375]], offlineLayoutProblems)
+    await offlineViewer.getByRole('button', { name: '关闭' }).click()
     assert.deepEqual(offlineLayoutProblems, [], tag + ': offline rendering must be safe and clearly labeled')
     await reconnect(engine, context)
     if (tag === 'webkit') {
@@ -440,6 +452,16 @@ async function verify(engine) {
     assert(offlineError && gardenTabs && offlineError.y + offlineError.height <= gardenTabs.y + 2,
       tag + ': offline data error must appear above the garden tabs, not buried below filters')
     await sampleOfflineLayouts(page, tag, 'garden-no-snapshot', [[320,700],[390,844]], offlineLayoutProblems)
+    if (staleCardCount) {
+      // An already mounted list may retain its previous cards after the user
+      // revokes offline consent. Detail navigation must say "not cached",
+      // rather than claiming the flower was deleted.
+      await page.getByText(name, { exact: true }).click()
+      await page.getByText('没有这株花的已保存离线详情', { exact: false }).waitFor()
+      await sampleOfflineLayouts(page, tag, 'garden-missing-detail',
+        [[320,700],[390,844]], offlineLayoutProblems)
+      await page.locator('.garden-detail-back').click()
+    }
     await page.getByRole('tab', { name: '成长日历' }).click()
     await page.locator('.garden-calendar-grid').waitFor()
     // Garden keeps the user's last viewed month across tabs. Recenter the
