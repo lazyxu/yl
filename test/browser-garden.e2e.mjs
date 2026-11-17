@@ -306,11 +306,17 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     // An actual MySQL-backed long-note record stresses History's narrow
     // header, edit grid and destructive-action confirmation.
     const pindouNote = '窄屏记录-' + tag + '-' + '这是很长的备注文字'.repeat(18)
+    const uploaded = await page.request.post(url + '/api/upload', { multipart: {
+      image: { name: 'history.png', mimeType: 'image/png', buffer: photo },
+    } })
+    check(uploaded.ok(), tag + ': setup history photo via secured upload')
+    const uploadedName = (await uploaded.json()).filename
     const created = await page.request.post(url + '/api/reminders', { data: {
       operation: '补豆', occurred_at: new Date().toISOString(),
-      items: [{ color: 'A1', count: 1 }], note: pindouNote,
+      items: [{ color: 'A1', count: 1 }], note: pindouNote, image_path: uploadedName,
     } })
     check(created.ok(), tag + ': setup history record via transactional API')
+    const createdId = (await created.json()).id
 
     await page.getByRole('button', { name: '历史', exact: true }).click()
     const historyTitle = page.locator('.app-header .app-title')
@@ -319,11 +325,26 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
       await page.getByText('补豆 / 消耗 历史', { exact: true }).count() === 0 &&
       await page.locator('section[data-view="历史"] button').filter({ hasText: '返回' }).count() === 0,
       tag + ': history has one title and one global back action')
-    const historyRow = page.locator('.pindou-history-card').first()
+    const historyRow = page.locator('.pindou-history-card')
+      .filter({ has: page.locator('button[aria-controls="pindou-history-details-' + createdId + '"]') })
     await historyRow.waitFor()
     check(await historyRow.getByText(pindouNote).count() === 0,
       tag + ': compact row hides long notes and edit/delete controls')
+    const compactImage = historyRow.locator('img[alt="历史记录缩略图"]')
+    const thumbnailPath = await compactImage.getAttribute('src')
+    check(thumbnailPath === '/api/upload/' + uploadedName + '/thumb',
+      tag + ': history list loads only the WebP derivative')
+    const derivative = await page.request.get(url + thumbnailPath)
+    check(derivative.ok() && derivative.headers()['content-type'].startsWith('image/webp'),
+      tag + ': thumbnail route returns WebP')
     await auditPindouLayout(page, tag, 'history-compact')
+    await historyRow.getByRole('button', { name: '查看记录图片' }).click()
+    const imageDialog = page.locator('[role="dialog"][aria-labelledby="pindou-history-image-title"]')
+    await imageDialog.locator('img[alt="历史记录原图"]').waitFor()
+    check(await imageDialog.locator('img[alt="历史记录原图"]').getAttribute('src') ===
+      '/api/upload/' + uploadedName, tag + ': original requested only in separate viewer')
+    await imageDialog.getByRole('button', { name: '关闭' }).click()
+    await imageDialog.waitFor({ state: 'detached' })
     await historyRow.getByRole('button', { name: /展开记录/ }).click()
     await historyRow.getByText(pindouNote).waitFor()
     await auditPindouLayout(page, tag, 'history-long-note')
