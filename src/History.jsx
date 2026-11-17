@@ -106,6 +106,9 @@ export default function History({ active = true, refreshKey }) {
     if (!active) return
     const controller = new AbortController()
     const fetchSummary = async () => {
+      // A previous total must not look like a fresh all-time value after a mutation
+      // or a retry that ultimately fails.
+      setSummary(null)
       setSummaryError('')
       try {
         const res = await fetch('/api/reminders/summary', { signal: controller.signal })
@@ -116,7 +119,10 @@ export default function History({ active = true, refreshKey }) {
           added < 0 || consumed < 0) throw new Error('历史累计统计数据无效')
         if (!controller.signal.aborted) setSummary({ added, consumed })
       } catch (err) {
-        if (err.name !== 'AbortError' && !controller.signal.aborted) setSummaryError('历史累计统计暂不可用')
+        if (err.name !== 'AbortError' && !controller.signal.aborted) {
+          setSummary(null)
+          setSummaryError('历史累计统计暂不可用')
+        }
       }
     }
     fetchSummary()
@@ -134,6 +140,7 @@ export default function History({ active = true, refreshKey }) {
       setRecords(prev => prev.filter(r => r.id !== id))
       setExpandedId(prev => prev === id ? null : prev)
       setPendingDelete(null)
+      setSummary(null)
       setSummaryRefreshKey(key => key + 1)
     } catch (err) {
       console.error(err)
@@ -202,6 +209,7 @@ export default function History({ active = true, refreshKey }) {
       if (!res.ok) throw new Error('保存失败')
       const updated = await res.json()
       setRecords(prev => prev.map(r => r.id === updated.id ? updated : r))
+      setSummary(null)
       setSummaryRefreshKey(key => key + 1)
       cancelEdit()
     } catch (err) {
