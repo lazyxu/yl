@@ -319,8 +319,13 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
       await page.getByText('补豆 / 消耗 历史', { exact: true }).count() === 0 &&
       await page.locator('section[data-view="历史"] button').filter({ hasText: '返回' }).count() === 0,
       tag + ': history has one title and one global back action')
-    const historyRow = page.locator('.pindou-history-card').filter({ hasText: pindouNote })
+    const historyRow = page.locator('.pindou-history-card').first()
     await historyRow.waitFor()
+    check(await historyRow.getByText(pindouNote).count() === 0,
+      tag + ': compact row hides long notes and edit/delete controls')
+    await auditPindouLayout(page, tag, 'history-compact')
+    await historyRow.getByRole('button', { name: /展开记录/ }).click()
+    await historyRow.getByText(pindouNote).waitFor()
     await auditPindouLayout(page, tag, 'history-long-note')
     await historyRow.getByRole('button', { name: '编辑记录' }).click()
     await historyRow.locator('.pindou-history-editor').waitFor()
@@ -346,7 +351,7 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     })
     await page.locator('section[data-view="补豆"]').getByText('图片：', { exact: false }).waitFor()
     await auditPindouLayout(page, tag, 'add-photo-draft')
-    await page.locator('section[data-view="补豆"]').getByRole('button', { name: '预览' }).click()
+    await page.locator('section[data-view="补豆"]').getByRole('button', { name: '查看图片' }).click()
     const pindouPreview = page.locator('[role="dialog"][aria-labelledby="pindou-preview-title"]')
     await pindouPreview.waitFor()
     await auditPindouLayout(page, tag, 'image-preview')
