@@ -267,11 +267,11 @@ test('所选图片随草稿保留，取消草稿后移除', async () => {
   await click('日历')
   await click('拼豆')
   expect(document.querySelector('[data-view="补豆"]').textContent).toContain('图片：draft.png')
-  expect(document.querySelector('img[alt="preview"]')).not.toBeNull()
+  expect(document.querySelector('[data-view="补豆"] [aria-label="查看图片"]')).not.toBeNull()
   await click('取消')
   await click('补豆')
   expect(document.querySelector('[data-view="补豆"]').textContent).not.toContain('图片：draft.png')
-  expect(document.querySelector('img[alt="preview"]')).toBeNull()
+  expect(document.querySelector('[data-view="补豆"] [aria-label="查看图片"]')).toBeNull()
 })
 
 test('保存成功刷新库存并清空已提交草稿', async () => {
