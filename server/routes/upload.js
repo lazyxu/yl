@@ -102,7 +102,7 @@ function ensureThumbnail(filename) {
     const type = await sniff(original)
     const ext = path.extname(filename).toLowerCase()
     const expected = type?.ext === '.jpg' ? ['.jpg', '.jpeg'] : [type?.ext]
-    if (!type || !expected.includes(ext) || type.mime === 'image/gif') {
+    if (!type || !expected.includes(ext)) {
       throw badImage('不支持此历史图片的缩略图')
     }
     try {
