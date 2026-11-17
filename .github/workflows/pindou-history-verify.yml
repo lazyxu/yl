@@ -55,7 +55,8 @@ jobs:
       - run: node --test test/upload.integration.cjs test/pindou-stock.integration.cjs
 
   browser-e2e:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 does not yet support the ubuntu-latest 26.04 image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     services:
       mysql:
