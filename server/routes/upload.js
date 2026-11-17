@@ -202,6 +202,13 @@ router.get('/:filename/thumb', async (req, res) => {
     res.setHeader('Cache-Control', 'private, max-age=3600')
     res.setHeader('Content-Disposition', 'inline')
     res.type('webp')
+    const stat = await fs.promises.stat(filename)
+    const etag = '"' + stat.size.toString(16) + '-' + Math.floor(stat.mtimeMs).toString(16) + '"'
+    res.setHeader('ETag', etag)
+    if (String(req.headers['if-none-match'] || '').split(',').some(value =>
+      value.trim() === etag || value.trim() === 'W/' + etag)) {
+      return res.status(304).end()
+    }
     res.sendFile(filename)
   } catch (error) {
     const status = error.code === 'ENOENT' ? 404 : (error.status || 500)
