@@ -76,9 +76,13 @@ test('pindou uploads reject active content, normalize raster files, and keep leg
     // extension matches verified bytes. Never serve uploaded markup as HTML.
     fs.writeFileSync(path.join(directory, '1700000-abc.png'), png)
     assert.equal((await fetch(endpoint + '/1700000-abc.png')).status, 200)
-    const legacyThumbnail = await fetch(endpoint + '/1700000-abc.png/thumb')
-    assert.equal(legacyThumbnail.status, 200, 'legacy images are converted on demand')
-    assert.equal((await sharp(Buffer.from(await legacyThumbnail.arrayBuffer())).metadata()).format, 'webp')
+    const legacyRequests = await Promise.all(Array.from({ length: 24 }, () =>
+      fetch(endpoint + '/1700000-abc.png/thumb')))
+    assert.ok(legacyRequests.every(response => response.status === 200),
+      'simultaneous legacy requests coalesce and do not overflow the thumbnail queue')
+    assert.equal((await sharp(Buffer.from(await legacyRequests[0].arrayBuffer())).metadata()).format, 'webp')
+    assert.equal(fs.readdirSync(path.join(directory, '.thumbs')).filter(name =>
+      name === '1700000-abc.png.webp').length, 1, 'one derivative per legacy original')
     fs.writeFileSync(path.join(directory, '1700000-evil.jpg'), Buffer.from('<script>alert(1)</script>'))
     assert.equal((await fetch(endpoint + '/1700000-evil.jpg')).status, 415)
     assert.equal((await fetch(endpoint + '/1700000-evil.jpg/thumb')).status, 415)
