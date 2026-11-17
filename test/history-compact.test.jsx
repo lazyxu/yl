@@ -116,3 +116,24 @@ test('summary failure never silently substitutes the newest 200 rows for all-his
   expect(host.querySelector('.pindou-history-totals')).toBeNull()
   expect(host.textContent).toContain('历史累计统计暂不可用')
 })
+
+
+test('failed revalidation hides previously successful totals rather than displaying outdated numbers', async () => {
+  let summaryRequests = 0
+  global.fetch = jest.fn(async url => {
+    if (url === '/api/reminders') return response(historyRows)
+    if (url === '/api/reminders/summary') {
+      summaryRequests += 1
+      return summaryRequests === 1 ? response({ added: 1250, consumed: 820 }) :
+        response({ error: 'transient failure' }, false)
+    }
+    throw new Error('unexpected request: ' + url)
+  })
+  await mount()
+  expect(host.querySelector('.pindou-history-totals').textContent).toContain('1,250')
+  await act(async () => root.render(<History refreshKey={1} />))
+  expect(summaryRequests).toBe(2)
+  expect(host.querySelector('.pindou-history-totals')).toBeNull()
+  expect(host.textContent).toContain('历史累计统计暂不可用')
+  expect(host.querySelectorAll('.pindou-history-card')).toHaveLength(2)
+})
