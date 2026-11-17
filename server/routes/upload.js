@@ -165,7 +165,8 @@ async function storeImage(input) {
     }
     return name
   } catch (error) {
-    if (error.status === 415) throw error
+    // Resource saturation is temporary; never report it as a bad image.
+    if (error.status === 503 || error.status === 415) throw error
     throw badImage('图片解码或安全转换失败，请换用 JPEG、PNG 或 WEBP')
   } finally {
     await remove(staged)
