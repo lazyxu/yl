@@ -30,6 +30,7 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
   const submitting = useRef(false)
   const [imgPreview, setImgPreview] = useState(null)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [viewerSrc, setViewerSrc] = useState(null)
   const [formMessage, setFormMessage] = useState('')
   const filePicker = useRef(null)
   const [serverReachable, setServerReachable] = useState(() => navigator.onLine ? null : false)
@@ -156,18 +157,67 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
   
 
   // 选择文件时：本地预览并上传到后端（FormData）
-  async function handleFileChange(file){
+  function handleFileChange(file){
     if (!file) return
+    setPreviewOpen(false)
     setImgFile(file)
   }
 
-  // File stays in the draft; each mounted form owns only its preview URL.
+  // The form displays a real, bounded thumbnail rather than decoding an
+  // original blob as a small <img>. Keep the original URL only while the
+  // explicit full-image dialog is open, and release both URLs on cleanup.
   useEffect(() => {
-    if (!imgFile) { setImgPreview(null); return }
-    const url = URL.createObjectURL(imgFile)
-    setImgPreview(url)
-    return () => URL.revokeObjectURL(url)
+    setImgPreview(null)
+    if (!imgFile) return
+    let cancelled = false
+    let thumbnailUrl = null
+    const originalUrl = URL.createObjectURL(imgFile)
+    let releasedOriginal = false
+    const releaseOriginal = () => {
+      if (releasedOriginal) return
+      releasedOriginal = true
+      URL.revokeObjectURL(originalUrl)
+    }
+    const image = new Image()
+    image.onload = () => {
+      try {
+        const width = image.naturalWidth || image.width
+        const height = image.naturalHeight || image.height
+        if (!width || !height) { releaseOriginal(); return }
+        const scale = Math.min(1, 192 / Math.max(width, height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(width * scale))
+        canvas.height = Math.max(1, Math.round(height * scale))
+        const context = canvas.getContext('2d')
+        if (!context || typeof canvas.toBlob !== 'function') { releaseOriginal(); return }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height)
+        canvas.toBlob(blob => {
+          releaseOriginal()
+          if (cancelled || !blob) return
+          thumbnailUrl = URL.createObjectURL(blob)
+          setImgPreview(thumbnailUrl)
+        }, 'image/webp', 0.76)
+      } catch {
+        releaseOriginal()
+      }
+    }
+    image.onerror = releaseOriginal
+    image.src = originalUrl
+    return () => {
+      cancelled = true
+      image.onload = null
+      image.onerror = null
+      releaseOriginal()
+      if (thumbnailUrl) URL.revokeObjectURL(thumbnailUrl)
+    }
   }, [imgFile])
+
+  useEffect(() => {
+    if (!previewOpen || !imgFile) { setViewerSrc(null); return }
+    const url = URL.createObjectURL(imgFile)
+    setViewerSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [previewOpen, imgFile])
 
   return (
     <>
@@ -206,10 +256,12 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
           {imgFile && <Typography variant="caption" className="pindou-file-name">
             图片：{imgFile.name}
           </Typography>}
-          {imgPreview && <img className="pindou-draft-photo"
-            src={imgPreview} alt="preview" />}
-          <Button size="small" variant="outlined" disabled={!imgPreview}
-            onClick={() => setPreviewOpen(true)}>预览</Button>
+          {imgFile && <button type="button" className="pindou-draft-photo-button"
+            aria-label="查看图片" disabled={loading} onClick={() => setPreviewOpen(true)}>
+            {imgPreview ? <img className="pindou-draft-photo"
+              src={imgPreview} alt="preview" /> :
+              <span className="pindou-draft-thumbnail-fallback">缩略图生成中或不可用，点击查看</span>}
+          </button>}
         </Box>
 
         <Box className="pindou-form-field">
@@ -234,12 +286,13 @@ export default function PindouConsume({ initialOperation = '消耗', draft, load
         </Box>
       </Box>
 
-      <Dialog open={previewOpen && !!imgPreview} onClose={() => setPreviewOpen(false)}
+      <Dialog open={previewOpen && !!imgFile} onClose={() => setPreviewOpen(false)}
         fullWidth maxWidth="sm" aria-labelledby="pindou-preview-title"
         PaperProps={{ className: 'pindou-image-preview', sx: { m: 1, maxWidth: 'calc(100% - 16px)' } }}>
         <DialogTitle id="pindou-preview-title">图片预览</DialogTitle>
         <DialogContent>
-          {imgPreview && <img src={imgPreview} alt={imgFile?.name || '本次记录图片'} />}
+          {viewerSrc ? <img src={viewerSrc} alt={imgFile?.name || '本次记录图片'} /> :
+            <Typography variant="body2">正在打开图片…</Typography>}
           <Button fullWidth sx={{ mt: 2 }} onClick={() => setPreviewOpen(false)}>关闭</Button>
         </DialogContent>
       </Dialog>
