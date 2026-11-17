@@ -48,29 +48,68 @@
 .pindou-page .pindou-inventory-sections .MuiFormGroup-root {
   padding-block: 6px;
 }
-.pindou-history-list { min-width: 0; }
-.pindou-history-card {
+.pindou-history-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pindou-history-totals {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px; margin-bottom: 12px;
+}
+.pindou-history-total {
   min-width: 0; padding: 12px;
+  border: 1px solid var(--pindou-line); border-radius: 14px;
+  background: var(--pindou-surface);
+}
+.pindou-history-total .MuiTypography-caption { color: var(--pindou-muted); }
+.pindou-history-total-number {
+  margin-top: 5px !important; font-size: clamp(18px, 4vw, 25px) !important;
+  font-weight: 750 !important; line-height: 1.3 !important;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.pindou-history-total-number small { font-size: 12px; font-weight: 500; }
+.pindou-history-card {
+  min-width: 0; padding: 10px;
   background: var(--pindou-surface); border: 1px solid var(--pindou-line);
-  border-radius: 16px;
-  box-shadow: 0 1px 3px rgb(30 50 70 / 4%);
+  border-radius: 16px; box-shadow: 0 1px 3px rgb(30 50 70 / 4%);
 }
-.pindou-history-head, .pindou-history-meta, .pindou-history-actions {
-  display: flex; align-items: center; gap: 8px; min-width: 0;
+.pindou-history-head {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center; gap: 10px; min-width: 0;
 }
-.pindou-history-head { justify-content: space-between; flex-wrap: wrap; }
-.pindou-history-meta { flex: 1 1 135px; flex-wrap: wrap; }
+.pindou-history-thumbnail, .pindou-history-image-empty {
+  display: flex; justify-content: center; align-items: center; overflow: hidden;
+  width: 56px; height: 56px; padding: 0; border: 1px solid var(--pindou-line);
+  border-radius: 9px; background: #f3f6fa;
+}
+.pindou-history-thumbnail { cursor: pointer; }
+.pindou-history-thumbnail:focus-visible, .pindou-draft-photo-button:focus-visible {
+  outline: 3px solid #1976d2; outline-offset: 2px;
+}
+.pindou-history-thumbnail img {
+  display: block; width: 100%; height: 100%; object-fit: cover;
+}
+.pindou-page .pindou-history-toggle {
+  justify-content: space-between; gap: 8px; width: 100%; min-width: 0;
+  padding: 4px; text-align: left; text-transform: none; color: inherit;
+}
+.pindou-history-meta {
+  display: flex; flex: 1; flex-direction: column; align-items: flex-start;
+  min-width: 0; gap: 3px;
+}
 .pindou-history-meta .MuiTypography-root { overflow-wrap: anywhere; }
-.pindou-history-actions { flex: 0 0 auto; margin-left: auto; }
-.pindou-history-media {
-  display: flex; align-items: flex-start; gap: 10px; min-width: 0;
-  margin: 10px 0 4px; padding-block: 4px;
+.pindou-history-meta .MuiTypography-caption { color: var(--pindou-muted); }
+.pindou-history-quantity { font-weight: 750; font-size: 15px; }
+.pindou-history-arrow { flex-shrink: 0; transition: transform 160ms ease; }
+.pindou-history-arrow.is-expanded { transform: rotate(180deg); }
+.pindou-history-details {
+  min-width: 0; margin-top: 10px; padding: 10px 3px 2px;
+  border-top: 1px solid var(--pindou-line);
 }
-.pindou-history-media img {
-  display: block; width: 56px; height: 56px; flex: none;
-  object-fit: cover; border: 1px solid var(--pindou-line); border-radius: 9px;
+.pindou-history-actions {
+  display: flex; gap: 8px; justify-content: flex-end; min-width: 0;
+  margin-bottom: 8px;
 }
-.pindou-history-note { min-width: 0; flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pindou-history-note {
+  white-space: pre-wrap; overflow-wrap: anywhere; padding: 2px 0 8px;
+}
 .pindou-history-editor {
   padding: 12px; margin: 10px 0; border: 1px solid var(--pindou-line);
   background: #f8fafc; border-radius: 13px; min-width: 0;
@@ -106,6 +145,17 @@
   display: flex; align-items: center; min-width: 0; gap: 10px; flex-wrap: wrap;
 }
 .pindou-file-name { flex: 1 1 130px; min-width: 0; overflow-wrap: anywhere; }
+.pindou-draft-photo-button {
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  max-width: min(100%, 180px); min-width: 96px; min-height: 56px;
+  border: 1px solid var(--pindou-line); border-radius: 11px;
+  background: #f3f6fa; cursor: pointer; overflow: hidden;
+}
+.pindou-draft-photo-button:disabled { opacity: 0.6; }
+.pindou-draft-thumbnail-fallback {
+  max-width: 180px; padding: 8px; font-size: 12px; line-height: 1.4;
+  color: var(--pindou-muted); overflow-wrap: anywhere;
+}
 .pindou-draft-photo { display: block; max-width: min(100%, 180px); max-height: 120px;
   width: auto; height: auto; border-radius: 11px; border: 1px solid var(--pindou-line);
 }
