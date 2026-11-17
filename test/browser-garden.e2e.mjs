@@ -306,11 +306,24 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     // An actual MySQL-backed long-note record stresses History's narrow
     // header, edit grid and destructive-action confirmation.
     const pindouNote = '窄屏记录-' + tag + '-' + '这是很长的备注文字'.repeat(18)
+    const uploaded = await page.request.post(url + '/api/upload', { multipart: {
+      image: { name: 'history.png', mimeType: 'image/png', buffer: photo },
+    } })
+    check(uploaded.ok(), tag + ': setup history photo via secured upload')
+    const uploadedName = (await uploaded.json()).filename
     const created = await page.request.post(url + '/api/reminders', { data: {
       operation: '补豆', occurred_at: new Date().toISOString(),
-      items: [{ color: 'A1', count: 1 }], note: pindouNote,
+      items: [{ color: 'A1', count: 1 }], note: pindouNote, image_path: uploadedName,
     } })
     check(created.ok(), tag + ': setup history record via transactional API')
+    const createdId = (await created.json()).id
+    const originalImagePath = '/api/upload/' + uploadedName
+    const originalImageRequests = []
+    page.on('request', request => {
+      if (new URL(request.url()).pathname === originalImagePath) {
+        originalImageRequests.push(request.url())
+      }
+    })
 
     await page.getByRole('button', { name: '历史', exact: true }).click()
     const historyTitle = page.locator('.app-header .app-title')
@@ -319,8 +332,36 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
       await page.getByText('补豆 / 消耗 历史', { exact: true }).count() === 0 &&
       await page.locator('section[data-view="历史"] button').filter({ hasText: '返回' }).count() === 0,
       tag + ': history has one title and one global back action')
-    const historyRow = page.locator('.pindou-history-card').filter({ hasText: pindouNote })
+    const historyRow = page.locator('.pindou-history-card')
+      .filter({ has: page.locator('button[aria-controls="pindou-history-details-' + createdId + '"]') })
     await historyRow.waitFor()
+    check(await historyRow.getByText(pindouNote).count() === 0,
+      tag + ': compact row hides long notes and edit/delete controls')
+    const compactImage = historyRow.locator('img[alt="历史记录缩略图"]')
+    const thumbnailPath = await compactImage.getAttribute('src')
+    check(thumbnailPath === '/api/upload/' + uploadedName + '/thumb',
+      tag + ': history list loads only the WebP derivative')
+    await compactImage.evaluate(async image => { if (image.decode) await image.decode() })
+    check(originalImageRequests.length === 0,
+      tag + ': history list must not request the full-size original before click')
+    const derivative = await page.request.get(url + thumbnailPath)
+    check(derivative.ok() && derivative.headers()['content-type'].startsWith('image/webp'),
+      tag + ': thumbnail route returns WebP')
+    await auditPindouLayout(page, tag, 'history-compact')
+    const originalResponse = page.waitForResponse(response =>
+      new URL(response.url()).pathname === originalImagePath && response.ok())
+    await historyRow.getByRole('button', { name: '查看记录图片' }).click()
+    await originalResponse
+    check(originalImageRequests.length === 1,
+      tag + ': clicking the photo requests the original exactly once')
+    const imageDialog = page.locator('[role="dialog"][aria-labelledby="pindou-history-image-title"]')
+    await imageDialog.locator('img[alt="历史记录原图"]').waitFor()
+    check(await imageDialog.locator('img[alt="历史记录原图"]').getAttribute('src') ===
+      '/api/upload/' + uploadedName, tag + ': original requested only in separate viewer')
+    await imageDialog.getByRole('button', { name: '关闭' }).click()
+    await imageDialog.waitFor({ state: 'detached' })
+    await historyRow.getByRole('button', { name: /展开记录/ }).click()
+    await historyRow.getByText(pindouNote).waitFor()
     await auditPindouLayout(page, tag, 'history-long-note')
     await historyRow.getByRole('button', { name: '编辑记录' }).click()
     await historyRow.locator('.pindou-history-editor').waitFor()
@@ -345,8 +386,18 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
       mimeType: 'image/png', buffer: photo,
     })
     await page.locator('section[data-view="补豆"]').getByText('图片：', { exact: false }).waitFor()
+    const draftThumbnail = page.locator('section[data-view="补豆"] img.pindou-draft-photo')
+    await draftThumbnail.waitFor({ timeout: 10000 })
+    const thumbDimensions = await draftThumbnail.evaluate(async image => {
+      if (image.decode) await image.decode()
+      return { width: image.naturalWidth, height: image.naturalHeight, src: image.getAttribute('src') }
+    })
+    check(thumbDimensions.width > 0 && thumbDimensions.width <= 192 &&
+      thumbDimensions.height > 0 && thumbDimensions.height <= 192 &&
+      thumbDimensions.src?.startsWith('blob:'),
+      tag + ': add form shows a real bounded local thumbnail')
     await auditPindouLayout(page, tag, 'add-photo-draft')
-    await page.locator('section[data-view="补豆"]').getByRole('button', { name: '预览' }).click()
+    await page.locator('section[data-view="补豆"]').getByRole('button', { name: '查看图片' }).click()
     const pindouPreview = page.locator('[role="dialog"][aria-labelledby="pindou-preview-title"]')
     await pindouPreview.waitFor()
     await auditPindouLayout(page, tag, 'image-preview')
@@ -355,6 +406,14 @@ async function runBrowser(engine, viewport, colorScheme = 'light') {
     await page.getByText('库存总览').waitFor()
 
     await page.getByRole('button', { name: '消耗', exact: true }).click()
+    await page.locator('section[data-view="消耗"] input[type="file"]').setInputFiles({
+      name: 'consume-photo.png', mimeType: 'image/png', buffer: photo,
+    })
+    const consumeThumbnail = page.locator('section[data-view="消耗"] img.pindou-draft-photo')
+    await consumeThumbnail.waitFor({ timeout: 10000 })
+    check(await consumeThumbnail.evaluate(image => image.naturalWidth > 0 &&
+      image.naturalWidth <= 192 && image.naturalHeight > 0 && image.naturalHeight <= 192),
+      tag + ': consume form also shows generated thumbnail')
     await auditPindouLayout(page, tag, 'consume-form')
     await page.locator('section[data-view="消耗"]').getByRole('button', { name: '取消' }).click()
     await page.getByText('库存总览').waitFor()

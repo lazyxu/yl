@@ -52,6 +52,18 @@ test('pindou materialized inventory seeds old rows and stays transactional acros
       assert.equal(out.code, 200)
       return new Map(out.data.map(item => [item.color, item.count]))
     }
+    // The history list remains capped at 200, but the totals include all 507
+    // seeded ledger rows and sum item quantities (not row counts).
+    const summary = async () => {
+      const response = await send('/reminders/summary')
+      assert.equal(response.code, 200, JSON.stringify(response.data))
+      return response.data
+    }
+    assert.deepEqual(await summary(), { added: 655, consumed: 30 })
+    const recent = await send('/reminders')
+    assert.equal(recent.code, 200)
+    assert.equal(recent.data.length, 200)
+
     let quantities = await stock()
     assert.equal(quantities.get('A1'), 70)
     assert.equal(quantities.get('A2'), 50)
@@ -70,6 +82,7 @@ test('pindou materialized inventory seeds old rows and stays transactional acros
       occurred_at: when.toISOString(), note: 'new', image_path: null,
     }))
     assert.equal(first.code, 201, JSON.stringify(first.data))
+    assert.deepEqual(await summary(), { added: 685, consumed: 30 })
     quantities = await stock()
     assert.equal(quantities.get('A1'), 90)
     assert.equal(quantities.get('A3'), 10)
@@ -79,11 +92,13 @@ test('pindou materialized inventory seeds old rows and stays transactional acros
       occurred_at: when.toISOString(), note: 'edited', image_path: null,
     }, 'PUT'))
     assert.equal(edit.code, 200, JSON.stringify(edit.data))
+    assert.deepEqual(await summary(), { added: 655, consumed: 50 })
     quantities = await stock()
     assert.equal(quantities.get('A1'), 55)
     assert.equal(quantities.get('A2'), 45)
     assert.equal(quantities.get('A3'), 0)
     assert.equal((await send('/reminders/' + first.data.id, { method: 'DELETE' })).code, 200)
+    assert.deepEqual(await summary(), { added: 655, consumed: 30 })
     quantities = await stock()
     assert.equal(quantities.get('A1'), 70)
     assert.equal(quantities.get('A2'), 50)
@@ -94,6 +109,7 @@ test('pindou materialized inventory seeds old rows and stays transactional acros
     assert.ok(concurrent.every(response => response.code === 201),
       'all concurrent ledger and stock writes must commit atomically')
     assert.equal((await stock()).get('A1'), 82)
+    assert.deepEqual(await summary(), { added: 667, consumed: 30 })
     assert.equal((await send('/reminders', json({
       operation: '补豆', items: [{ color: 'A1', count: 1.5 }], occurred_at: when.toISOString(),
     }))).code, 400)
